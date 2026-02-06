@@ -35,7 +35,7 @@ dnf5 -y copr disable sdegler/hyprland
 ### Install essential session/system packages (only what's missing from Bazzite)
 dnf5 install -y \
   xdg-desktop-portal-gnome \
-  polkit-gnome-devel \
+  lxqt-policykit \
   systemd-devel
 
 ### Install keyring and authentication packages
