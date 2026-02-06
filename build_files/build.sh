@@ -107,6 +107,14 @@ dnf5 install -y \
   gcr \
   gcr-devel
 
+### Install disk encryption tools (LUKS)
+dnf5 install -y \
+  cryptsetup \
+  clevis \
+  clevis-luks \
+  clevis-systemd \
+  tpm2-tools
+
 ### Install additional utilities
 dnf5 install -y tmux git chezmoi kitty
 
@@ -118,6 +126,26 @@ dnf5 install -y nix
 dnf5 install -y \
   brightnessctl \
   imv
+
+### Install Cursor Clip dependencies (runtime + build)
+dnf5 install -y \
+  gtk4 \
+  libadwaita \
+  gtk4-layer-shell \
+  gtk4-devel \
+  libadwaita-devel \
+  gtk4-layer-shell-devel \
+  pkgconf-pkg-config \
+  rust \
+  cargo
+
+### Build and install Cursor Clip
+git clone --depth 1 https://github.com/Sirulex/cursor-clip /tmp/cursor-clip
+pushd /tmp/cursor-clip
+cargo build --release
+install -m 0755 target/release/cursor-clip /usr/local/bin/cursor-clip
+popd
+rm -rf /tmp/cursor-clip
 
 ### Install media applications
 dnf5 install -y vlc
@@ -134,6 +162,9 @@ dnf5 install -y \
 dnf5 install -y \
   network-manager-applet \
   pavucontrol
+
+### Install automount utility for removable drives
+dnf5 install -y udiskie
 
 ### Install Zen Browser from sneexy COPR
 dnf5 -y copr enable sneexy/zen-browser
