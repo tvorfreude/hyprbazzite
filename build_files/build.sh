@@ -15,13 +15,22 @@ dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
   kde-workspace kde-plasma-desktop kdebase kde-settings \
   plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
 
-### Setup shell-based Hyprland auto-launch (no display manager)
+### Setup shell-based Hyprland auto-launch with dotfiles provisioning (no display manager)
 mkdir -p /etc/profile.d
 cat > /etc/profile.d/hyprland-autostart.sh << 'PROFILE'
 #!/bin/bash
-# Auto-launch Hyprland on first TTY login
+# Auto-launch Hyprland with dotfiles provisioning on first TTY login
 if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" && "$XDG_VTNR" == "1" ]]; then
-  exec Hyprland
+  # Provision dotfiles on first login if not already done
+  if [[ ! -d "$HOME/.local/share/chezmoi" ]]; then
+    chezmoi init --apply github.com/tristanbollard/dotfiles 2>/dev/null || true
+    # Install Bitwarden Flatpak after dotfiles
+    flatpak install -y flathub com.bitwarden.desktop 2>/dev/null || true
+  fi
+  
+  Hyprland &
+  sleep 5
+  exec hyprlock
 fi
 PROFILE
 chmod +x /etc/profile.d/hyprland-autostart.sh
@@ -75,26 +84,3 @@ cat > /etc/xdg/xdg-desktop-portal/hyprland-portals.conf << 'EOF'
 [preferred]
 default=hyprland
 org.freedesktop.impl.portal.Secret=gnome
-EOF
-
-### Enable necessary services
-systemctl enable podman.socket
-
-### Setup provisioning script and systemd service
-mkdir -p /usr/local/bin
-install -Dm755 /ctx/chezmoi-provision.sh /usr/local/bin/chezmoi-provision
-
-# Create systemd user service directory structure
-mkdir -p /etc/systemd/user
-install -Dm644 /ctx/chezmoi-provision.service /etc/systemd/user/chezmoi-provision.service
-
-### Setup default Hyprland configuration for fallback
-mkdir -p /etc/skel/.config/hypr
-install -Dm644 /ctx/hyprland.conf /etc/skel/.config/hypr/hyprland.conf
-
-# Create placeholder for hyprpaper wallpaper
-mkdir -p /etc/skel/.config/hypr
-echo "preload = /usr/share/pixmaps/backgrounds/hyprland/hyprland.png" > /etc/skel/.config/hypr/hyprpaper.conf
-echo "wallpaper = ,/usr/share/pixmaps/backgrounds/hyprland/hyprland.png" >> /etc/skel/.config/hypr/hyprpaper.conf
-
-echo "✓ Hyprland setup complete. Dotfiles will be provisioned on first login via chezmoi."
