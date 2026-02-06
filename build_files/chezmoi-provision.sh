@@ -28,6 +28,12 @@ chezmoi init --apply "$DOTFILES_REPO"
 echo -e "${GREEN}✓ Dotfiles provisioned successfully!${NC}"
 echo -e "${BLUE}Applying configurations...${NC}"
 
+# Install Bitwarden Flatpak for the user (if not already installed)
+if ! flatpak list --app --columns=application 2>/dev/null | grep -q '^com.bitwarden.desktop$'; then
+    echo -e "${BLUE}Installing Bitwarden (Flatpak)...${NC}"
+    flatpak install -y flathub com.bitwarden.desktop || true
+fi
+
 # Ensure session variables are set for the new user session
 export DISPLAY=:0
 export WAYLAND_DISPLAY=wayland-0

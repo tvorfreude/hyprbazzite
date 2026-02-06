@@ -57,9 +57,8 @@ dnf5 install -y zen-browser
 # Disable COPR so it doesn't end up enabled on the final image
 dnf5 -y copr disable sneexy/zen-browser
 
-### Install Bitwarden desktop client via Flatpak
+### Flatpak setup (Bitwarden will be installed on first login)
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install -y flathub com.bitwarden.desktop
 
 ### Configure Hyprland as default session
 # Create Hyprland session file if it doesn't exist
@@ -76,7 +75,6 @@ EOF
 
 ### Enable necessary services
 systemctl enable podman.socket
-systemctl enable dbus.service
 systemctl enable lightdm.service
 
 ### Setup provisioning script and systemd service
