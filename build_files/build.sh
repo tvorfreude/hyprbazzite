@@ -57,7 +57,7 @@ dnf5 install -y \
   gcr-devel
 
 ### Install additional utilities
-dnf5 install -y tmux git chezmoi
+dnf5 install -y tmux git chezmoi kitty
 
 ### Install Zen Browser from sneexy COPR
 dnf5 -y copr enable sneexy/zen-browser
