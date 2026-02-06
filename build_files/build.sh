@@ -71,15 +71,13 @@ dnf5 install -y \
 ### Install additional utilities
 dnf5 install -y tmux git chezmoi kitty
 
+### Install Nix package manager
+dnf5 install -y nix
+
 ### Install Wayland utilities and system tools
+# Note: wl-clipboard, grim, slurp, playerctl already included in Bazzite base
 dnf5 install -y \
-  wl-clipboard \
-  cliphist \
-  grim \
-  slurp \
   brightnessctl \
-  playerctl \
-  iio-hyprland \
   imv
 
 ### Install file manager and support libraries
