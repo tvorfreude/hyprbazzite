@@ -19,18 +19,20 @@ dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
 mkdir -p /etc/profile.d
 cat > /etc/profile.d/hyprland-autostart.sh << 'PROFILE'
 #!/bin/bash
-# Auto-launch Hyprland with dotfiles provisioning on first TTY login
+# Auto-launch Hyprland with UWSM and dotfiles provisioning on first TTY login
 if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" && "$XDG_VTNR" == "1" ]]; then
-  # Provision dotfiles on first login if not already done
+  # Initialize dotfiles on first login if not already done
   if [[ ! -d "$HOME/.local/share/chezmoi" ]]; then
     chezmoi init --apply github.com/tristanbollard/dotfiles 2>/dev/null || true
-    # Install Bitwarden Flatpak after dotfiles
+    # Install Bitwarden Flatpak after initial dotfiles setup
     flatpak install -y flathub com.bitwarden.desktop 2>/dev/null || true
+  else
+    # Update dotfiles on subsequent logins
+    chezmoi update 2>/dev/null || true
   fi
   
-  Hyprland &
-  sleep 5
-  exec hyprlock
+  # Launch Hyprland with UWSM for proper session management
+  exec uwsm start hyprland
 fi
 PROFILE
 chmod +x /etc/profile.d/hyprland-autostart.sh
@@ -45,6 +47,7 @@ dnf5 install -y \
   waybar \
   dunst \
   wofi \
+  uwsm \
   xdg-desktop-portal-hyprland
 # Disable COPR so it doesn't end up enabled on the final image
 dnf5 -y copr disable sdegler/hyprland
