@@ -1,0 +1,14 @@
+[Unit]
+Description=Provision dotfiles on first login
+After=default.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/chezmoi-provision
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical-session.target
