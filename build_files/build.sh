@@ -13,7 +13,46 @@ set -ouex pipefail
 dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
   gnome-shell-extensions gnome-control-center gnome-terminal nautilus \
   kde-workspace kde-plasma-desktop kdebase kde-settings dolphin \
-  plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
+  plasma-desktop plasma-workspaces sddm kdeconnect kdeconnectd kde-connect \
+  kdebugger kdebugtools kdebug --noautoremove 2>/dev/null || true
+
+### Remove Firefox and redundant Flatpak apps (replaced with Zen Browser and alternatives)
+flatpak uninstall -y \
+  org.mozilla.firefox \
+  org.gnome.Totem \
+  org.gnome.eog \
+  org.gnome.Evince \
+  org.gnome.gedit \
+  org.gnome.Calculator \
+  org.gnome.TextEditor \
+  org.gnome.Maps \
+  org.gnome.Weather \
+  org.gnome.Music \
+  org.gnome.Photos \
+  org.gnome.Cheese \
+  org.kde.okular \
+  org.kde.kate \
+  org.kde.gwenview \
+  org.kde.dolphin \
+  org.kde.ark \
+  org.kde.elisa 2>/dev/null || true
+
+### Remove redundant GNOME/KDE RPM packages (replaced with better alternatives)
+dnf5 remove -y \
+  totem mpv \
+  eog gwenview \
+  evince okular \
+  gedit kate kwrite \
+  gnome-calculator kcalc \
+  gnome-text-editor \
+  konsole \
+  ark file-roller \
+  gnome-music elisa \
+  gnome-photos \
+  cheese \
+  rhythmbox \
+  gnome-maps \
+  gnome-weather --noautoremove 2>/dev/null || true
 
 ### Setup shell-based Hyprland auto-launch with dotfiles provisioning (no display manager)
 mkdir -p /etc/profile.d
@@ -79,6 +118,9 @@ dnf5 install -y nix
 dnf5 install -y \
   brightnessctl \
   imv
+
+### Install media applications
+dnf5 install -y vlc
 
 ### Install file manager and support libraries
 dnf5 install -y \
