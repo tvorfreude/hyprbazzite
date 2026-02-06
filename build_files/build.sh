@@ -32,24 +32,11 @@ dnf5 install -y \
 # Disable COPR so it doesn't end up enabled on the final image
 dnf5 -y copr disable sdegler/hyprland
 
-### Install essential session/system packages
+### Install essential session/system packages (only what's missing from Bazzite)
 dnf5 install -y \
-  xorg-x11-server-Xwayland \
-  xwayland \
-  xdg-user-dirs \
-  xdg-utils \
-  xdg-desktop-portal \
-  xdg-desktop-portal-gtk \
   xdg-desktop-portal-gnome \
-  polkit \
-  polkit-gnome \
-  systemd-devel \
-  dbus \
-  dbus-daemon \
-  dbus-tools \
-  libxkbcommon \
-  libinput \
-  libdrm
+  polkit-gnome-devel \
+  systemd-devel
 
 ### Install keyring and authentication packages
 dnf5 install -y \
