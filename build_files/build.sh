@@ -11,8 +11,8 @@ set -ouex pipefail
 
 ### Remove GNOME and KDE Desktop Environments
 dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
-  gnome-shell-extensions gnome-control-center gnome-terminal \
-  kde-workspace kde-plasma-desktop kdebase kde-settings \
+  gnome-shell-extensions gnome-control-center gnome-terminal nautilus \
+  kde-workspace kde-plasma-desktop kdebase kde-settings dolphin \
   plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
 
 ### Setup shell-based Hyprland auto-launch with dotfiles provisioning (no display manager)
@@ -71,6 +71,30 @@ dnf5 install -y \
 ### Install additional utilities
 dnf5 install -y tmux git chezmoi kitty
 
+### Install Wayland utilities and system tools
+dnf5 install -y \
+  wl-clipboard \
+  cliphist \
+  grim \
+  slurp \
+  brightnessctl \
+  playerctl \
+  iio-hyprland \
+  imv
+
+### Install file manager and support libraries
+dnf5 install -y \
+  thunar \
+  tumbler \
+  gvfs \
+  gvfs-mtp \
+  gvfs-gphoto2
+
+### Install system tray utilities
+dnf5 install -y \
+  network-manager-applet \
+  pavucontrol
+
 ### Install Zen Browser from sneexy COPR
 dnf5 -y copr enable sneexy/zen-browser
 dnf5 install -y zen-browser
@@ -79,6 +103,37 @@ dnf5 -y copr disable sneexy/zen-browser
 
 ### Flatpak setup (Bitwarden will be installed on first login)
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
+### Configure default applications via XDG MIME associations
+mkdir -p /etc/xdg
+cat > /etc/xdg/mimeapps.list << 'MIMEAPPS'
+[Default Applications]
+# Web Browser - Zen Browser
+text/html=zen-browser.desktop
+x-scheme-handler/http=zen-browser.desktop
+x-scheme-handler/https=zen-browser.desktop
+x-scheme-handler/about=zen-browser.desktop
+x-scheme-handler/unknown=zen-browser.desktop
+
+# File Manager - Thunar
+inode/directory=thunar.desktop
+
+# Terminal - Kitty
+x-scheme-handler/terminal=kitty.desktop
+
+# Images - imv
+image/png=imv.desktop
+image/jpeg=imv.desktop
+image/jpg=imv.desktop
+image/gif=imv.desktop
+image/webp=imv.desktop
+image/svg+xml=imv.desktop
+image/bmp=imv.desktop
+
+# Text Files - Kitty with default editor
+text/plain=kitty.desktop
+text/x-readme=kitty.desktop
+MIMEAPPS
 
 ### Configure XDG Desktop Portal for Hyprland
 # Create portal configuration to use Hyprland portal backend
