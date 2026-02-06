@@ -15,8 +15,29 @@ dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
   kde-workspace kde-plasma-desktop kdebase kde-settings \
   plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
 
-### Install LightDM as login manager
-dnf5 install -y lightdm lightdm-gtk-greeter
+### Install greetd as login manager (Wayland-native)
+dnf5 install -y greetd greetd-agreety
+
+### Configure greetd
+mkdir -p /etc/greetd
+cat > /etc/greetd/config.toml << 'EOF'
+[terminal]
+vt = 1
+
+[general]
+sessions_dir = "/usr/share/wayland-sessions:/usr/share/xsessions"
+
+[default_session]
+command = "agreety --cmd Hyprland"
+user = "greeter"
+EOF
+
+### Fix greetd directory permissions
+mkdir -p /var/cache/greetd
+mkdir -p /var/lib/greetd
+chmod 700 /var/cache/greetd
+chown greetd:greetd /var/cache/greetd
+chown -R greetd:greetd /var/lib/greetd
 
 ### Install Hyprland and dependencies from sdegler COPR
 dnf5 -y copr enable sdegler/hyprland
@@ -61,8 +82,24 @@ dnf5 -y copr disable sneexy/zen-browser
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 ### Configure Hyprland as default session
-# Create Hyprland session file if it doesn't exist
+# Hyprland session file is provided by the hyprland package
 mkdir -p /usr/share/wayland-sessions
+
+### Configure LightDM
+mkdir -p /etc/lightdm
+cat > /etc/lightdm/lightdm.conf << 'EOF'
+[General]
+greeter-session=lightdm-gtk-greeter
+user-session=hyprland
+logind-check-graphical=true
+EOF
+
+cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'EOF'
+[greeter]
+theme-name=Adwaita
+icon-theme-name=Adwaita
+font-name=Noto Sans 12
+EOF
 
 ### Configure XDG Desktop Portal for Hyprland
 # Create portal configuration to use Hyprland portal backend
@@ -75,7 +112,7 @@ EOF
 
 ### Enable necessary services
 systemctl enable podman.socket
-systemctl enable lightdm.service
+systemctl enable greetd.service
 
 ### Setup provisioning script and systemd service
 mkdir -p /usr/local/bin
