@@ -22,7 +22,6 @@ dnf5 install -y lightdm lightdm-gtk-greeter
 dnf5 -y copr enable sdegler/hyprland
 dnf5 install -y \
   hyprland \
-  hyprland-devel \
   hyprlock \
   hypridle \
   hyprpaper \
