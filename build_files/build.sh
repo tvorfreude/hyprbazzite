@@ -16,7 +16,7 @@ dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
   plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
 
 ### Install greetd as login manager (Wayland-native)
-dnf5 install -y greetd greetd-agreety
+dnf5 install -y greetd greetd-fakegreet
 
 ### Configure greetd
 mkdir -p /etc/greetd
@@ -28,7 +28,7 @@ vt = 1
 sessions_dir = "/usr/share/wayland-sessions:/usr/share/xsessions"
 
 [default_session]
-command = "agreety --cmd Hyprland"
+command = "fakegreet --cmd Hyprland"
 user = "greeter"
 EOF
 
