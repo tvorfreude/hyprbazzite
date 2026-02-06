@@ -7,7 +7,7 @@ set -ouex pipefail
 # Packages can be installed from any enabled yum repo on the image.
 # RPMfusion repos are available by default in ublue main images
 # List of rpmfusion packages can be found here:
-# https://mirrors.rpmfusion.org/mirrorlist?path=free/fedora/updates/43/x86_64/repoview/index.html&protocol=https&redirect=1
+# https://mirrors.rpmfusion.org/mirrorlist\?path\=free/fedora/updates/43/x86_64/repoview/index.html\&protocol\=https\&redirect\=1
 
 ### Remove GNOME and KDE Desktop Environments
 dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
@@ -15,29 +15,16 @@ dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
   kde-workspace kde-plasma-desktop kdebase kde-settings \
   plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
 
-### Install greetd as login manager (Wayland-native)
-dnf5 install -y greetd greetd-fakegreet
-
-### Configure greetd
-mkdir -p /etc/greetd
-cat > /etc/greetd/config.toml << 'EOF'
-[terminal]
-vt = 1
-
-[general]
-sessions_dir = "/usr/share/wayland-sessions:/usr/share/xsessions"
-
-[default_session]
-command = "fakegreet --cmd Hyprland"
-user = "greeter"
-EOF
-
-### Fix greetd directory permissions
-mkdir -p /var/cache/greetd
-mkdir -p /var/lib/greetd
-chmod 700 /var/cache/greetd
-chown greetd:greetd /var/cache/greetd
-chown -R greetd:greetd /var/lib/greetd
+### Setup shell-based Hyprland auto-launch (no display manager)
+mkdir -p /etc/profile.d
+cat > /etc/profile.d/hyprland-autostart.sh << 'PROFILE'
+#!/bin/bash
+# Auto-launch Hyprland on first TTY login
+if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" && "$XDG_VTNR" == "1" ]]; then
+  exec Hyprland
+fi
+PROFILE
+chmod +x /etc/profile.d/hyprland-autostart.sh
 
 ### Install Hyprland and dependencies from sdegler COPR
 dnf5 -y copr enable sdegler/hyprland
@@ -81,26 +68,6 @@ dnf5 -y copr disable sneexy/zen-browser
 ### Flatpak setup (Bitwarden will be installed on first login)
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-### Configure Hyprland as default session
-# Hyprland session file is provided by the hyprland package
-mkdir -p /usr/share/wayland-sessions
-
-### Configure LightDM
-mkdir -p /etc/lightdm
-cat > /etc/lightdm/lightdm.conf << 'EOF'
-[General]
-greeter-session=lightdm-gtk-greeter
-user-session=hyprland
-logind-check-graphical=true
-EOF
-
-cat > /etc/lightdm/lightdm-gtk-greeter.conf << 'EOF'
-[greeter]
-theme-name=Adwaita
-icon-theme-name=Adwaita
-font-name=Noto Sans 12
-EOF
-
 ### Configure XDG Desktop Portal for Hyprland
 # Create portal configuration to use Hyprland portal backend
 mkdir -p /etc/xdg/xdg-desktop-portal
@@ -112,7 +79,6 @@ EOF
 
 ### Enable necessary services
 systemctl enable podman.socket
-systemctl enable greetd.service
 
 ### Setup provisioning script and systemd service
 mkdir -p /usr/local/bin
@@ -132,9 +98,3 @@ echo "preload = /usr/share/pixmaps/backgrounds/hyprland/hyprland.png" > /etc/ske
 echo "wallpaper = ,/usr/share/pixmaps/backgrounds/hyprland/hyprland.png" >> /etc/skel/.config/hypr/hyprpaper.conf
 
 echo "✓ Hyprland setup complete. Dotfiles will be provisioned on first login via chezmoi."
-#
-# dnf5 -y copr enable ublue-os/staging
-# dnf5 -y install package
-# Disable COPRs so they don't end up enabled on the final image:
-# dnf5 -y copr disable ublue-os/staging
-
