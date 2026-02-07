@@ -30,7 +30,7 @@ dnf5 install -y \
 dnf5 -y copr disable sdegler/hyprland
 
 ### Install and configure LightDM display manager
-dnf5 install -y lightdm lightdm-gtk-greeter
+dnf5 install -y lightdm lightdm-gtk
 
 # Pre-create LightDM data dir with correct owner and SELinux label.
 mkdir -p /var/lib/lightdm-data/lightdm
@@ -43,7 +43,7 @@ cat > /etc/lightdm/lightdm.conf << 'EOF'
 logind-check-graphical=true
 
 [Seat:*]
-greeter-session=lightdm-gtk-greeter
+greeter-session=lightdm-gtk
 user-session=hyprland
 EOF
 
