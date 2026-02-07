@@ -57,7 +57,7 @@ RUN --mount=type=cache,dst=/var/cache \
 # Install and setup LightDM display manager
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
-    dnf5 install -y lightdm lightdm-gtk && \
+    dnf5 install -y lightdm lightdm-slick-greeter && \
     mkdir -p /usr/share/wayland-sessions && \
     printf '[Desktop Entry]\nName=Hyprland\nExec=start-hyprland\nType=Application\n' > /usr/share/wayland-sessions/hyprland.desktop && \
     chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
