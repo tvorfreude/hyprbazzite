@@ -67,9 +67,19 @@ Rectangle {
                     }
                     echoMode: TextInput.Password
                     placeholderText: "Password"
-                    placeholderTextColor: "#6272a4"
                     focus: true
                     onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
+                }
+
+                Text {
+                    text: "Password"
+                    color: "#6272a4"
+                    font.family: "JetBrainsMono Nerd Font"
+                    font.pixelSize: 14
+                    anchors.verticalCenter: parent.children[0].verticalCenter
+                    anchors.left: parent.children[0].left
+                    anchors.leftMargin: 15
+                    visible: parent.children[0].text.length === 0
                 }
 
                 Row {
