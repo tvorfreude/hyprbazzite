@@ -62,11 +62,17 @@ cat > /etc/profile.d/hyprland-autostart.sh << 'PROFILE'
 if [[ -z "$DISPLAY" && -z "$WAYLAND_DISPLAY" && "$XDG_VTNR" == "1" ]]; then
   # Initialize dotfiles on first login if not already done
   if [[ ! -d "$HOME/.local/share/chezmoi" ]]; then
-    chezmoi init --apply github.com/tristanbollard/dotfiles 2>/dev/null || true
-    # Install Bitwarden Flatpak after initial dotfiles setup
-    flatpak install -y flathub com.bitwarden.desktop 2>/dev/null || true
+    echo "[tblue-bazzite] Initializing dotfiles on first login..."
+    if chezmoi init --apply github.com/tristanbollard/dotfiles 2>&1; then
+      echo "[tblue-bazzite] Dotfiles initialized successfully"
+      # Install Bitwarden Flatpak after initial dotfiles setup
+      echo "[tblue-bazzite] Installing Bitwarden..."
+      flatpak install -y --noninteractive flathub com.bitwarden.desktop 2>/dev/null || echo "[tblue-bazzite] Bitwarden install skipped (optional)"
+    else
+      echo "[tblue-bazzite] Warning: Dotfiles init failed, continuing without custom config"
+    fi
   else
-    # Update dotfiles on subsequent logins
+    # Update dotfiles on subsequent logins (silent, non-blocking)
     chezmoi update 2>/dev/null || true
   fi
   
@@ -82,7 +88,6 @@ dnf5 install -y \
   hyprland \
   hyprlock \
   hypridle \
-  hyprpaper \
   waybar \
   dunst \
   wofi \
@@ -115,8 +120,13 @@ dnf5 install -y \
   clevis-systemd \
   tpm2-tools
 
-### Install additional utilities
-dnf5 install -y tmux git chezmoi kitty
+### Install additional utilities and shells
+dnf5 install -y \
+  tmux \
+  git \
+  chezmoi \
+  kitty \
+  zsh
 
 ### Install Nix package manager
 dnf5 install -y nix
@@ -125,7 +135,14 @@ dnf5 install -y nix
 # Note: wl-clipboard, grim, slurp, playerctl already included in Bazzite base
 dnf5 install -y \
   brightnessctl \
-  imv
+  imv \
+  swww \
+  bemoji \
+  fastfetch \
+  btop
+
+### Set zsh as default shell
+chsh -s /bin/zsh root
 
 ### Install Cursor Clip dependencies (runtime + build)
 dnf5 install -y \
@@ -147,8 +164,15 @@ install -m 0755 target/release/cursor-clip /usr/local/bin/cursor-clip
 popd
 rm -rf /tmp/cursor-clip
 
-### Install media applications
-dnf5 install -y vlc
+### Remove build-only dependencies for Cursor Clip
+dnf5 remove -y rust cargo gtk4-devel libadwaita-devel gtk4-layer-shell-devel pkgconf-pkg-config --noautoremove 2>/dev/null || true
+
+### Install media applications and codecs
+dnf5 install -y \
+  vlc \
+  ffmpeg \
+  libavcodec-freeworld \
+  pipewire-pulseaudio
 
 ### Install file manager and support libraries
 dnf5 install -y \
