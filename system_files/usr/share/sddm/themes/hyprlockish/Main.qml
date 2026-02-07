@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Layouts
 import SddmComponents
 
 Rectangle {
@@ -9,14 +8,14 @@ Rectangle {
     width: 1920
     height: 1080
 
-    VerticalLayout {
+    Column {
         anchors.fill: parent
         anchors.margins: 0
         spacing: 0
 
         Item {
-            Layout.fillHeight: true
-            Layout.fillWidth: true
+            width: parent.width
+            height: parent.height - 200
 
             Column {
                 anchors.centerIn: parent
@@ -43,9 +42,8 @@ Rectangle {
         }
 
         Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 200
-            Layout.margins: 40
+            width: parent.width
+            height: 200
 
             Column {
                 anchors.horizontalCenter: parent.horizontalCenter
