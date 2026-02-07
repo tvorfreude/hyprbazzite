@@ -66,7 +66,6 @@ Rectangle {
                         radius: 4
                     }
                     echoMode: TextInput.Password
-                    placeholderText: "Password"
                     focus: true
                     onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
                 }
