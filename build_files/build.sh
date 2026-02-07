@@ -73,7 +73,6 @@ dnf5 install -y tmux git chezmoi kitty
 ### Install Wayland utilities and system tools
 dnf5 install -y \
   wl-clipboard \
-  cliphist \
   grim \
   slurp \
   brightnessctl \
