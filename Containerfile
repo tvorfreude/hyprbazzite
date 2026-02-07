@@ -55,6 +55,12 @@ RUN --mount=type=cache,dst=/var/cache \
     xdg-desktop-portal-hyprland && \
     dnf5 -y copr disable sdegler/hyprland
 
+# Set zsh as default shell
+RUN dnf5 install -y zsh && \
+    usermod -s /bin/zsh root && \
+    mkdir -p /etc/default && \
+    echo 'SHELL=/bin/zsh' >> /etc/default/useradd
+
 # Install and setup SDDM display manager
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
@@ -94,7 +100,8 @@ RUN --mount=type=cache,dst=/var/cache \
     slurp \
     brightnessctl \
     playerctl \
-    imv
+    imv \
+    fastfetch
 
 # Install zen-browser as Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
@@ -112,24 +119,7 @@ RUN --mount=type=cache,dst=/var/cache \
     network-manager-applet \
     pavucontrol
 
-# Install Zen Browser from sneexy COPR
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    dnf5 -y copr enable sneexy/zen-browser && \
-    dnf5 install -y zen-browser && \
-    dnf5 -y copr disable sneexy/zen-browser
 
-# Setup Flatpak with flathub remote and retry logic
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    if ! flatpak remote-list --system --columns=name 2>/dev/null | grep -qx flathub; then \
-    for attempt in 1 2 3; do \
-    if flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null; then \
-    break; \
-    fi; \
-    sleep 2; \
-    done; \
-    fi
 
 # Cleanup runtime artifacts from /var that shouldn't persist in image
 RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/lib/yum /var/opt
