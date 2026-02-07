@@ -107,7 +107,6 @@ cat > /etc/xdg/hypr/hyprland.conf << 'HYPRCONF'
 monitor=,preferred,auto,auto
 
 # Execute your favorite apps at launch
-exec-once = swww init
 exec-once = waybar
 exec-once = dunst
 exec-once = cursor-clip --daemon
@@ -198,7 +197,6 @@ bind = $mainMod, P, pseudo,
 bind = $mainMod, J, togglesplit,
 
 # System utilities
-bind = $mainMod SHIFT, E, exec, bemoji --clipboard
 bind = $mainMod SHIFT, I, exec, fastfetch
 bind = $mainMod SHIFT, M, exec, kitty --class btop -e btop
 bind = $mainMod SHIFT, S, exec, grim -g "$(slurp)" - | wl-copy
@@ -279,14 +277,10 @@ dnf5 install -y \
 dnf5 install -y nix
 
 ### Install Wayland utilities and system tools
-# Note: wl-clipboard, grim, slurp, playerctl already included in Bazzite base
+# Note: wl-clipboard, grim, slurp, playerctl, fastfetch, btop already included in Bazzite base
 dnf5 install -y \
   brightnessctl \
-  imv \
-  swww \
-  bemoji \
-  fastfetch \
-  btop
+  imv
 
 ### Set zsh as default shell
 chsh -s /bin/zsh root
