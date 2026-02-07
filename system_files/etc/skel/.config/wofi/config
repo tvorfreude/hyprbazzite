@@ -1,0 +1,15 @@
+width=35%
+height=40%
+show=drun
+prompt=apps
+term=kitty
+allow_images=true
+allow_markup=true
+image_size=28
+insensitive=true
+hide_scroll=true
+matching=fuzzy
+show_all=false
+no_actions=true
+layer=overlay
+style=~/.config/wofi/style.css
