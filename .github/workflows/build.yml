@@ -26,8 +26,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  check_base_image:
+    name: Check for base image updates
+    runs-on: ubuntu-24.04
+    outputs:
+      base-updated: ${{ steps.check.outputs.updated }}
+    steps:
+      - name: Check bazzite:stable for updates
+        id: check
+        run: |
+          # Get digest of base image
+          BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
+          echo "Base image digest: $BASE_DIGEST"
+          
+          # Try to get current image's base digest if it exists
+          if skopeo inspect docker://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest 2>/dev/null | jq -e '.Labels."org.opencontainers.image.base.digest"' > /dev/null; then
+            CURRENT_BASE=$(skopeo inspect docker://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest | jq -r '.Labels."org.opencontainers.image.base.digest"')
+            echo "Current base digest: $CURRENT_BASE"
+            
+            if [ "$BASE_DIGEST" != "$CURRENT_BASE" ]; then
+              echo "Base image has been updated!"
+              echo "updated=true" >> $GITHUB_OUTPUT
+            else
+              echo "Base image unchanged"
+              echo "updated=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Image doesn't exist yet or no base digest label"
+            echo "updated=true" >> $GITHUB_OUTPUT
+          fi
+
   build_push:
     name: Build and push image
+    needs: check_base_image
+    # Build if: manual trigger, push event, or base image updated
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.check_base_image.outputs.base-updated == 'true'
     runs-on: ubuntu-24.04
 
     permissions:
@@ -61,6 +94,13 @@ jobs:
 
       # Image metadata for https://artifacthub.io/ - This is optional but is highly recommended so we all can get a index of all the custom images
       # The metadata by itself is not going to do anything, you choose if you want your image to be on ArtifactHub or not.
+      - name: Get base image digest
+        id: base_digest
+        run: |
+          BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
+          echo "digest=${BASE_DIGEST}" >> $GITHUB_OUTPUT
+          echo "Base image digest: ${BASE_DIGEST}"
+
       - name: Image Metadata
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
         id: metadata
@@ -83,6 +123,8 @@ jobs:
             org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
             org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
+            org.opencontainers.image.base.name=ghcr.io/ublue-os/bazzite:stable
+            org.opencontainers.image.base.digest=${{ steps.base_digest.outputs.digest }}
             io.artifacthub.package.deprecated=false
             io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}
             io.artifacthub.package.license=Apache-2.0
