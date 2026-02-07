@@ -87,7 +87,8 @@ RUN --mount=type=cache,dst=/var/cache \
     libsecret \
     libsecret-devel \
     gcr \
-    gcr-devel
+    gcr-devel \
+    qt5ct
 
 # Install fonts including Nerd Fonts
 RUN --mount=type=cache,dst=/var/cache \
@@ -121,7 +122,8 @@ RUN --mount=type=cache,dst=/var/cache \
 
 # Install zen-browser as Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
-    flatpak install -y flathub io.github.zen_browser.zen
+    flatpak install -y flathub io.github.zen_browser.zen && \
+    flatpak override --user --env=GTK_THEME=Adwaita:dark io.github.zen_browser.zen
 
 # Install file manager, thunar, and media support
 RUN --mount=type=cache,dst=/var/cache \
@@ -135,7 +137,8 @@ RUN --mount=type=cache,dst=/var/cache \
     network-manager-applet \
     pavucontrol
 
-
+# Compile dconf database for dark mode defaults
+RUN dconf update
 
 # Cleanup runtime artifacts from /var that shouldn't persist in image
 RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/lib/yum /var/opt

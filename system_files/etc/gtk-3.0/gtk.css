@@ -1,0 +1,207 @@
+/* Dracula GTK+ Theme Override */
+
+/* Main colors */
+@define-color bg_color #282a36;
+@define-color fg_color #f8f8f2;
+@define-color base_color #282a36;
+@define-color text_color #f8f8f2;
+@define-color selected_bg_color #bd93f9;
+@define-color selected_fg_color #f8f8f2;
+@define-color tooltip_bg_color #44475a;
+@define-color tooltip_fg_color #f8f8f2;
+@define-color link_color #8be9fd;
+@define-color visited_link_color #bd93f9;
+@define-color accent_color #bd93f9;
+@define-color accent_fg_color #282a36;
+@define-color borders #44475a;
+@define-color warning_color #ffb86c;
+@define-color error_color #ff5555;
+@define-color success_color #50fa7b;
+
+/* Apply to all windows */
+window {
+  background-color: @bg_color;
+  color: @fg_color;
+}
+
+/* Buttons */
+button {
+  background-color: #44475a;
+  color: @fg_color;
+  border-color: @borders;
+}
+
+button:hover {
+  background-color: #6272a4;
+}
+
+button:active,
+button:checked {
+  background-color: @accent_color;
+  color: @accent_fg_color;
+}
+
+/* Text entries */
+entry {
+  background-color: #44475a;
+  color: @fg_color;
+  border-color: @borders;
+  caret-color: @accent_color;
+}
+
+entry:focus {
+  border-color: @accent_color;
+  box-shadow: inset 0 0 0 1px @accent_color;
+}
+
+/* Selections */
+selection {
+  background-color: @accent_color;
+  color: @accent_fg_color;
+}
+
+/* Links */
+@define-color link_color #8be9fd;
+
+/* Scrollbars */
+scrollbar slide {
+  background-color: #44475a;
+}
+
+scrollbar slider:hover {
+  background-color: #6272a4;
+}
+
+/* Menubars and menus */
+menubar {
+  background-color: #44475a;
+  color: @fg_color;
+}
+
+menu,
+.context-menu {
+  background-color: #44475a;
+  color: @fg_color;
+  border-color: @borders;
+}
+
+menuitem:hover {
+  background-color: @accent_color;
+  color: @accent_fg_color;
+}
+
+/* Dialogs */
+dialog {
+  background-color: @bg_color;
+  color: @fg_color;
+}
+
+/* File chooser */
+.file-chooser {
+  background-color: @bg_color;
+  color: @fg_color;
+}
+
+.file-chooser button {
+  background-color: #44475a;
+}
+
+/* Tooltips */
+tooltip {
+  background-color: @tooltip_bg_color;
+  color: @tooltip_fg_color;
+  border: 1px solid @borders;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+/* Headers */
+headerbar {
+  background-color: #44475a;
+  color: @fg_color;
+  border-bottom: 1px solid @borders;
+}
+
+/* Notebooks/tabs */
+notebook {
+  background-color: @bg_color;
+  color: @fg_color;
+}
+
+notebook tab {
+  background-color: #44475a;
+  color: @fg_color;
+}
+
+notebook tab:active {
+  background-color: @accent_color;
+  color: @accent_fg_color;
+}
+
+/* Scrolled windows */
+scrolledwindow {
+  background-color: @bg_color;
+  color: @fg_color;
+}
+
+/* Tree views and lists */
+treeview,
+iconview {
+  background-color: #44475a;
+  color: @fg_color;
+}
+
+treeview:selected,
+iconview:selected {
+  background-color: @accent_color;
+  color: @accent_fg_color;
+}
+
+/* Separators */
+separator {
+  color: @borders;
+}
+
+/* Switch */
+switch {
+  background-color: #44475a;
+}
+
+switch:checked {
+  background-color: @accent_color;
+}
+
+/* Spinners and scales */
+scale slider,
+spinbutton {
+  background-color: #44475a;
+}
+
+scale slider:hover {
+  background-color: #6272a4;
+}
+
+scale slider:active {
+  background-color: @accent_color;
+}
+
+/* Info/error/warning bars */
+.info {
+  background-color: #8be9fd;
+  color: #282a36;
+}
+
+.warning {
+  background-color: @warning_color;
+  color: #282a36;
+}
+
+.error {
+  background-color: @error_color;
+  color: @fg_color;
+}
+
+.success {
+  background-color: @success_color;
+  color: #282a36;
+}
