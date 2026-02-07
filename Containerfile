@@ -125,6 +125,9 @@ RUN --mount=type=cache,dst=/var/cache \
     done; \
     fi
 
+# Cleanup runtime artifacts from /var that shouldn't persist in image
+RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/lib/yum /var/opt
+
 ### LINTING
 ## Verify final image and contents are correct.
 RUN bootc container lint
