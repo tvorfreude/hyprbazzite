@@ -1,0 +1,16 @@
+//* ---- 💫 https://github.com/JaKooLit 💫 ---- *//
+/* Waybar Modules Extras */
+
+/* This is where you can add Extra Modules you wish. copy.sh will try to restore*/
+/* this file along with the unique configs and styles. */
+/* IMPORTANT, be mindful with , or ". else waybar will not start */
+
+{
+"user/headset-battery": {
+        "format": "󰠇 {}%",
+        "exec": "~/.config/hypr/scripts/TritonCtl.sh LogiBattery",
+        "interval": 5,
+        "on-click": "solarr",
+        "return-type": "integer" 
+}
+}

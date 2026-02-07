@@ -45,6 +45,7 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y copr enable sdegler/hyprland && \
     dnf5 install -y \
     hyprland \
+    hyprland-guitools \
     hyprlock \
     hypridle \
     hyprpaper \
@@ -72,6 +73,7 @@ RUN --mount=type=cache,dst=/var/cache \
     systemd-devel \
     gnome-keyring \
     seahorse \
+    blueman \
     python3-secretstorage \
     libsecret \
     libsecret-devel \
@@ -86,6 +88,7 @@ RUN --mount=type=cache,dst=/var/cache \
     git \
     chezmoi \
     kitty \
+    zen-browser \
     nix \
     wl-clipboard \
     grim \

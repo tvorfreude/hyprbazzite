@@ -80,7 +80,7 @@ Wallpaper() {
     hyprctl reload
 
     # Set the new wallpaper (still using JPG for swaybg, PNG for Hyprlock)
-    uwsm app -- swaybg -i "$wallust_current_wall" -m fill &
+    swaybg -i "$wallust_current_wall" -m fill &
 
     notify-send "Wallpaper and Theme Changed" "$(basename "$wall_path")"
     }
@@ -238,11 +238,11 @@ Refresh() {
         pkill "$app"
     done
     # Restart each app under uwsm
-    uwsm app -- hypridle &
-    uwsm app -- mako &
-    uwsm app -- waybar &
-    uwsm app -- fcitx5 &
-    uwsm app -- swaybg -i "$HOME/.config/hypr/wallust/current_wallpaper.jpg" -m fill &
+    hypridle &
+    mako &
+    waybar &
+    fcitx5 &
+    swaybg -i "$HOME/.config/hypr/wallust/current_wallpaper.jpg" -m fill &
     notify-send "TritonCtl" "Session apps refreshed."
 }
 ChezmoiPullApply() {
@@ -336,7 +336,7 @@ Gamemode() {
         hyprctl keyword decoration:active_opacity 1.0
         hyprctl keyword decoration:inactive_opacity 1.0
         hyprctl keyword "windowrule opacity 1 override, ^(.*)$"
-        uwsm app -- swaybg -i "$HOME/.config/hypr/wallust/current_wallpaper.jpg" -m fill &
+        swaybg -i "$HOME/.config/hypr/wallust/current_wallpaper.jpg" -m fill &
         sleep 0.5
         notify-send -e -u normal -i "$notif" " Gamemode:" " disabled"
         hyprctl reload

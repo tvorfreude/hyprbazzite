@@ -1,0 +1,316 @@
+/* Dracula Color Scheme */
+@define-color background #282a36;
+@define-color current_line #44475a;
+@define-color foreground #f8f8f2;
+@define-color comment #6272a4;
+@define-color cyan #8be9fd;
+@define-color green #50fa7b;
+@define-color orange #ffb86c;
+@define-color pink #ff79c6;
+@define-color purple #bd93f9;
+@define-color red #ff5555;
+@define-color yellow #f1fa8c;
+
+* {
+    font-family: "JetBrainsMono Nerd Font";
+    font-weight: bold;
+    min-height: 0;
+    /* set font-size to 100% if font scaling is set to 1.00 using nwg-look */
+    font-size: 97%;
+    font-feature-settings: '"zero", "ss01", "ss02", "ss03", "ss04", "ss05", "cv31"';
+}
+
+/* Removed Catppuccin import */
+/* @import "../waybar/style/catppuccin-themes/mocha.css"; */
+
+window#waybar {
+    transition-property: background-color;
+    transition-duration: 0.5s;
+    background: transparent;
+    border-radius: 10px;
+}
+
+window#waybar.hidden {
+    opacity: 0.2;
+}
+
+window#waybar.empty,
+window#waybar.empty #window {
+    background-color: transparent;
+    padding: 0px;
+    border: 0px;
+}
+
+#taskbar button,
+#workspaces button {
+    color: @comment; /* Using a lighter comment color for inactive buttons */
+    box-shadow: none;
+    text-shadow: none;
+    padding: 0px;
+    border-radius: 9px;
+    padding-left: 4px;
+    padding-right: 4px;
+    animation: gradient_f 20s ease-in infinite;
+    transition: all 0.5s cubic-bezier(.55,-0.68,.48,1.682);
+}
+
+#taskbar button:hover,
+#workspaces button:hover {
+    border-radius: 10px;
+    color: @orange; /* Dracula orange for hover */
+    background-color: @current_line; /* Lighter background on hover */
+    padding-left: 2px;
+    padding-right: 2px;
+    animation: gradient_f 20s ease-in infinite;
+    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.682);
+}
+
+#workspaces button.persistent {
+    color: @current_line; /* A subtle color for persistent workspaces */
+    border-radius: 10px;
+}
+
+#taskbar button.active,
+#workspaces button.active {
+    color: @purple; /* Dracula purple for active workspaces/tasks */
+    border-radius: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
+    animation: gradient_f 20s ease-in infinite;
+    transition: all 0.3s cubic-bezier(.55,-0.68,.48,1.682);
+}
+
+#workspaces button.urgent {
+    color: @red; /* Dracula red for urgent windows */
+    border-radius: 0px;
+}
+
+/* This section can be use if you want to separate waybar modules */
+.modules-left, .modules-center, .modules-right {
+    background: @background; /* Dracula background color */
+    border: 0.5px solid @comment; /* Dracula comment color for borders */
+    padding-top: 2px;
+    padding-bottom: 2px;
+    padding-right: 4px;
+    padding-left: 4px;
+    border-radius: 10px;
+}
+
+.modules-left, .modules-right {
+    border: 1px solid @cyan; /* Dracula cyan for module borders */
+}
+
+#backlight,
+#backlight-slider,
+#battery,
+#bluetooth,
+#clock,
+#cpu,
+#disk,
+#idle_inhibitor,
+#keyboard-state,
+#memory,
+#mode,
+#mpris,
+#network,
+#power-profiles-daemon,
+#pulseaudio,
+#custom-headset-battery,
+#pulseaudio-slider,
+#taskbar button,
+#taskbar,
+#temperature,
+#tray,
+#window,
+#wireplumber,
+#workspaces,
+#custom-backlight,
+#custom-browser,
+#custom-cava_mviz,
+#custom-cycle_wall,
+#custom-dot_update,
+#custom-file_manager,
+#custom-keybinds,
+#custom-keyboard,
+#custom-light_dark,
+#custom-lock,
+#custom-hint,
+#custom-hypridle,
+#custom-menu,
+#custom-playerctl,
+#custom-power_vertical,
+#custom-power,
+#custom-quit,
+#custom-reboot,
+#custom-settings,
+#custom-spotify,
+#custom-swaync,
+#custom-tty,
+#custom-updater,
+#custom-weather,
+#custom-weather.clearNight,
+#custom-weather.cloudyFoggyDay,
+#custom-weather.cloudyFoggyNight,
+#custom-weather.default,
+#custom-weather.rainyDay,
+#custom-weather.rainyNight,
+#custom-weather.severe,
+#custom-weather.showyIcyDay,
+#custom-weather.snowyIcyNight,
+#custom-weather.sunnyDay {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    padding-right: 6px;
+    padding-left: 6px;
+}
+/*-----Indicators----*/
+#custom-hypridle.notactive,
+#idle_inhibitor.activated {
+    color: @green; /* Dracula green for active indicators */
+}
+
+#bluetooth,
+#backlight {
+  color: @cyan; /* Dracula cyan */
+}
+
+#battery {
+  color: @green; /* Dracula green */
+}
+
+@keyframes blink {
+  to {
+    color: @current_line; /* Blinking to current line color */
+  }
+}
+
+#battery.critical:not(.charging) {
+  background-color: @red;
+  color: @foreground; /* Foreground color for text on critical battery */
+    animation-name: blink;
+    animation-duration: 3.0s;
+    animation-timing-function: steps(12);
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+  box-shadow: inset 0 -3px transparent;
+}
+
+#clock {
+  color: @yellow; /* Dracula yellow */
+}
+
+#cpu {
+  color: @green; /* Dracula green */
+}
+
+#custom-keyboard,
+#memory {
+  color: @cyan; /* Dracula cyan */
+}
+
+#disk {
+  color: @purple; /* Dracula purple */
+}
+
+#temperature {
+  color: @orange; /* Dracula orange */
+}
+
+#temperature.critical {
+  background-color: @red;
+}
+
+#tray > .passive {
+  -gtk-icon-effect: dim;
+}
+#tray > .needs-attention {
+  -gtk-icon-effect: highlight;
+}
+
+#keyboard-state {
+  color: @pink; /* Dracula pink */
+}
+
+#custom-cava_mviz {
+    color: @pink; /* Dracula pink */
+}
+
+#custom-menu {
+  color: @foreground; /* Foreground color for menu */
+}
+
+#custom-power {
+  color: @red; /* Dracula red */
+}
+
+#custom-updater {
+  color: @red; /* Dracula red */
+}
+
+#custom-light_dark {
+  color: @cyan; /* Dracula cyan */
+}
+
+#custom-weather {
+  color: @orange; /* Dracula orange for weather */
+}
+
+#custom-lock {
+  color: @red; /* Dracula red */
+}
+
+#pulseaudio {
+  color: @cyan; /* Dracula cyan */
+}
+
+#custom-headset-battery {
+  color: @cyan; /* Dracula cyan for headset battery */
+}
+
+
+#pulseaudio.bluetooth {
+  color: @pink; /* Dracula pink for Bluetooth audio */
+}
+#pulseaudio.muted {
+  color: @red; /* Dracula red for muted audio */
+}
+
+#window {
+  color: @purple; /* Dracula purple for window title */
+}
+
+#mpris {
+  color: @green; /* Dracula green for media player */
+}
+
+#network {
+  color: @orange; /* Dracula orange for network */
+}
+#network.disconnected,
+#network.disabled {
+  background-color: @current_line; /* Current line color for disconnected/disabled network */
+  color: @foreground; /* Foreground color for text */
+}
+
+#backlight-slider slider,
+#pulseaudio-slider slider {
+    min-width: 0px;
+    min-height: 0px;
+    opacity: 0;
+    background-image: none;
+    border: none;
+    box-shadow: none;
+}
+
+#backlight-slider trough,
+#pulseaudio-slider trough {
+    min-width: 80px;
+    min-height: 5px;
+    border-radius: 5px;
+}
+
+#backlight-slider highlight,
+#pulseaudio-slider highlight {
+    min-height: 10px;
+    border-radius: 5px;
+}
