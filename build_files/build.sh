@@ -305,12 +305,9 @@ rm -rf /tmp/cursor-clip
 ### Remove build-only dependencies for Cursor Clip
 dnf5 remove -y rust cargo gtk4-devel libadwaita-devel gtk4-layer-shell-devel pkgconf-pkg-config --noautoremove 2>/dev/null || true
 
-### Install media applications and codecs
-dnf5 install -y \
-  vlc \
-  ffmpeg \
-  libavcodec-freeworld \
-  pipewire-pulseaudio
+### Install media applications
+# Note: ffmpeg, pipewire-pulseaudio already included in Bazzite base
+dnf5 install -y vlc
 
 ### Install file manager and support libraries
 dnf5 install -y \
