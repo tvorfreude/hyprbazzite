@@ -78,7 +78,6 @@ dnf5 install -y \
   slurp \
   brightnessctl \
   playerctl \
-  iio-hyprland \
   imv
 
 ### Install file manager and support libraries
