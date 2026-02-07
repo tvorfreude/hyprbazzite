@@ -166,12 +166,9 @@
 
 "disk": {
 	"interval": 30,
-	//"format": "󰋊",
-	"path": "/",
-	//"format-alt-click": "click",
+	"path": "/var",
 	"format": "{percentage_used}% 󰋊",
-	//"tooltip": true,
-	"tooltip-format": "{used} used out of {total} on {path} ({percentage_used}%)",
+	"tooltip-format": "{used} used out of {total} ({percentage_used}%)",
 },
 
 "hyprland/language": {
