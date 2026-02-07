@@ -45,7 +45,7 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y copr enable sdegler/hyprland && \
     dnf5 install -y \
     hyprland \
-    hyprland-guitools \
+    hyprland-guiutils \
     hyprlock \
     hypridle \
     hyprpaper \
