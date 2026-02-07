@@ -170,10 +170,6 @@ dwindle {
 master {
 }
 
-gestures {
-    workspace_swipe = false
-}
-
 # Keybinds
 $mainMod = SUPER
 
