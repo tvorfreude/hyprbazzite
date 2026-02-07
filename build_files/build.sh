@@ -38,12 +38,13 @@ chown -R lightdm:lightdm /var/lib/lightdm-data
 restorecon -Rv /var/lib/lightdm-data || true
 
 # Ensure LightDM uses a valid config section for greeter/session.
-cat > /etc/lightdm/lightdm.conf << 'EOF'
+mkdir -p /usr/share/lightdm/lightdm.conf.d
+cat > /usr/share/lightdm/lightdm.conf.d/90-local.conf << 'EOF'
 [LightDM]
 logind-check-graphical=true
 
 [Seat:*]
-greeter-session=lightdm-gtk
+greeter-session=lightdm-gtk-greeter
 user-session=hyprland
 EOF
 
