@@ -282,9 +282,6 @@ dnf5 install -y \
   brightnessctl \
   imv
 
-### Set zsh as default shell
-chsh -s /bin/zsh root
-
 ### Install Cursor Clip dependencies (runtime + build)
 dnf5 install -y \
   gtk4 \
