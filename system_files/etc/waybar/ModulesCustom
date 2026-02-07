@@ -37,11 +37,9 @@
 
 "custom/power": {
 	"format": " ⏻ ",
-	"on-click": "systemctl poweroff",
-	"on-click-middle": "systemctl reboot",
-	"on-click-right": "systemctl suspend",
+	"on-click": "/etc/hypr/scripts/power-menu.sh",
 	"tooltip": true,
-	"tooltip-format": "Left: Shutdown | Middle: Reboot | Right: Suspend",
+	"tooltip-format": "Power Menu",
 },
 
 "custom/quit": {
