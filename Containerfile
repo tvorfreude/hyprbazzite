@@ -70,6 +70,7 @@ RUN --mount=type=cache,dst=/var/cache \
     chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
     chmod -R 0755 /usr/share/sddm/themes && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
+    chmod +x /etc/hypr/scripts/power-menu.sh && \
     systemctl enable sddm.service
 
 # Install essential session, keyring, and authentication packages
