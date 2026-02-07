@@ -54,14 +54,14 @@ RUN --mount=type=cache,dst=/var/cache \
     xdg-desktop-portal-hyprland && \
     dnf5 -y copr disable sdegler/hyprland
 
-# Install and setup LightDM display manager
+# Install and setup SDDM display manager
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
-    dnf5 install -y lightdm lightdm-slick-greeter && \
+    dnf5 install -y sddm && \
     mkdir -p /usr/share/wayland-sessions && \
     printf '[Desktop Entry]\nName=Hyprland\nExec=start-hyprland\nType=Application\n' > /usr/share/wayland-sessions/hyprland.desktop && \
     chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
-    systemctl enable lightdm.service
+    systemctl enable sddm.service
 
 # Install essential session, keyring, and authentication packages
 RUN --mount=type=cache,dst=/var/cache \
