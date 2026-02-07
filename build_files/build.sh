@@ -32,6 +32,21 @@ dnf5 -y copr disable sdegler/hyprland
 ### Install and configure LightDM display manager
 dnf5 install -y lightdm lightdm-gtk-greeter
 
+# Pre-create LightDM data dir with correct owner and SELinux label.
+mkdir -p /var/lib/lightdm-data/lightdm
+chown -R lightdm:lightdm /var/lib/lightdm-data
+restorecon -Rv /var/lib/lightdm-data || true
+
+# Ensure LightDM uses a valid config section for greeter/session.
+cat > /etc/lightdm/lightdm.conf << 'EOF'
+[LightDM]
+logind-check-graphical=true
+
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+user-session=hyprland
+EOF
+
 # Install fallback config to standard locations
 mkdir -p /etc/hypr /etc/skel/.config/hypr
 install -D -m 0644 /ctx/hyprland.conf /etc/hypr/hyprland.conf
