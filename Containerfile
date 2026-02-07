@@ -59,7 +59,7 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 install -y sddm && \
     mkdir -p /usr/share/wayland-sessions && \
-    printf '[Desktop Entry]\nName=Hyprland\nExec=start-hyprland\nType=Application\n' > /usr/share/wayland-sessions/hyprland.desktop && \
+    printf '[Desktop Entry]\nName=Hyprland\nExec=start-hyprland -- --config /etc/hypr/hyprland.conf\nType=Application\n' > /usr/share/wayland-sessions/hyprland.desktop && \
     chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
     systemctl enable sddm.service
 
