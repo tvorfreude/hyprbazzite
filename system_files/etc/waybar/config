@@ -1,12 +1,10 @@
-/* ---- 💫 https://github.com/JaKooLit 💫 ---- */
-/* My Mostly Used waybar config incase you wonder :) */
 {
 	"include": [
-		"$HOME/.config/waybar/UserModules",
-		"$HOME/.config/waybar/Modules",
-		"$HOME/.config/waybar/ModulesWorkspaces",
-		"$HOME/.config/waybar/ModulesCustom",
-		"$HOME/.config/waybar/ModulesGroups",
+		"/etc/waybar/UserModules",
+		"/etc/waybar/Modules",
+		"/etc/waybar/ModulesWorkspaces",
+		"/etc/waybar/ModulesCustom",
+		"/etc/waybar/ModulesGroups",
 	],
 	"layer": "top",
 	"mode": "dock",
@@ -31,9 +29,7 @@
 	"modules-center": [
 		"group/app_drawer",
 		"custom/separator#dot-line",
-		"hyprland/workspaces#rw",
-		"custom/separator#dot-line",
-		"group/notify",
+		"hyprland/workspaces#rw"
 	],
 	"modules-right": [
 		"group/laptop",
@@ -41,17 +37,10 @@
 		"group/mobo_drawer",
 		"custom/separator#line",
 		"group/audio",
-		"custom/headset-battery",
+		"user/headset-battery",
 		"custom/separator#dot-line",
 		"mpris",
 		"custom/separator#blank",
 		"group/status",
-	],
-	"custom/headset-battery": {
-		"format": "󰠇 {}%",
-		"exec": "$HOME/.config/hypr/scripts/TritonCtl.sh LogiBattery",
-		"interval": 5,
-		"on-click": "solaar",
-		"return-type": "text"
-	}
+	]
 }
