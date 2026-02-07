@@ -1,7 +1,7 @@
 width=35%
 height=40%
 show=drun
-prompt=apps
+prompt=󰀬 apps
 term=kitty
 allow_images=true
 allow_markup=true
@@ -12,4 +12,4 @@ matching=fuzzy
 show_all=false
 no_actions=true
 layer=overlay
-style=~/.config/wofi/style.css
+style=/etc/wofi/style.css

@@ -1,8 +1,9 @@
-@import "~/.config/wofi/colors.css";
+@import "/etc/wofi/colors.css";
 
 * {
-  font-family: "Sans";
+  font-family: "JetBrainsMono Nerd Font";
   font-size: 12px;
+  font-weight: 500;
   border: none;
   outline: none;
   background: transparent;
@@ -11,7 +12,7 @@
 
 window {
   background-color: @bg;
-  border: 2px solid @border;
+  border: 2px solid @accent;
   border-radius: 10px;
   padding: 10px;
 }
@@ -20,8 +21,8 @@ window {
   margin: 8px;
   padding: 10px;
   border-radius: 8px;
-  background-color: shade(@bg, 1.08);
-  color: @fg;
+  background-color: @bg_alt;
+  color: @accent2;
 }
 
 #inner-box {
@@ -31,11 +32,13 @@ window {
 #entry {
   padding: 8px;
   border-radius: 6px;
+  margin: 4px 0;
 }
 
 #entry:selected {
   background-color: @accent;
-  color: @fg;
+  color: @bg;
+  border-radius: 6px;
 }
 
 #text {

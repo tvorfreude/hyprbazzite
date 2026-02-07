@@ -68,6 +68,8 @@ RUN --mount=type=cache,dst=/var/cache \
     mkdir -p /usr/share/wayland-sessions && \
     printf '[Desktop Entry]\nName=Hyprland\nExec=start-hyprland -- --config /etc/hypr/hyprland.conf\nType=Application\n' > /usr/share/wayland-sessions/hyprland.desktop && \
     chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
+    chmod -R 0755 /usr/share/sddm/themes && \
+    chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
     systemctl enable sddm.service
 
 # Install essential session, keyring, and authentication packages
@@ -85,6 +87,19 @@ RUN --mount=type=cache,dst=/var/cache \
     libsecret-devel \
     gcr \
     gcr-devel
+
+# Install fonts including Nerd Fonts
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    dnf5 install -y \
+    liberation-fonts \
+    google-noto-sans-fonts && \
+    mkdir -p /usr/local/share/fonts/nerd-fonts && \
+    cd /usr/local/share/fonts/nerd-fonts && \
+    curl -fsSL https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip -o JetBrainsMono.zip && \
+    unzip -q JetBrainsMono.zip && \
+    rm JetBrainsMono.zip && \
+    fc-cache -fv
 
 # Install development and system utilities
 RUN --mount=type=cache,dst=/var/cache \

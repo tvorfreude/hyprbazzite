@@ -1,97 +1,130 @@
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
-import SddmComponents 2.0
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import SddmComponents
 
 Rectangle {
     id: root
+    color: "#282a36"
     width: 1920
     height: 1080
-    color: "#000000"
 
-    property color accentColor: "#7aa2f7"
-    property color textColor: "#cbd5e1"
-    property color faintTextColor: "#94a3b8"
+    VerticalLayout {
+        anchors.fill: parent
+        anchors.margins: 0
+        spacing: 0
 
-    Text {
-        id: minutes
-        text: Qt.formatDateTime(new Date(), "mm")
-        color: accentColor
-        font.family: "JetBrainsMono Nerd Font"
-        font.pixelSize: 180
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: -80
-    }
+        Item {
+            Layout.fillHeight: true
+            Layout.fillWidth: true
 
-    Text {
-        id: hours
-        text: Qt.formatDateTime(new Date(), "HH")
-        color: textColor
-        font.family: "JetBrainsMono Nerd Font"
-        font.pixelSize: 180
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: 140
-    }
+            Column {
+                anchors.centerIn: parent
+                spacing: 30
 
-    Text {
-        id: layout
-        text: keyboard.layout
-        color: accentColor
-        font.family: "Victor Mono"
-        font.pixelSize: 16
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.topMargin: 40
-    }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "Dracula"
+                    color: "#bd93f9"
+                    font.family: "JetBrainsMono Nerd Font"
+                    font.bold: true
+                    font.pixelSize: 48
+                }
 
-    Text {
-        id: uptime
-        text: "Uptime: " + sddm.uptime
-        color: accentColor
-        font.family: "Victor Mono"
-        font.pixelSize: 18
-        anchors.right: parent.right
-        anchors.rightMargin: 40
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 40
-    }
-
-    Rectangle {
-        id: inputBox
-        width: 360
-        height: 60
-        radius: 6
-        color: "#0b0f14"
-        border.color: accentColor
-        border.width: 2
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 120
-
-        TextField {
-            id: passwordField
-            anchors.fill: parent
-            anchors.margins: 12
-            echoMode: TextInput.Password
-            placeholderText: "Type Password"
-            color: textColor
-            font.family: "JetBrainsMono Nerd Font"
-            font.pixelSize: 18
-            background: Rectangle { color: "transparent" }
-            focus: true
-            onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Qt.formatDateTime(new Date(), "HH:mm")
+                    color: "#8be9fd"
+                    font.family: "JetBrainsMono Nerd Font"
+                    font.bold: true
+                    font.pixelSize: 120
+                }
+            }
         }
-    }
 
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: {
-            minutes.text = Qt.formatDateTime(new Date(), "mm")
-            hours.text = Qt.formatDateTime(new Date(), "HH")
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 200
+            Layout.margins: 40
+
+            Column {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                width: 400
+                spacing: 15
+
+                TextInput {
+                    width: parent.width
+                    height: 50
+                    leftPadding: 15
+                    rightPadding: 15
+                    font.family: "JetBrainsMono Nerd Font"
+                    font.pixelSize: 14
+                    color: "#8be9fd"
+                    background: Rectangle {
+                        color: "#44475a"
+                        border.color: "#bd93f9"
+                        border.width: 2
+                        radius: 4
+                    }
+                    echoMode: TextInput.Password
+                    placeholderText: "Password"
+                    placeholderTextColor: "#6272a4"
+                    focus: true
+                    onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 10
+                    height: 40
+
+                    ComboBox {
+                        id: sessions
+                        width: parent.width / 2 - 5
+                        height: parent.height
+                        model: sessionModel
+                        currentIndex: sessionModel.lastIndex
+                        textRole: "name"
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.pixelSize: 12
+                        onCurrentIndexChanged: sessionModel.lastIndex = currentIndex
+                    }
+
+                    ComboBox {
+                        id: users
+                        width: parent.width / 2 - 5
+                        height: parent.height
+                        model: userModel
+                        currentIndex: userModel.lastIndex
+                        textRole: "name"
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.pixelSize: 12
+                        onCurrentIndexChanged: userModel.lastIndex = currentIndex
+                    }
+                }
+
+                Button {
+                    width: parent.width
+                    height: 45
+                    text: "Login"
+                    font.family: "JetBrainsMono Nerd Font"
+                    font.bold: true
+                    font.pixelSize: 14
+                    background: Rectangle {
+                        color: "#bd93f9"
+                        radius: 4
+                    }
+                    contentItem: Text {
+                        text: parent.text
+                        color: "#282a36"
+                        font: parent.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                    onClicked: sddm.login(users.currentIndex >= 0 ? userModel.data(userModel.index(users.currentIndex, 0), userModel.roles.name) : userModel.lastUser, "", sessionModel.lastIndex)
+                }
+            }
         }
     }
 }
