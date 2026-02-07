@@ -88,7 +88,6 @@ RUN --mount=type=cache,dst=/var/cache \
     git \
     chezmoi \
     kitty \
-    zen-browser \
     nix \
     wl-clipboard \
     grim \
@@ -96,6 +95,10 @@ RUN --mount=type=cache,dst=/var/cache \
     brightnessctl \
     playerctl \
     imv
+
+# Install zen-browser as Flatpak
+RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
+    flatpak install -y flathub io.github.zen_browser.zen
 
 # Install file manager, thunar, and media support
 RUN --mount=type=cache,dst=/var/cache \
