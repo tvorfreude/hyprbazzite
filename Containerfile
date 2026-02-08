@@ -61,20 +61,15 @@ RUN dnf5 install -y zsh && \
     mkdir -p /etc/default && \
     echo 'SHELL=/bin/zsh' >> /etc/default/useradd
 
-# Install optional zsh tools (skip unavailable)
+# Install optional zsh tools and starship via COPR
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
+    dnf5 -y copr enable atim/starship && \
     dnf5 install -y --skip-unavailable \
+    starship \
     lsd \
     zsh-autosuggestions \
     zsh-syntax-highlighting || true
-
-# Install starship via prebuilt binary
-RUN mkdir -p /tmp/starship && \
-    cd /tmp/starship && \
-    curl -sL https://github.com/starship/starship/releases/download/v1.21.1/starship-x86_64-unknown-linux-gnu.tar.gz | tar xz && \
-    install -Dm755 starship /usr/local/bin/starship && \
-    cd / && rm -rf /tmp/starship
 
 # Provision oh-my-zsh and plugins for new users
 RUN --mount=type=cache,dst=/var/cache \
@@ -113,17 +108,14 @@ RUN --mount=type=cache,dst=/var/cache \
     gcr-devel \
     qt5ct
 
-# Install fonts including Nerd Fonts
+# Install fonts including Nerd Fonts via COPR
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
+    dnf5 -y copr enable che/nerd-fonts && \
     dnf5 install -y \
     liberation-fonts \
-    google-noto-sans-fonts && \
-    mkdir -p /usr/local/share/fonts/nerd-fonts && \
-    cd /usr/local/share/fonts/nerd-fonts && \
-    curl -fsSL https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip -o JetBrainsMono.zip && \
-    unzip -q JetBrainsMono.zip && \
-    rm JetBrainsMono.zip && \
+    google-noto-sans-fonts \
+    nerd-fonts-JetBrainsMono && \
     fc-cache -fv
 
 # Install development and system utilities
