@@ -1,10 +1,12 @@
 [[customizations.filesystem]]
 mountpoint = "/"
 minsize = "20 GiB"
+type = "xfs"
 
 [[customizations.filesystem]]
 mountpoint = "/boot"
 minsize = "1 GiB"
+type = "ext4"
 
 [customizations.installer.kickstart]
 contents = """
