@@ -55,11 +55,25 @@ RUN --mount=type=cache,dst=/var/cache \
     xdg-desktop-portal-hyprland && \
     dnf5 -y copr disable sdegler/hyprland
 
-# Set zsh as default shell
-RUN dnf5 install -y zsh && \
+# Set zsh as default shell + tools
+RUN dnf5 install -y \
+    zsh \
+    fzf \
+    lsd \
+    starship \
+    zsh-autosuggestions \
+    zsh-syntax-highlighting && \
     usermod -s /bin/zsh root && \
     mkdir -p /etc/default && \
     echo 'SHELL=/bin/zsh' >> /etc/default/useradd
+
+# Provision oh-my-zsh and plugins for new users
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    mkdir -p /etc/skel/.oh-my-zsh/custom/plugins && \
+    git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /etc/skel/.oh-my-zsh && \
+    git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions /etc/skel/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
+    git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting /etc/skel/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
 
 # Install and setup SDDM display manager
 RUN --mount=type=cache,dst=/var/cache \
