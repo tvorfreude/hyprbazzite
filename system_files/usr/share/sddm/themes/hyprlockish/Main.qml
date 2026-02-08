@@ -15,40 +15,25 @@ Rectangle {
 
         Item {
             width: parent.width
-            height: parent.height - 200
+            height: parent.height * 0.65
 
-            Column {
+            Text {
                 anchors.centerIn: parent
-                spacing: 30
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: "Dracula"
-                    color: "#bd93f9"
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.bold: true
-                    font.pixelSize: 48
-                }
-
-                Text {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    text: Qt.formatDateTime(new Date(), "HH:mm")
-                    color: "#8be9fd"
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.bold: true
-                    font.pixelSize: 120
-                }
+                text: Qt.formatDateTime(new Date(), "HH:mm")
+                color: "#8be9fd"
+                font.family: "JetBrainsMono Nerd Font"
+                font.bold: true
+                font.pixelSize: 280
             }
         }
 
         Item {
             width: parent.width
-            height: 200
+            height: parent.height * 0.35
 
             Column {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.bottom: parent.bottom
-                width: 400
+                anchors.centerIn: parent
+                width: 450
                 spacing: 15
 
                 Rectangle {
