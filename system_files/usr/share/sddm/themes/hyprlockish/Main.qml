@@ -51,23 +51,27 @@ Rectangle {
                 width: 400
                 spacing: 15
 
-                TextInput {
+                Rectangle {
                     width: parent.width
                     height: 50
-                    leftPadding: 15
-                    rightPadding: 15
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.pixelSize: 14
-                    color: "#8be9fd"
-                    background: Rectangle {
-                        color: "#44475a"
-                        border.color: "#bd93f9"
-                        border.width: 2
-                        radius: 4
+                    color: "#44475a"
+                    border.color: "#bd93f9"
+                    border.width: 2
+                    radius: 4
+
+                    TextInput {
+                        width: parent.width
+                        height: parent.height
+                        leftPadding: 15
+                        rightPadding: 15
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.pixelSize: 14
+                        color: "#8be9fd"
+                        echoMode: TextInput.Password
+                        focus: true
+                        verticalAlignment: TextInput.AlignVCenter
+                        onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
                     }
-                    echoMode: TextInput.Password
-                    focus: true
-                    onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
                 }
 
                 Text {
@@ -111,25 +115,25 @@ Rectangle {
                     }
                 }
 
-                Button {
+                Rectangle {
                     width: parent.width
                     height: 45
-                    text: "Login"
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.bold: true
-                    font.pixelSize: 14
-                    background: Rectangle {
-                        color: "#bd93f9"
-                        radius: 4
-                    }
-                    contentItem: Text {
-                        text: parent.text
+                    color: "#bd93f9"
+                    radius: 4
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Login"
                         color: "#282a36"
-                        font: parent.font
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                        font.family: "JetBrainsMono Nerd Font"
+                        font.bold: true
+                        font.pixelSize: 14
                     }
-                    onClicked: sddm.login(users.currentIndex >= 0 ? userModel.data(userModel.index(users.currentIndex, 0), userModel.roles.name) : userModel.lastUser, "", sessionModel.lastIndex)
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: sddm.login(users.currentIndex >= 0 ? userModel.data(userModel.index(users.currentIndex, 0), userModel.roles.name) : userModel.lastUser, "", sessionModel.lastIndex)
+                    }
                 }
             }
         }
