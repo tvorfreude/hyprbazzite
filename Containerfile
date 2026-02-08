@@ -105,15 +105,7 @@ RUN --mount=type=cache,dst=/var/cache \
     gcr-devel \
     qt5ct
 
-# Install fonts including Nerd Fonts via COPR
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    dnf5 -y copr enable che/nerd-fonts && \
-    dnf5 install -y \
-    liberation-fonts \
-    google-noto-sans-fonts \
-    nerd-fonts-JetBrainsMono && \
-    fc-cache -fv
+# Fonts already included in bazzite base image
 
 # Install development and system utilities
 RUN --mount=type=cache,dst=/var/cache \
