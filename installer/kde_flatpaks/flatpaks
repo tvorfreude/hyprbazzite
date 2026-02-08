@@ -1,0 +1,4 @@
+# List of Flatpaks to include in the ISO
+# One per line, e.g.:
+# org.mozilla.firefox
+# org.gnome.FileManager

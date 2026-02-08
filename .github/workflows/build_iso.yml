@@ -1,0 +1,123 @@
+---
+name: Build ISOs
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-iso
+  cancel-in-progress: true
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+
+      - name: Checkout Repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set Image Tag
+        id: generate-tag
+        shell: bash
+        run: |
+          TAG="latest"
+
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+              TAG="latest"
+          fi
+
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Set Flatpaks Directory Shortname
+        id: generate-flatpak-dir-shortname
+        shell: bash
+        run: |
+          FLATPAK_DIR_SHORTNAME="installer/kde_flatpaks"
+          echo "flatpak-dir-shortname=${FLATPAK_DIR_SHORTNAME}" >> $GITHUB_OUTPUT
+
+      # Docker requires lowercase registry references
+      - name: Lowercase Registry
+        id: registry_case
+        uses: ASzc/change-string-case-action@d0603cd0a7dd490be678164909f65c7737470a7f # v6
+        with:
+          string: ${{ env.IMAGE_REGISTRY }}
+
+      - name: Determine Flatpak Dependencies
+        id: flatpak_dependencies
+        shell: bash
+        run: |
+          set -ex
+          image="${{ steps.registry_case.outputs.lowercase }}/${{ github.event.repository.name }}:${{ steps.generate-tag.outputs.tag }}"
+          # Make temp space
+          TEMP_FLATPAK_INSTALL_DIR=$(mktemp -d -p ${{ github.workspace }} flatpak.XXX)
+          # Get list of refs from directory
+          FLATPAK_REFS_DIR=${{ github.workspace }}/${{ steps.generate-flatpak-dir-shortname.outputs.flatpak-dir-shortname }}
+          FLATPAK_REFS_DIR_LIST=$(cat ${FLATPAK_REFS_DIR}/* | tr '\n' ' ' )
+          # Generate install script
+          cat << EOF > ${TEMP_FLATPAK_INSTALL_DIR}/script.sh
+          mkdir -p /flatpak/flatpak /flatpak/triggers
+          mkdir /var/tmp || true
+          chmod -R 1777 /var/tmp
+          flatpak config --system --set languages "*"
+          flatpak remote-add --system flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --system -y ${FLATPAK_REFS_DIR_LIST}
+          ostree refs --repo=\${FLATPAK_SYSTEM_DIR}/repo | grep '^deploy/' | grep -v 'org\.freedesktop\.Platform\.openh264' | sed 's/^deploy\///g' > /output/flatpaks_with_deps
+          EOF
+          docker run --rm --privileged \
+            --entrypoint bash \
+            -e FLATPAK_SYSTEM_DIR=/flatpak/flatpak \
+            -e FLATPAK_TRIGGERSDIR=/flatpak/triggers \
+            --volume ${FLATPAK_REFS_DIR}:/output \
+            --volume ${TEMP_FLATPAK_INSTALL_DIR}:/temp_flatpak_install_dir \
+            ${image} /temp_flatpak_install_dir/script.sh
+          docker rmi ${image}
+
+      - name: Build ISOs
+        uses: jasonn3/build-container-installer@c9ef3de33236e66781ec37bd0485e8009eaefe24 # v1.4.0
+        id: build
+        with:
+          arch: x86_64
+          image_name: ${{ github.event.repository.name }}
+          image_repo: ${{ steps.registry_case.outputs.lowercase }}
+          variant: 'Kinoite'
+          version: 43
+          image_tag: ${{ steps.generate-tag.outputs.tag }}
+          secure_boot_key_url: '${{ github.server_url }}/${{ github.repository }}/raw/main/secure_boot.der'
+          enrollment_password: 'universalblue'
+          iso_name: ${{ github.event.repository.name }}-${{ steps.generate-tag.outputs.tag }}-amd64.iso
+          enable_cache_dnf: "false"
+          enable_cache_skopeo: "false"
+          flatpak_remote_refs_dir: ${{ steps.generate-flatpak-dir-shortname.outputs.flatpak-dir-shortname }}
+          enable_flatpak_dependencies: "false"
+          additional_templates: '/github/workspace/installer/lorax_templates/remove_root_password_prompt.tmpl'
+
+      - name: Move ISOs to Upload Directory
+        id: upload-directory
+        shell: bash
+        run: |
+          ISO_UPLOAD_DIR=${{ github.workspace }}/upload
+          mkdir ${ISO_UPLOAD_DIR}
+          mv ${{ steps.build.outputs.iso_path }}/${{ steps.build.outputs.iso_name }} ${ISO_UPLOAD_DIR}
+          mv ${{ steps.build.outputs.iso_path }}/${{ steps.build.outputs.iso_name }}-CHECKSUM ${ISO_UPLOAD_DIR}
+          echo "iso-upload-dir=${ISO_UPLOAD_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Upload ISOs and Checksum to Job Artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ github.event.repository.name }}-${{ steps.generate-tag.outputs.tag }}
+          path: ${{ steps.upload-directory.outputs.iso-upload-dir }}
+          if-no-files-found: error
+          retention-days: 0
+          compression-level: 0
+          overwrite: true
