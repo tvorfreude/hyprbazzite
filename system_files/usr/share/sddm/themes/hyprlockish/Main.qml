@@ -95,7 +95,6 @@ Rectangle {
                         width: parent.width / 2 - 5
                         height: parent.height
                         model: sessionModel
-                        currentIndex: sessionModel.lastIndex
                     }
 
                     ComboBox {
@@ -103,7 +102,6 @@ Rectangle {
                         width: parent.width / 2 - 5
                         height: parent.height
                         model: userModel
-                        currentIndex: userModel.lastIndex
                     }
                 }
 
