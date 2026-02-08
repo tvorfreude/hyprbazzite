@@ -72,9 +72,10 @@ RUN --mount=type=cache,dst=/var/cache \
 
 # Fallback: install starship via cargo if dnf5 failed
 RUN if ! command -v starship &>/dev/null; then \
+    rm -rf /root/.cargo /root/.rustup && \
     dnf5 install -y cargo && \
     cargo install starship --locked && \
-    rm -rf $HOME/.cargo; \
+    rm -rf /root/.cargo /root/.rustup; \
     fi
 
 # Provision oh-my-zsh and plugins for new users
