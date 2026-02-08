@@ -96,7 +96,6 @@ Rectangle {
                         height: parent.height
                         model: sessionModel
                         currentIndex: sessionModel.lastIndex
-                        textRole: "name"
                     }
 
                     ComboBox {
@@ -105,7 +104,6 @@ Rectangle {
                         height: parent.height
                         model: userModel
                         currentIndex: userModel.lastIndex
-                        textRole: "name"
                     }
                 }
 
