@@ -66,17 +66,15 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 install -y --skip-unavailable \
     lsd \
-    starship \
     zsh-autosuggestions \
     zsh-syntax-highlighting || true
 
-# Fallback: install starship via cargo if dnf5 failed
-RUN if ! command -v starship &>/dev/null; then \
-    rm -rf /root/.cargo /root/.rustup && \
-    dnf5 install -y cargo && \
-    cargo install starship --locked && \
-    rm -rf /root/.cargo /root/.rustup; \
-    fi
+# Install starship via prebuilt binary
+RUN mkdir -p /tmp/starship && \
+    cd /tmp/starship && \
+    curl -sL https://github.com/starship/starship/releases/download/v1.21.1/starship-x86_64-unknown-linux-gnu.tar.gz | tar xz && \
+    install -Dm755 starship /usr/local/bin/starship && \
+    cd / && rm -rf /tmp/starship
 
 # Provision oh-my-zsh and plugins for new users
 RUN --mount=type=cache,dst=/var/cache \
