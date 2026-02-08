@@ -1,117 +1,246 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
+import QtQuick.Window
 import SddmComponents
 
 Rectangle {
     id: root
     color: "#282a36"
-    width: 1920
-    height: 1080
+    width: Screen.width
+    height: Screen.height
+
+    // Background with subtle gradient
+    Rectangle {
+        anchors.fill: parent
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: "#282a36" }
+            GradientStop { position: 1.0; color: "#1a1d2e" }
+        }
+    }
 
     Column {
         anchors.fill: parent
         anchors.margins: 0
         spacing: 0
 
+        // Top 65% - Clock and date
         Item {
             width: parent.width
             height: parent.height * 0.65
 
-            Text {
-                anchors.centerIn: parent
-                text: Qt.formatDateTime(new Date(), "HH:mm")
-                color: "#8be9fd"
-                font.family: "JetBrainsMono Nerd Font"
-                font.bold: true
-                font.pixelSize: 280
-            }
-        }
-
-        Item {
-            width: parent.width
-            height: parent.height * 0.35
-
             Column {
                 anchors.centerIn: parent
-                width: 450
-                spacing: 15
+                spacing: 10
 
-                Rectangle {
-                    width: parent.width
-                    height: 50
-                    color: "#44475a"
-                    border.color: "#bd93f9"
-                    border.width: 2
-                    radius: 4
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "Welcome to " + sddm.hostName
+                    color: "#bd93f9"
+                    font.family: "Liberation Mono"
+                    font.pixelSize: Math.max(16, root.height * 0.025)
+                    opacity: 0.9
+                }
 
-                    TextInput {
-                        width: parent.width
-                        height: parent.height
-                        leftPadding: 15
-                        rightPadding: 15
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.pixelSize: 14
-                        color: "#8be9fd"
-                        echoMode: TextInput.Password
-                        passwordCharacter: "•"
-                        focus: true
-                        verticalAlignment: TextInput.AlignVCenter
-                        onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Qt.formatDateTime(new Date(), "HH:mm")
+                    color: "#8be9fd"
+                    font.family: "Liberation Mono"
+                    font.bold: true
+                    font.pixelSize: Math.max(180, root.height * 0.25)
+                    style: Text.Outline
+                    styleColor: "#282a36"
+                    
+                    SequentialAnimation on opacity {
+                        running: true
+                        loops: Animation.Infinite
+                        NumberAnimation { to: 0.85; duration: 2000; easing.type: Easing.InOutQuad }
+                        NumberAnimation { to: 1.0; duration: 2000; easing.type: Easing.InOutQuad }
                     }
                 }
 
                 Text {
-                    text: "Password"
-                    color: "#6272a4"
-                    font.family: "JetBrainsMono Nerd Font"
-                    font.pixelSize: 14
-                    anchors.verticalCenter: parent.children[0].verticalCenter
-                    anchors.left: parent.children[0].left
-                    anchors.leftMargin: 15
-                    visible: parent.children[0].text.length === 0
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: Qt.formatDateTime(new Date(), "dddd, MMMM d")
+                    color: "#f8f8f2"
+                    font.family: "Liberation Mono"
+                    font.pixelSize: Math.max(14, root.height * 0.02)
+                    opacity: 0.7
                 }
+            }
+        }
 
-                Row {
-                    width: parent.width
-                    spacing: 10
-                    height: 40
+        // Bottom 35% - Login panel
+        Item {
+            width: parent.width
+            height: parent.height * 0.35
 
-                    ComboBox {
-                        id: sessions
-                        width: parent.width / 2 - 5
-                        height: parent.height
-                        model: sessionModel
-                    }
-
-                    ComboBox {
-                        id: users
-                        width: parent.width / 2 - 5
-                        height: parent.height
-                        model: userModel
-                    }
+            // Glassmorphic login panel
+            Rectangle {
+                id: loginPanel
+                anchors.centerIn: parent
+                width: Math.min(root.width * 0.35, 550)
+                height: Math.min(root.height * 0.28, 320)
+                color: "#44475a"
+                radius: 16
+                opacity: 0.3
+                
+                // Blur effect for glassmorphism
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blur: 0.8
+                    blurMax: 64
+                    blurMultiplier: 1.0
                 }
+            }
 
-                Rectangle {
-                    width: parent.width
-                    height: 45
-                    color: "#bd93f9"
-                    radius: 4
+            // Content overlay on glass panel
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.min(root.width * 0.35, 550)
+                height: Math.min(root.height * 0.28, 320)
+                color: "transparent"
+                radius: 16
+                border.color: "#6272a4"
+                border.width: 1
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Login"
+                Column {
+                    anchors.centerIn: parent
+                    width: parent.width * 0.88
+                    spacing: parent.height * 0.08
+
+                    // Password field with focus glow
+                    Rectangle {
+                        id: passwordBox
+                        width: parent.width
+                        height: Math.max(48, parent.parent.height * 0.22)
                         color: "#282a36"
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.bold: true
-                        font.pixelSize: 14
+                        border.color: passwordInput.activeFocus ? "#bd93f9" : "#44475a"
+                        border.width: passwordInput.activeFocus ? 3 : 2
+                        radius: 10
+                        opacity: 0.9
+
+                        Behavior on border.color {
+                            ColorAnimation { duration: 200 }
+                        }
+
+                        Behavior on border.width {
+                            NumberAnimation { duration: 200 }
+                        }
+
+                        // Glow effect when focused
+                        layer.enabled: passwordInput.activeFocus
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: "#bd93f9"
+                            shadowBlur: 0.8
+                            shadowHorizontalOffset: 0
+                            shadowVerticalOffset: 0
+                        }
+
+                        TextInput {
+                            id: passwordInput
+                            anchors.fill: parent
+                            leftPadding: parent.height * 0.3
+                            rightPadding: parent.height * 0.8
+                            font.family: "Liberation Mono"
+                            font.pixelSize: Math.max(12, parent.height * 0.3)
+                            color: "#f8f8f2"
+                            echoMode: TextInput.Password
+                            passwordCharacter: "●"
+                            focus: true
+                            verticalAlignment: TextInput.AlignVCenter
+                            onAccepted: {
+                                sddm.login(userModel.data(userModel.index(userModel.lastIndex, 0), 257), passwordInput.text, 0)
+                            }
+                        }
+
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: parent.height * 0.3
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "⏎"
+                            color: "#bd93f9"
+                            font.family: "Liberation Mono"
+                            font.pixelSize: Math.max(14, parent.height * 0.35)
+                            opacity: 0.7
+                        }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: sddm.login(users.currentIndex >= 0 ? userModel.data(userModel.index(users.currentIndex, 0), userModel.roles.name) : userModel.lastUser, "", sessionModel.lastIndex)
+                    // Glassmorphic login button with hover glow
+                    Rectangle {
+                        id: loginButton
+                        width: parent.width
+                        height: Math.max(48, parent.parent.height * 0.22)
+                        color: loginButtonMouse.containsMouse ? "#ffb86c" : "#bd93f9"
+                        radius: 10
+                        opacity: 0.95
+
+                        Behavior on color {
+                            ColorAnimation { duration: 200 }
+                        }
+
+                        scale: loginButtonMouse.pressed ? 0.97 : 1.0
+                        Behavior on scale {
+                            NumberAnimation { duration: 150; easing.type: Easing.OutBack }
+                        }
+
+                        // Glow effect on hover
+                        layer.enabled: loginButtonMouse.containsMouse
+                        layer.effect: MultiEffect {
+                            shadowEnabled: true
+                            shadowColor: loginButtonMouse.containsMouse ? "#ffb86c" : "#bd93f9"
+                            shadowBlur: 1.0
+                            shadowHorizontalOffset: 0
+                            shadowVerticalOffset: 0
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Login →"
+                            color: "#282a36"
+                            font.family: "Liberation Mono"
+                            font.pixelSize: Math.max(14, parent.height * 0.35)
+                            font.bold: true
+                        }
+
+                        MouseArea {
+                            id: loginButtonMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                sddm.login(userModel.data(userModel.index(userModel.lastIndex, 0), 257), passwordInput.text, 0)
+                            }
+                        }
+                    }
+
+                    // Session selector text
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "Session: " + sessionModel.data(sessionModel.index(sessionModel.lastIndex, 0), 257)
+                        color: "#6272a4"
+                        font.family: "Liberation Mono"
+                        font.pixelSize: Math.max(10, parent.parent.height * 0.08)
+                        opacity: 0.7
                     }
                 }
             }
         }
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: {
+            parent.update()
+        }
+    }
+
+    Component.onCompleted: {
+        passwordInput.forceActiveFocus()
     }
 }
