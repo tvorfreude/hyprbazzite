@@ -42,6 +42,8 @@
 		"custom/separator#dot-line",
 		"mpris",
 		"custom/separator#blank",
+		"group/notify",
+		"custom/separator#blank",
 		"group/status",
 	]
 }

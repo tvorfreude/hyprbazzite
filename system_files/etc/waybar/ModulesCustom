@@ -41,6 +41,17 @@
 		"tooltip": true,
 		"tooltip-format": "Exit Hyprland",
 	},
+	"custom/dunst": {
+		"format": "{}",
+		"exec": "/etc/hypr/scripts/dunst-status.sh",
+		"interval": 2,
+		"return-type": "json",
+		"tooltip": true,
+		"tooltip-format": "Notifications",
+		"on-click": "/etc/hypr/scripts/dunst-history.sh",
+		"on-click-middle": "dunstctl set-paused toggle",
+		"on-click-right": "dunstctl close-all",
+	},
 	"custom/separator#dot": {
 		"format": "•",
 		"interval": "once",
