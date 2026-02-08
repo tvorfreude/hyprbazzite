@@ -172,8 +172,8 @@ window#waybar.empty #window {
 #custom-weather.sunnyDay {
   padding-top: 4px;
   padding-bottom: 4px;
-  padding-right: 6px;
-  padding-left: 6px;
+  padding-right: 3px;
+  padding-left: 3px;
 }
 
 /*-----Indicators----*/

@@ -37,7 +37,14 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 remove -y gnome-shell gnome-desktop gnome-session gnome-settings-daemon \
     gnome-shell-extensions gnome-control-center gnome-terminal \
     kde-workspace kde-plasma-desktop kdebase kde-settings \
-    plasma-desktop plasma-workspaces sddm --noautoremove 2>/dev/null || true
+    plasma-desktop plasma-workspaces sddm \
+    plasma-* kde-* kdeconnectd \
+    --noautoremove 2>/dev/null || true
+
+# Remove unwanted Bazzite default flatpak apps
+RUN flatpak remove -y \
+    org.mozilla.firefox \
+    org.gnome.* 2>/dev/null || true
 
 # Install Hyprland and dependencies from sdegler COPR
 RUN --mount=type=cache,dst=/var/cache \

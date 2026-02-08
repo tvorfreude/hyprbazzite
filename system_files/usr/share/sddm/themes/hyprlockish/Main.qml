@@ -53,6 +53,7 @@ Rectangle {
                         font.pixelSize: 14
                         color: "#8be9fd"
                         echoMode: TextInput.Password
+                        passwordCharacter: "•"
                         focus: true
                         verticalAlignment: TextInput.AlignVCenter
                         onAccepted: sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
