@@ -55,17 +55,27 @@ RUN --mount=type=cache,dst=/var/cache \
     xdg-desktop-portal-hyprland && \
     dnf5 -y copr disable sdegler/hyprland
 
-# Set zsh as default shell + tools
-RUN dnf5 install -y \
-    zsh \
-    fzf \
-    lsd \
-    starship \
-    zsh-autosuggestions \
-    zsh-syntax-highlighting && \
+# Set zsh as default shell
+RUN dnf5 install -y zsh && \
     usermod -s /bin/zsh root && \
     mkdir -p /etc/default && \
     echo 'SHELL=/bin/zsh' >> /etc/default/useradd
+
+# Install optional zsh tools (skip unavailable)
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    dnf5 install -y --skip-unavailable \
+    lsd \
+    starship \
+    zsh-autosuggestions \
+    zsh-syntax-highlighting || true
+
+# Fallback: install starship via cargo if dnf5 failed
+RUN if ! command -v starship &>/dev/null; then \
+    dnf5 install -y cargo && \
+    cargo install starship --locked && \
+    rm -rf $HOME/.cargo; \
+    fi
 
 # Provision oh-my-zsh and plugins for new users
 RUN --mount=type=cache,dst=/var/cache \
