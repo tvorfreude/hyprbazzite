@@ -97,9 +97,7 @@ Rectangle {
                         model: sessionModel
                         currentIndex: sessionModel.lastIndex
                         textRole: "name"
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.pixelSize: 12
-                        onCurrentIndexChanged: sessionModel.lastIndex = currentIndex
+                        onActivated: sessionModel.lastIndex = currentIndex
                     }
 
                     ComboBox {
@@ -109,9 +107,7 @@ Rectangle {
                         model: userModel
                         currentIndex: userModel.lastIndex
                         textRole: "name"
-                        font.family: "JetBrainsMono Nerd Font"
-                        font.pixelSize: 12
-                        onCurrentIndexChanged: userModel.lastIndex = currentIndex
+                        onActivated: userModel.lastIndex = currentIndex
                     }
                 }
 
