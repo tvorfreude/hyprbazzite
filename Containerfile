@@ -151,6 +151,17 @@ RUN --mount=type=cache,dst=/var/cache \
 # Compile dconf database for dark mode defaults
 RUN dconf update
 
+# Configure bootc filesystem defaults
+RUN mkdir -p /usr/lib/bootc && cat > /usr/lib/bootc/bootc.toml << 'EOF'
+[[customizations.filesystem]]
+mountpoint = "/"
+type = "xfs"
+
+[[customizations.filesystem]]
+mountpoint = "/boot"
+type = "ext4"
+EOF
+
 # Cleanup runtime artifacts from /var that shouldn't persist in image
 RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/lib/yum /var/opt
 
