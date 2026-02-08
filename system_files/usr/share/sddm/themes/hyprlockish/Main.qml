@@ -97,7 +97,6 @@ Rectangle {
                         model: sessionModel
                         currentIndex: sessionModel.lastIndex
                         textRole: "name"
-                        onActivated: sessionModel.lastIndex = currentIndex
                     }
 
                     ComboBox {
@@ -107,7 +106,6 @@ Rectangle {
                         model: userModel
                         currentIndex: userModel.lastIndex
                         textRole: "name"
-                        onActivated: userModel.lastIndex = currentIndex
                     }
                 }
 
