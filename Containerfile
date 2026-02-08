@@ -61,6 +61,11 @@ RUN dnf5 install -y zsh && \
     mkdir -p /etc/default && \
     echo 'SHELL=/bin/zsh' >> /etc/default/useradd
 
+# Provision oh-my-zsh for new users first
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /etc/skel/.oh-my-zsh
+
 # Install optional zsh tools and starship via COPR
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
@@ -70,14 +75,6 @@ RUN --mount=type=cache,dst=/var/cache \
     lsd \
     zsh-autosuggestions \
     zsh-syntax-highlighting || true
-
-# Provision oh-my-zsh and plugins for new users
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    mkdir -p /etc/skel/.oh-my-zsh/custom/plugins && \
-    git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /etc/skel/.oh-my-zsh && \
-    git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions /etc/skel/.oh-my-zsh/custom/plugins/zsh-autosuggestions && \
-    git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting /etc/skel/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
 
 # Install and setup SDDM display manager
 RUN --mount=type=cache,dst=/var/cache \
