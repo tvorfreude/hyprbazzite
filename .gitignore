@@ -2,3 +2,8 @@ cosign.key
 _build_*
 output
 _build-*/**
+
+# Secure Boot private keys
+secure-boot-keys/*.key
+*.key
+!*.pub
