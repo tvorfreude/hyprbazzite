@@ -83,6 +83,14 @@ jobs:
             ${image} /temp_flatpak_install_dir/script.sh
           docker rmi ${image}
 
+      - name: Prepare Secure Boot Key
+        id: secure_boot
+        shell: bash
+        run: |
+          echo "${{ secrets.SECURE_BOOT_KEY }}" | base64 -d > ${{ github.workspace }}/secureboot.key
+          chmod 600 ${{ github.workspace }}/secureboot.key
+          echo "key-path=${{ github.workspace }}/secureboot.key" >> $GITHUB_OUTPUT
+
       - name: Build ISOs
         uses: jasonn3/build-container-installer@c9ef3de33236e66781ec37bd0485e8009eaefe24 # v1.4.0
         id: build
@@ -98,6 +106,13 @@ jobs:
           enable_cache_skopeo: "false"
           flatpak_remote_refs_dir: ${{ steps.generate-flatpak-dir-shortname.outputs.flatpak-dir-shortname }}
           enable_flatpak_dependencies: "false"
+          secure_boot_key_url: ${{ steps.secure_boot.outputs.key-path }}
+
+      - name: Cleanup Secure Boot Key
+        if: always()
+        shell: bash
+        run: |
+          rm -f ${{ github.workspace }}/secureboot.key
 
       - name: Move ISOs to Upload Directory
         id: upload-directory
