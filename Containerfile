@@ -134,7 +134,8 @@ RUN --mount=type=cache,dst=/var/cache \
 # Install zen-browser as Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
     flatpak install -y flathub io.github.zen_browser.zen && \
-    flatpak override --user --env=GTK_THEME=Adwaita:dark io.github.zen_browser.zen
+    flatpak override --system --env=GTK_THEME=Adwaita:dark io.github.zen_browser.zen && \
+    flatpak override --system --env=QT_STYLE_OVERRIDE=adwaita-dark io.github.zen_browser.zen
 
 # Install file manager, thunar, and media support
 RUN --mount=type=cache,dst=/var/cache \
