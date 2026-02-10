@@ -10,6 +10,13 @@ Rectangle {
     width: Screen.width
     height: Screen.height
 
+    // Mouse cursor
+    MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.ArrowCursor
+        acceptedButtons: Qt.NoButton
+    }
+
     // Lava lamp background
     Item {
         anchors.fill: parent
