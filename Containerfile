@@ -8,6 +8,10 @@ FROM ghcr.io/ublue-os/bazzite:stable
 # Bazzite-style provisioning (ship defaults in /usr)
 COPY system_files /
 
+# Fix terra-mesa GPG key issue by disabling GPG check for the repo
+RUN sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/null || true && \
+    sed -i 's/^repo_gpgcheck=1/repo_gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/null || true
+
 ## Other possible base images include:
 # FROM ghcr.io/ublue-os/bazzite:latest
 # FROM ghcr.io/ublue-os/bluefin-nvidia:stable
@@ -134,8 +138,34 @@ RUN --mount=type=cache,dst=/var/cache \
 # Install zen-browser as Flatpak
 RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
     flatpak install -y flathub io.github.zen_browser.zen && \
+    flatpak install -y flathub com.visualstudio.code && \
+    flatpak install -y flathub com.discordapp.Discord && \
+    flatpak install -y flathub org.prismlauncher.PrismLauncher && \
+    flatpak install -y flathub com.bitwarden.desktop && \
+    flatpak install -y flathub org.openrgb.OpenRGB && \
+    flatpak install -y flathub com.surfshark.Surfshark && \
     flatpak override --system --env=GTK_THEME=Adwaita:dark io.github.zen_browser.zen && \
     flatpak override --system --env=QT_STYLE_OVERRIDE=adwaita-dark io.github.zen_browser.zen
+
+# VS Code Flatpak configuration for host integration and terminal
+RUN flatpak override --system com.visualstudio.code \
+    --filesystem=host \
+    --talk-name=org.freedesktop.Flatpak \
+    --env=TERM=xterm-256color
+
+# Flatpak overrides and configuration for OpenRGB and Bitwarden SSH Agent
+RUN flatpak override --system --device=all org.openrgb.OpenRGB && \
+    echo 'Note: For full OpenRGB hardware support, install the latest udev rules on the host.' && \
+    flatpak override --system --socket=ssh-auth com.bitwarden.desktop && \
+    echo 'Note: For Bitwarden SSH Agent, configure your SSH client to use the Bitwarden agent and ensure your Git/SSH tools can communicate with the agent socket.'
+
+RUN mkdir -p /etc/skel/.config/Code/User && \
+    if [ -f /etc/skel/.config/Code/User/settings.json ]; then \
+    jq '. + {"terminal.integrated.defaultProfile.linux": "zsh-host", "terminal.integrated.profiles.linux": (.terminal.integrated.profiles.linux // {}) + {"zsh-host": {"path": "flatpak-spawn", "args": ["--host", "env", "TERM=xterm-256color", "zsh", "-i"]}}}' /etc/skel/.config/Code/User/settings.json > /etc/skel/.config/Code/User/settings.json.tmp && \
+    mv /etc/skel/.config/Code/User/settings.json.tmp /etc/skel/.config/Code/User/settings.json; \
+    else \
+    printf '{\n  "terminal.integrated.defaultProfile.linux": "zsh-host",\n  "terminal.integrated.profiles.linux": {\n    "zsh-host": {\n      "path": "flatpak-spawn",\n      "args": ["--host", "env", "TERM=xterm-256color", "zsh", "-i"]\n    }\n  }\n}\n' > /etc/skel/.config/Code/User/settings.json; \
+    fi
 
 # Install file manager, thunar, and media support
 RUN --mount=type=cache,dst=/var/cache \
