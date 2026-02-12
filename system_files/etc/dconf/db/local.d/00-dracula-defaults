@@ -6,6 +6,14 @@ cursor-theme='Adwaita'
 font-name='JetBrainsMono Nerd Font 10'
 monospace-font-name='JetBrainsMono Nerd Font 11'
 document-font-name='JetBrainsMono Nerd Font 10'
+[org.gnome.desktop.interface]
+gtk-theme='Dracula'
+color-scheme='prefer-dark'
+icon-theme='Dracula'
+cursor-theme='Dracula'
+font-name='JetBrainsMono Nerd Font 10'
+monospace-font-name='JetBrainsMono Nerd Font 11'
+document-font-name='JetBrainsMono Nerd Font 10'
 
 [org.gtk.gtk4.Settings.FileChooser]
 sort-order='alphabetical'

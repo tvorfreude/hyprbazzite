@@ -135,29 +135,16 @@ RUN --mount=type=cache,dst=/var/cache \
     imv \
     fastfetch
 
-# Install zen-browser as Flatpak
-RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
-    flatpak install -y flathub io.github.zen_browser.zen && \
-    flatpak install -y flathub com.visualstudio.code && \
-    flatpak install -y flathub com.discordapp.Discord && \
-    flatpak install -y flathub org.prismlauncher.PrismLauncher && \
-    flatpak install -y flathub com.bitwarden.desktop && \
-    flatpak install -y flathub org.openrgb.OpenRGB && \
-    flatpak install -y flathub com.surfshark.Surfshark && \
-    flatpak override --system --env=GTK_THEME=Adwaita:dark io.github.zen_browser.zen && \
-    flatpak override --system --env=QT_STYLE_OVERRIDE=adwaita-dark io.github.zen_browser.zen
 
-# VS Code Flatpak configuration for host integration and terminal
-RUN flatpak override --system com.visualstudio.code \
-    --filesystem=host \
-    --talk-name=org.freedesktop.Flatpak \
-    --env=TERM=xterm-256color
+# Flatpak installation and overrides moved to first boot script.
 
-# Flatpak overrides and configuration for OpenRGB and Bitwarden SSH Agent
-RUN flatpak override --system --device=all org.openrgb.OpenRGB && \
-    echo 'Note: For full OpenRGB hardware support, install the latest udev rules on the host.' && \
-    flatpak override --system --socket=ssh-auth com.bitwarden.desktop && \
-    echo 'Note: For Bitwarden SSH Agent, configure your SSH client to use the Bitwarden agent and ensure your Git/SSH tools can communicate with the agent socket.'
+# Ensure Adwaita GTK and icon themes are present
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    dnf5 install -y adwaita-gtk2-theme adwaita-qt5 adwaita-qt6 adwaita-icon-theme || true
+
+
+# Flatpak overrides for VS Code, OpenRGB, and Bitwarden moved to first boot script if needed.
 
 RUN mkdir -p /etc/skel/.config/Code/User && \
     if [ -f /etc/skel/.config/Code/User/settings.json ]; then \

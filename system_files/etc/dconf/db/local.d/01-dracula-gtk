@@ -7,6 +7,15 @@ cursor-theme='Adwaita'
 font-name='JetBrainsMono Nerd Font 10'
 monospace-font-name='JetBrainsMono Nerd Font 11'
 document-font-name='JetBrainsMono Nerd Font 10'
+[org.gnome.desktop.interface]
+gtk-application-prefer-dark-ui=true
+gtk-theme='Dracula'
+color-scheme='prefer-dark'
+icon-theme='Dracula'
+cursor-theme='Dracula'
+font-name='JetBrainsMono Nerd Font 10'
+monospace-font-name='JetBrainsMono Nerd Font 11'
+document-font-name='JetBrainsMono Nerd Font 10'
 
 [org.gnome.settings-daemon.plugins.power]
 power-button-action='interactive'
