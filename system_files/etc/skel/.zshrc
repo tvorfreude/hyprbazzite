@@ -1,6 +1,6 @@
 # ===== BASE ENV =====
 export GTK_THEME=Adwaita:dark
-export QT_STYLE_OVERRIDE=adwaita-dark
+
 export QT_QPA_PLATFORMTHEME=qt5ct
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 
@@ -15,8 +15,6 @@ plugins=(
 	sudo
 	colored-man-pages
 	command-not-found
-	zsh-autosuggestions
-	zsh-syntax-highlighting
 )
 
 if [ -r "$ZSH/oh-my-zsh.sh" ]; then
