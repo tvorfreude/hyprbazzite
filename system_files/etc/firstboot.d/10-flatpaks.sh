@@ -21,6 +21,6 @@ done
 
 # Set Dracula theme for zen-browser Flatpak
 flatpak override --system --env=GTK_THEME=Dracula io.github.zen_browser.zen
-flatpak override --system --env=QT_STYLE_OVERRIDE=Dracula io.github.zen_browser.zen
+
 
 exit 0
