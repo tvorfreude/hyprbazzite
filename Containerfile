@@ -152,7 +152,9 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 install -y adwaita-gtk2-theme adwaita-qt5 adwaita-qt6 adwaita-icon-theme || true \
     && git clone --depth=1 https://github.com/dracula/gtk.git /usr/share/themes/Dracula \
-    && rm -rf /usr/share/themes/Dracula/.git
+    && rm -rf /usr/share/themes/Dracula/.git \
+    && chmod -R 755 /usr/share/themes/Dracula \
+    && glib-compile-schemas /usr/share/glib-2.0/schemas/
 
 
 # Flatpak overrides for VS Code, OpenRGB, and Bitwarden moved to first boot script if needed.

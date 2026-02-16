@@ -1,12 +1,4 @@
-[org.gnome.desktop.interface]
-gtk-theme='Adwaita:dark'
-color-scheme='prefer-dark'
-icon-theme='Adwaita'
-cursor-theme='Adwaita'
-font-name='JetBrainsMono Nerd Font 10'
-monospace-font-name='JetBrainsMono Nerd Font 11'
-document-font-name='JetBrainsMono Nerd Font 10'
-[org.gnome.desktop.interface]
+[org/gnome/desktop/interface]
 gtk-theme='Dracula'
 color-scheme='prefer-dark'
 icon-theme='Dracula'
@@ -15,20 +7,20 @@ font-name='JetBrainsMono Nerd Font 10'
 monospace-font-name='JetBrainsMono Nerd Font 11'
 document-font-name='JetBrainsMono Nerd Font 10'
 
-[org.gtk.gtk4.Settings.FileChooser]
+[org/gtk/gtk4/Settings/FileChooser]
 sort-order='alphabetical'
 sidebar-width=200
 show-hidden=true
 type-format='category'
 view-type='list'
 
-[org.gtk.Settings.FileChooser]
+[org/gtk/Settings/FileChooser]
 sort-order='alphabetical'
 sidebar-width=200
 show-hidden=true
 type-format='category'
 view-type='list'
 
-[org.gnome.shell.extensions.dash-to-dock]
+[org/gnome/shell/extensions/dash-to-dock]
 dock-position='TOP'
 preferred-monitor=0
