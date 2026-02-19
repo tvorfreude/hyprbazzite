@@ -99,6 +99,11 @@ done
 
 echo "[HIJACK] Applying VS Code overrides..."
 flatpak override --system --filesystem=host --talk-name=org.freedesktop.Flatpak com.visualstudio.code
+# Ensure the SSH agent socket directory exists for Flatpak VS Code
+if [ -n "$XDG_RUNTIME_DIR" ]; then
+    mkdir -p "$XDG_RUNTIME_DIR/keyring"
+fi
+flatpak override --user --env=SSH_AUTH_SOCK=$XDG_RUNTIME_DIR/keyring/ssh com.visualstudio.code
 
 # Final success notification (closes or updates the progress bar to 100%)
 NOTIFICATION_ID=$(send_progress_notification "System Provisioning" 100 "All Flatpaks installed successfully!" "normal" "$NOTIFICATION_ID")
