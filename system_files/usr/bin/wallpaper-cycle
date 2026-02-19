@@ -1,0 +1,36 @@
+#!/bin/bash
+# Directory containing wallpapers
+DIR="/usr/share/backgrounds/gif_wallpapers"
+
+# Transition config
+TRANSITION="--transition-type grow --transition-pos 0.5,0.5 --transition-fps 30 --transition-step 90 --transition-duration 2"
+
+# Function to cycle wallpaper
+cycle_now() {
+    # Re-scan directory (in case files change)
+    if [ -d "$DIR" ]; then
+        FILES=("$DIR"/*.gif)
+        # Check if dir is not empty
+        if [ ${#FILES[@]} -gt 0 ] && [ -e "${FILES[0]}" ]; then
+            WALLPAPER="${FILES[RANDOM % ${#FILES[@]}]}"
+            if [ -f "$WALLPAPER" ]; then
+                swww img "$WALLPAPER" $TRANSITION --resize crop --filter Nearest
+            fi
+        fi
+    fi
+}
+
+# Trap USR1 signal for manual cycle
+trap 'cycle_now' USR1
+
+# Initial delay to ensure daemon is ready config
+sleep 2
+cycle_now
+
+# Infinite loop with interruptible sleep
+while true; do
+  # Sleep in background so 'wait' can be interrupted by trap
+  sleep 900 &
+  wait $!
+  cycle_now
+done

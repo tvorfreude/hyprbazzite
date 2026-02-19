@@ -1,0 +1,16 @@
+mode=drun
+show=drun
+width=500
+height=350
+always_dmenu=true
+rm_mode=false
+allow_images=true
+image_size=24
+prompt=Search...
+filter_rate=100
+allow_markup=true
+no_actions=true
+halign=fill
+orientation=vertical
+content_halign=fill
+insensitive=true

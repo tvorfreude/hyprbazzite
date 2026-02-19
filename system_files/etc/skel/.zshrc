@@ -1,6 +1,4 @@
 # ===== BASE ENV =====
-export GTK_THEME=Adwaita:dark
-
 export QT_QPA_PLATFORMTHEME=qt5ct
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 

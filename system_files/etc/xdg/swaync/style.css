@@ -1,0 +1,254 @@
+/* Dracula Theme for SwayNotificationCenter */
+
+/* Global Variables */
+@define-color base #282a36;
+@define-color mantle #1e1f29;
+@define-color crust #181926;
+@define-color text #f8f8f2;
+@define-color subtext0 #a6adc8;
+@define-color subtext1 #bac2de;
+@define-color surface0 #313244;
+@define-color surface1 #45475a;
+@define-color surface2 #585b70;
+@define-color overlay0 #6c7086;
+@define-color overlay1 #7f849c;
+@define-color overlay2 #9399b2;
+@define-color blue #8be9fd;
+@define-color lavender #b4befe;
+@define-color sapphire #74c7ec;
+@define-color sky #89dceb;
+@define-color teal #94e2d5;
+@define-color green #50fa7b;
+@define-color yellow #f1fa8c;
+@define-color peach #ffb86c;
+@define-color maroon #eba0ac;
+@define-color red #ff5555;
+@define-color mauve #bd93f9;
+@define-color pink #f5c2e7;
+@define-color flamingo #f2cdcd;
+@define-color rosewater #f5e0dc;
+
+* {
+    font-family: "JetBrains Mono Nerd Font", monospace;
+}
+
+window#swaync-notification-window,
+window#swaync-control-center {
+    background-color: transparent;
+}
+
+layer-shell {
+    background-color: transparent;
+}
+
+.notification-row {
+    outline: none;
+    margin: 0px;
+    padding: 0px;
+}
+
+.notification-row:focus,
+.notification-row:hover {
+    background: transparent;
+}
+
+.notification {
+    border-radius: 12px;
+    margin: 6px 12px;
+    box-shadow: 0 0 0 1px @surface0;
+    padding: 0;
+    background: @base;
+}
+
+.notification-content {
+    background: transparent;
+    padding: 12px;
+    border-radius: 12px;
+}
+
+.close-button {
+    background: @surface0;
+    color: @text;
+    text-shadow: none;
+    padding: 0;
+    border-radius: 10px;
+    margin-top: 5px;
+    margin-right: 5px;
+    box-shadow: none;
+    border: none;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+.close-button:hover {
+    box-shadow: none;
+    background: @red;
+    transition: all 0.15s ease-in-out;
+    border: none;
+}
+
+.notification-default-action,
+.notification-action {
+    padding: 4px;
+    margin: 0;
+    box-shadow: none;
+    background: transparent;
+    border: none;
+    color: @text;
+}
+
+.notification-default-action:hover,
+.notification-action:hover {
+    -gtk-icon-effect: none;
+    background: @surface0;
+}
+
+.notification-default-action {
+    border-radius: 12px;
+}
+
+/* Control Center */
+.control-center {
+    background: @base;
+    border-radius: 12px;
+    border: 1px solid @surface0;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+    margin: 18px;
+    padding: 12px;
+}
+
+/* Widgets */
+.widget-title {
+    color: @text;
+    background: @base;
+    padding: 8px;
+    margin: 8px;
+    font-size: 1.5rem;
+    border-radius: 12px;
+}
+
+.widget-title>button {
+    font-size: initial;
+    color: @text;
+    text-shadow: none;
+    background: @surface0;
+    border: 1px solid @surface1;
+    box-shadow: none;
+    border-radius: 12px;
+}
+
+.widget-title>button:hover {
+    background: @red;
+    color: @base;
+}
+
+.widget-dnd {
+    background: @surface0;
+    padding: 8px;
+    margin: 8px;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    color: @text;
+}
+
+.widget-dnd>switch {
+    font-size: initial;
+    border-radius: 12px;
+    background: @surface1;
+    border: 1px solid @surface1;
+    box-shadow: none;
+}
+
+.widget-dnd>switch:checked {
+    background: @mauve;
+}
+
+.widget-dnd>switch slider {
+    background: @text;
+    border-radius: 12px;
+}
+
+.widget-mpris {
+    color: @text;
+    background: @surface0;
+    padding: 4px;
+    margin: 8px;
+    border-radius: 12px;
+}
+
+.widget-mpris-player {
+    padding: 8px;
+    margin: 0;
+}
+
+.widget-mpris-player.paused {
+    display: none;
+}
+
+
+
+.widget-mpris-title {
+    font-size: 1rem;
+}
+
+.widget-mpris-subtitle {
+    font-size: 0.8rem;
+}
+
+.widget-mpris>box>button {
+    border-radius: 12px;
+}
+
+/* Notification Groups */
+.notification-group {
+    background: transparent;
+}
+
+.notification-group-header {
+    margin: 4px 10px;
+    font-size: 1rem;
+    color: @text;
+    text-shadow: none;
+}
+
+.notification-group-icon {
+    color: @text;
+}
+
+.notification-group-close-all {
+    color: @text;
+    background: @surface0;
+    border: none;
+    box-shadow: none;
+}
+
+.notification-group-close-all:hover {
+    background: @red;
+    color: @base;
+}
+
+/* Buttons Grid */
+.widget-buttons-grid {
+    padding: 8px;
+    margin: 8px;
+    border-radius: 12px;
+    background: @surface0;
+}
+
+.widget-buttons-grid>flowbox>flowboxchild>button {
+    background: @surface1;
+    border-radius: 12px;
+    padding: 12px;
+    margin: 4px;
+    border: none;
+    box-shadow: none;
+    min-width: 60px;
+    min-height: 60px;
+    font-size: 1.5rem;
+    color: @text;
+}
+
+.widget-buttons-grid>flowbox>flowboxchild>button:hover {
+    background: @mauve;
+    color: @base;
+}

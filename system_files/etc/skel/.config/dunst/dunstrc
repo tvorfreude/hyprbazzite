@@ -1,0 +1,30 @@
+[global]
+    frame_color = "#bd93f9"
+    separator_color = frame
+    font = JetBrains Mono 10
+    corner_radius = 8
+    width = 300
+    height = 300
+    offset = 30x50
+    origin = top-right
+    notification_limit = 5
+    progress_bar = true
+    icon_position = left
+    max_icon_size = 80
+    format = "<b>%s</b>\n%b\n<small>%a</small>"
+    enable_recursive_icon_lookup = true
+    icon_theme = breeze-dark
+
+[urgency_low]
+    background = "#282a36"
+    foreground = "#6272a4"
+    frame_color = "#6272a4"
+
+[urgency_normal]
+    background = "#282a36"
+    foreground = "#f8f8f2"
+
+[urgency_critical]
+    background = "#ff5555"
+    foreground = "#f8f8f2"
+    frame_color = "#ff5555"

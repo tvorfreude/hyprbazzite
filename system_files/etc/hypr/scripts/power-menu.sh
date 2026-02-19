@@ -1,23 +1,21 @@
 #!/bin/bash
-# Power Menu Script for Wofi
 
-# Wofi menu options
-options="Shutdown\nReboot\nSuspend\nCancel"
+SELECTION=$(echo -e "  Shutdown\n  Reboot\n  Logout\n  Lock\n  Suspend" | wofi --dmenu --conf /etc/wofi/config --style /etc/wofi/style.css --width 250 --height 210 --prompt "Power Menu")
 
-# Show wofi menu
-chosen=$(echo -e "$options" | wofi --show dmenu --conf /etc/wofi/config --style /etc/wofi/style.css --prompt "Power")
-
-case "$chosen" in
-    "Shutdown")
-        systemctl poweroff
-        ;;
-    "Reboot")
-        systemctl reboot
-        ;;
-    "Suspend")
-        systemctl suspend
-        ;;
-    *)
-        exit 0
-        ;;
+case "$SELECTION" in
+	"  Shutdown")
+		systemctl poweroff
+		;;
+	"  Reboot")
+		systemctl reboot
+		;;
+	"  Logout")
+		hyprctl dispatch exit
+		;;
+	"  Lock")
+		hyprlock
+		;;
+	"  Suspend")
+		systemctl suspend
+		;;
 esac

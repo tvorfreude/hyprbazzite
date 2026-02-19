@@ -8,11 +8,6 @@ FROM ghcr.io/ublue-os/bazzite:stable
 # Bazzite-style provisioning (ship defaults in /usr)
 COPY system_files /
 
-# Ensure hijacked script is executable and inject it into manager
-RUN chmod +x /usr/libexec/bazzite-flatpak-hijack.sh && \
-    chmod +x /usr/libexec/bazzite-flatpak-manager && \
-    echo 'source /usr/libexec/bazzite-flatpak-hijack.sh' >> /usr/libexec/bazzite-flatpak-manager
-
 
 # Fix terra-mesa GPG key issue by disabling GPG check for the repo
 RUN sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/null || true && \
@@ -52,25 +47,33 @@ RUN --mount=type=cache,dst=/var/cache \
     --noautoremove 2>/dev/null || true
 
 # Remove unwanted Bazzite default flatpak apps
-RUN flatpak remove -y \
-    org.mozilla.firefox \
-    org.gnome.* 2>/dev/null || true
+# Manage Flatpaks
+# Manage Flatpaks (Move custom install to first-boot service due to build-time sandbox limitations)
+# Manage Flatpaks
+# Manage Flatpaks (Runtime Hijack Method)
+RUN flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo && \
+    flatpak uninstall -y org.mozilla.firefox org.gnome.* 2>/dev/null || true && \
+    chmod +x /usr/libexec/bazzite-flatpak-hijack.sh && \
+    chmod +x /usr/libexec/bazzite-flatpak-manager && \
+    chmod +x /usr/bin/wallpaper-cycle && \
+    echo 'source /usr/libexec/bazzite-flatpak-hijack.sh' >> /usr/libexec/bazzite-flatpak-manager
 
 # Install Hyprland and dependencies from sdegler COPR
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y copr enable sdegler/hyprland && \
+    dnf5 -y copr enable erikreider/SwayNotificationCenter && \
     dnf5 install -y \
     hyprland \
     hyprland-guiutils \
     hyprlock \
     hypridle \
     hyprpaper \
+    swww \
     waybar \
-    dunst \
+    SwayNotificationCenter \
     wofi \
-    xdg-desktop-portal-hyprland && \
-    dnf5 -y copr disable sdegler/hyprland
+    xdg-desktop-portal-hyprland
 
 # Set zsh as default shell
 RUN dnf5 install -y zsh && \
@@ -89,9 +92,7 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y copr enable atim/starship && \
     dnf5 install -y --skip-unavailable \
     starship \
-    lsd \
-    zsh-autosuggestions \
-    zsh-syntax-highlighting || true
+    lsd || true
 
 # Install and setup SDDM display manager
 RUN --mount=type=cache,dst=/var/cache \
@@ -102,7 +103,7 @@ RUN --mount=type=cache,dst=/var/cache \
     chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
     chmod -R 0755 /usr/share/sddm/themes && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
-    chmod +x /etc/hypr/scripts/power-menu.sh && \
+    chmod +x /etc/hypr/scripts/*.sh && \
     systemctl enable sddm.service
 
 # Install essential session, keyring, and authentication packages
@@ -115,6 +116,7 @@ RUN --mount=type=cache,dst=/var/cache \
     gnome-keyring \
     seahorse \
     blueman \
+    breeze-icon-theme \
     python3-secretstorage \
     libsecret \
     libsecret-devel \
@@ -122,7 +124,18 @@ RUN --mount=type=cache,dst=/var/cache \
     gcr-devel \
     qt5ct
 
-# Fonts already included in bazzite base image
+# Install Dracula GTK and Qt themes
+RUN mkdir -p /usr/share/themes/Dracula && \
+    curl -L https://github.com/dracula/gtk/archive/master.zip -o /tmp/dracula-gtk.zip && \
+    unzip /tmp/dracula-gtk.zip -d /tmp && \
+    mv /tmp/gtk-master/* /usr/share/themes/Dracula/ && \
+    rm -rf /tmp/dracula-gtk.zip /tmp/gtk-master && \
+    mkdir -p /usr/share/qt5ct/colors && \
+    curl -L https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf -o /usr/share/qt5ct/colors/Dracula.conf && \
+    mkdir -p /usr/share/backgrounds/gif_wallpapers
+
+# Set global environment variables for Qt theming
+RUN echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /etc/environment
 
 # Install development and system utilities
 RUN --mount=type=cache,dst=/var/cache \
@@ -135,33 +148,35 @@ RUN --mount=type=cache,dst=/var/cache \
     nix \
     wl-clipboard \
     grim \
+    jetbrains-mono-fonts \
     slurp \
     brightnessctl \
     playerctl \
     imv \
-    fastfetch
+    fastfetch \
+    jq \
+    ripgrep \
+    swappy \
+    mpv \
+    btop \
+    cliphist \
+    network-manager-applet
 
-
-# Flatpak installation and overrides moved to first boot script.
-
-# Ensure Adwaita GTK and icon themes are present
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    dnf5 install -y adwaita-gtk2-theme adwaita-qt5 adwaita-qt6 adwaita-icon-theme || true \
-    && git clone --depth=1 https://github.com/dracula/gtk.git /usr/share/themes/Dracula \
-    && rm -rf /usr/share/themes/Dracula/.git \
-    && chmod -R 755 /usr/share/themes/Dracula \
-    && glib-compile-schemas /usr/share/glib-2.0/schemas/
+# Install Nerd Fonts for icons
+RUN curl -L -o /tmp/jb-mono.zip https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip && \
+    unzip -o /tmp/jb-mono.zip -d /usr/share/fonts/ && \
+    rm /tmp/jb-mono.zip && \
+    fc-cache -fv
 
 
 # Flatpak overrides for VS Code, OpenRGB, and Bitwarden moved to first boot script if needed.
 
-RUN mkdir -p /etc/skel/.config/Code/User && \
-    if [ -f /etc/skel/.config/Code/User/settings.json ]; then \
-    jq '. + {"terminal.integrated.defaultProfile.linux": "zsh-host", "terminal.integrated.profiles.linux": (.terminal.integrated.profiles.linux // {}) + {"zsh-host": {"path": "flatpak-spawn", "args": ["--host", "env", "TERM=xterm-256color", "zsh", "-i"]}}}' /etc/skel/.config/Code/User/settings.json > /etc/skel/.config/Code/User/settings.json.tmp && \
-    mv /etc/skel/.config/Code/User/settings.json.tmp /etc/skel/.config/Code/User/settings.json; \
+RUN mkdir -p /etc/skel/.var/app/com.visualstudio.code/config/Code/User && \
+    if [ -f /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json ]; then \
+    jq '. + {"terminal.integrated.defaultProfile.linux": "zsh-host", "terminal.integrated.profiles.linux": (.terminal.integrated.profiles.linux // {}) + {"zsh-host": {"path": "flatpak-spawn", "args": ["--host", "env", "TERM=xterm-256color", "zsh", "-i"]}}}' /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json > /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json.tmp && \
+    mv /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json.tmp /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json; \
     else \
-    printf '{\n  "terminal.integrated.defaultProfile.linux": "zsh-host",\n  "terminal.integrated.profiles.linux": {\n    "zsh-host": {\n      "path": "flatpak-spawn",\n      "args": ["--host", "env", "TERM=xterm-256color", "zsh", "-i"]\n    }\n  }\n}\n' > /etc/skel/.config/Code/User/settings.json; \
+    printf '{\n  "terminal.integrated.defaultProfile.linux": "zsh-host",\n  "terminal.integrated.profiles.linux": {\n    "zsh-host": {\n      "path": "flatpak-spawn",\n      "args": ["--host", "env", "TERM=xterm-256color", "zsh", "-i"]\n    }\n  }\n}\n' > /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json; \
     fi
 
 # Install file manager, thunar, and media support

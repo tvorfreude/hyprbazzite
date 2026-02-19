@@ -1,0 +1,8 @@
+[org/gnome/desktop/interface]
+gtk-theme='Dracula'
+color-scheme='prefer-dark'
+icon-theme='breeze-dark'
+cursor-theme='breeze_cursors'
+
+[org/gnome/desktop/wm/preferences]
+theme='Dracula'

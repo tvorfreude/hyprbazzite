@@ -11,7 +11,7 @@
 	"exclusive": false,
 	"passthrough": false,
 	"position": "top",
-	"spacing": 3,
+	"spacing": 6,
 	"fixed-center": true,
 	"ipc": true,
 	"margin-top": 0,
@@ -20,11 +20,8 @@
 	"hide-on-focus": true,
 	"modules-left": [
 		"idle_inhibitor",
-		"custom/separator#blank",
 		"tray",
-		"custom/separator#blank",
 		"clock",
-		"custom/separator#blank",
 		"hyprland/window",
 	],
 	"modules-center": [
@@ -34,16 +31,14 @@
 	],
 	"modules-right": [
 		"group/laptop",
-		"custom/separator#blank",
 		"group/mobo_drawer",
 		"custom/separator#line",
+		"network",
 		"group/audio",
 		"user/headset-battery",
 		"custom/separator#dot-line",
 		"mpris",
-		"custom/separator#blank",
 		"group/notify",
-		"custom/separator#blank",
 		"group/status",
 	]
 }

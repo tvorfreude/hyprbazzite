@@ -41,16 +41,25 @@
 		"tooltip": true,
 		"tooltip-format": "Exit Hyprland",
 	},
-	"custom/dunst": {
-		"format": "{}",
-		"exec": "/etc/hypr/scripts/dunst-status.sh",
-		"interval": 2,
+	"custom/notification": {
+		"tooltip": false,
+		"format": "{icon}",
+		"format-icons": {
+			"notification": "<span foreground='#ff5555'><sup></sup></span>",
+			"none": "",
+			"dnd-notification": "<span foreground='#ff5555'><sup></sup></span>",
+			"dnd-none": "",
+			"inhibited-notification": "<span foreground='#ff5555'><sup></sup></span>",
+			"inhibited-none": "",
+			"dnd-inhibited-notification": "<span foreground='#ff5555'><sup></sup></span>",
+			"dnd-inhibited-none": ""
+		},
 		"return-type": "json",
-		"tooltip": true,
-		"tooltip-format": "Notifications",
-		"on-click": "/etc/hypr/scripts/dunst-history.sh",
-		"on-click-middle": "dunstctl set-paused toggle",
-		"on-click-right": "dunstctl close-all",
+		"exec-if": "which swaync-client",
+		"exec": "swaync-client -swb",
+		"on-click": "swaync-client -t -sw",
+		"on-click-right": "swaync-client -d -sw",
+		"escape": true
 	},
 	"custom/separator#dot": {
 		"format": "•",

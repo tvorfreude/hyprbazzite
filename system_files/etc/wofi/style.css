@@ -1,54 +1,49 @@
-@import "/etc/wofi/colors.css";
-
-* {
-  font-family: "JetBrainsMono Nerd Font";
-  font-size: 12px;
-  font-weight: 500;
-  border: none;
-  outline: none;
-  background: transparent;
-  color: @fg;
-}
-
 window {
-  background-color: @bg;
-  border: 2px solid @accent;
+  margin: 0px;
+  border: 2px solid #bd93f9;
+  background-color: #282a36;
   border-radius: 10px;
-  padding: 10px;
 }
 
 #input {
-  margin: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: @bg_alt;
-  color: @accent2;
+  margin: 5px;
+  border: none;
+  color: #f8f8f2;
+  background-color: #44475a;
+  border-radius: 5px;
 }
 
 #inner-box {
-  margin: 6px;
+  margin: 5px;
+  border: none;
+  background-color: #282a36;
+  color: #f8f8f2;
 }
 
-#entry {
-  padding: 8px;
-  border-radius: 6px;
-  margin: 4px 0;
-}
-
-#entry:selected {
-  background-color: @accent;
-  color: @bg;
-  border-radius: 6px;
-}
-
-#text {
-  margin-left: 8px;
-}
-
-#img {
-  margin-right: 8px;
+#outer-box {
+  margin: 5px;
+  border: none;
+  background-color: #282a36;
 }
 
 #scroll {
-  margin: 6px;
+  margin: 0px;
+  border: none;
+}
+
+#text {
+  margin: 5px;
+  border: none;
+  color: #f8f8f2;
+}
+
+#entry:selected {
+  background-color: #44475a;
+  border-radius: 5px;
+  border: none;
+}
+
+#text:selected {
+  color: #bd93f9;
+  font-weight: bold;
 }

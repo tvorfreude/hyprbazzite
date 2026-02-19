@@ -94,11 +94,11 @@
 		"orientation": "inherit",
 		"drawer": {
 			"transition-duration": 500,
-			"children-class": "custom/dunst",
+			"children-class": "custom/notification",
 			"transition-left-to-right": false
 		},
 		"modules": [
-			"custom/dunst",
+			"custom/notification",
 			"custom/dot_update",
 		]
 	},

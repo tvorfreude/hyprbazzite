@@ -459,7 +459,7 @@ Rectangle {
                             return "Good Evening";
                         }
                         color: "#bd93f9"
-                        font.family: "Inter, Liberation Mono"
+                        font.family: "JetBrains Mono, Symbols Nerd Font"
                         font.pixelSize: 16
                         font.weight: Font.Medium
                     }
@@ -486,7 +486,7 @@ Rectangle {
                                 return "Day " + day + " of " + new Date().getFullYear();
                             }
                             color: "#8be9fd"
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 10
                             opacity: 0.7
                         }
@@ -500,7 +500,7 @@ Rectangle {
                                 return "Week " + week;
                             }
                             color: "#6272a4"
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 9
                             opacity: 0.6
                         }
@@ -533,7 +533,7 @@ Rectangle {
                         Text {
                             text: sddm.hostName
                             color: "#50fa7b"
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 13
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
@@ -558,7 +558,7 @@ Rectangle {
                                 return "Session: " + sessionName;
                             }
                             color: "#8be9fd"
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 9
                             elide: Text.ElideRight
                         }
@@ -566,7 +566,7 @@ Rectangle {
                         Text {
                             text: "Uptime: Ready"
                             color: "#6272a4"
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 9
                             opacity: 0.7
                         }
@@ -583,7 +583,7 @@ Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: Qt.formatDateTime(new Date(), "HH:mm")
                     color: "#f8f8f2"
-                    font.family: "Inter, Liberation Mono"
+                    font.family: "JetBrains Mono, Symbols Nerd Font"
                     font.weight: Font.Thin
                     font.pixelSize: Math.max(140, root.height * 0.22)
                     lineHeight: 0.95
@@ -611,7 +611,7 @@ Rectangle {
                     Text {
                         text: Qt.formatDateTime(new Date(), "MMMM d, dddd")
                         color: "#8be9fd"
-                        font.family: "Inter, Liberation Mono"
+                        font.family: "JetBrains Mono, Symbols Nerd Font"
                         font.pixelSize: Math.max(13, root.height * 0.017)
                         font.weight: Font.Light
                         opacity: 0.8
@@ -628,7 +628,7 @@ Rectangle {
                     Text {
                         text: new Date().getFullYear().toString()
                         color: "#f8f8f2"
-                        font.family: "Inter, Liberation Mono"
+                        font.family: "JetBrains Mono, Symbols Nerd Font"
                         font.pixelSize: Math.max(12, root.height * 0.015)
                         font.weight: Font.Light
                         opacity: 0.9
@@ -697,7 +697,7 @@ Rectangle {
                             Text {
                                 text: "Account"
                                 color: "#6272a4"
-                                font.family: "Inter, Liberation Mono"
+                                font.family: "JetBrains Mono, Symbols Nerd Font"
                                 font.pixelSize: 11
                                 font.weight: Font.Medium
                                 opacity: 0.6
@@ -708,7 +708,7 @@ Rectangle {
                                 id: usernameDisplay
                                 text: userModel.data(userModel.index(userModel.lastIndex, 0), 257) || "Select"
                                 color: "#f8f8f2"
-                                font.family: "Inter, Liberation Mono"
+                                font.family: "JetBrains Mono, Symbols Nerd Font"
                                 font.pixelSize: 16
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
@@ -848,7 +848,7 @@ Rectangle {
                             anchors.fill: parent
                             leftPadding: 14
                             rightPadding: 70
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 14
                             color: "#f8f8f2"
                             echoMode: passwordBox.showPassword ? TextInput.Normal : TextInput.Password
@@ -890,7 +890,7 @@ Rectangle {
                                 anchors.centerIn: parent
                                 text: passwordBox.showPassword ? "Hide" : "Show"
                                 color: "#bd93f9"
-                                font.family: "Inter, Liberation Mono"
+                                font.family: "JetBrains Mono, Symbols Nerd Font"
                                 font.pixelSize: 10
                                 font.weight: Font.Medium
                             }
@@ -950,7 +950,7 @@ Rectangle {
                             anchors.centerIn: parent
                             text: "Login"
                             color: "#0f1119"
-                            font.family: "Inter, Liberation Mono"
+                            font.family: "JetBrains Mono, Symbols Nerd Font"
                             font.pixelSize: 14
                             font.weight: Font.DemiBold
                             font.letterSpacing: 0.3

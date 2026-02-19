@@ -1,0 +1,28 @@
+[Default Applications]
+text/html=io.github.zen_browser.zen.desktop
+x-scheme-handler/http=io.github.zen_browser.zen.desktop
+x-scheme-handler/https=io.github.zen_browser.zen.desktop
+x-scheme-handler/about=io.github.zen_browser.zen.desktop
+x-scheme-handler/unknown=io.github.zen_browser.zen.desktop
+inode/directory=thunar.desktop
+application/x-directory=thunar.desktop
+image/jpeg=imv.desktop
+image/png=imv.desktop
+image/gif=imv.desktop
+image/webp=imv.desktop
+image/svg+xml=imv.desktop
+video/mp4=mpv.desktop
+video/mkv=mpv.desktop
+video/webm=mpv.desktop
+audio/mpeg=mpv.desktop
+audio/ogg=mpv.desktop
+text/plain=com.visualstudio.code.desktop
+application/pdf=io.github.zen_browser.zen.desktop
+
+[Added Associations]
+text/html=io.github.zen_browser.zen.desktop;
+x-scheme-handler/http=io.github.zen_browser.zen.desktop;
+x-scheme-handler/https=io.github.zen_browser.zen.desktop;
+inode/directory=thunar.desktop;
+image/png=imv.desktop;
+video/mp4=mpv.desktop;
