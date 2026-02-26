@@ -101,11 +101,17 @@ echo "[HIJACK] Applying VS Code overrides..."
 flatpak override --system --filesystem=host --talk-name=org.freedesktop.Flatpak com.visualstudio.code
 flatpak override --system --socket=ssh-auth com.visualstudio.code
 flatpak override --system --filesystem=home com.visualstudio.code
-flatpak override --system --filesystem=xdg-config/fontconfig:ro com.visualstudio.code
-flatpak override --system --filesystem=/usr/share/fonts:ro com.visualstudio.code
 
 echo "[HIJACK] Applying Discord Wayland override..."
 flatpak override --system --socket=wayland com.discordapp.Discord
+
+echo "[HIJACK] Applying global font and theme overrides for all Flatpaks..."
+flatpak override --system --filesystem=xdg-config/fontconfig:ro
+flatpak override --system --filesystem=/usr/share/fonts:ro
+flatpak override --system --filesystem=xdg-config/gtk-3.0:ro
+flatpak override --system --filesystem=xdg-config/gtk-4.0:ro
+flatpak override --system --filesystem=xdg-config/kdeglobals:ro
+flatpak override --system --filesystem=/usr/share/themes:ro
 
 # Final success notification (closes or updates the progress bar to 100%)
 NOTIFICATION_ID=$(send_progress_notification "System Provisioning" 100 "All Flatpaks installed successfully!" "normal" "$NOTIFICATION_ID")
