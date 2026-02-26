@@ -115,4 +115,19 @@ flatpak override --system --filesystem=/usr/share/themes:ro
 
 # Final success notification (closes or updates the progress bar to 100%)
 NOTIFICATION_ID=$(send_progress_notification "System Provisioning" 100 "All Flatpaks installed successfully!" "normal" "$NOTIFICATION_ID")
+
+echo "[HIJACK] Applying user-specific font and theme overrides for active users..."
+for user in $(users | tr ' ' '\n' | sort -u); do
+    local uid=$(id -u "$user")
+    local bus_address="unix:path=/run/user/$uid/bus"
+    if [ -e "/run/user/$uid/bus" ]; then
+        echo "[HIJACK] Applying user overrides for $user..."
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/fontconfig:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=/usr/share/fonts:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/gtk-3.0:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/gtk-4.0:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/kdeglobals:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=/usr/share/themes:ro"
+    fi
+done
 # --- HIJACKED INSTALLER LOGIC END ---
