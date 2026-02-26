@@ -101,6 +101,8 @@ echo "[HIJACK] Applying VS Code overrides..."
 flatpak override --system --filesystem=host --talk-name=org.freedesktop.Flatpak com.visualstudio.code
 flatpak override --system --socket=ssh-auth com.visualstudio.code
 flatpak override --system --filesystem=home com.visualstudio.code
+flatpak override --system --filesystem=xdg-config/fontconfig:ro com.visualstudio.code
+flatpak override --system --filesystem=/usr/share/fonts:ro com.visualstudio.code
 
 echo "[HIJACK] Applying Discord Wayland override..."
 flatpak override --system --socket=wayland com.discordapp.Discord
