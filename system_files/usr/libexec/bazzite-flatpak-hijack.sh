@@ -106,6 +106,9 @@ fi
 flatpak override --system --env=SSH_AUTH_SOCK=$XDG_RUNTIME_DIR/keyring/ssh com.visualstudio.code
 flatpak override --system --filesystem=home com.visualstudio.code
 
+echo "[HIJACK] Applying Discord Wayland override..."
+flatpak override --system --socket=wayland com.discordapp.Discord
+
 # Final success notification (closes or updates the progress bar to 100%)
 NOTIFICATION_ID=$(send_progress_notification "System Provisioning" 100 "All Flatpaks installed successfully!" "normal" "$NOTIFICATION_ID")
 # --- HIJACKED INSTALLER LOGIC END ---
