@@ -115,12 +115,16 @@
   border-radius: 12px;
 }
 .image {
-  width: 40px;
-  height: 40px;
+  height: 80px;
+  width: 80px;
+  max-height: 80%;
+  max-width: 80%;
   border-radius: 50%;
   object-fit: cover;
-  margin-right: 12px;
+  margin-right: 18px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .body-image {
@@ -139,6 +143,18 @@
   background: transparent;
   color: white;
   text-shadow: none;
+  display: flex;
+  align-items: center;
+}
+
+.app-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  border-radius: 6px;
+  object-fit: cover;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .time {
