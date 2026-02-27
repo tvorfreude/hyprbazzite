@@ -1,3 +1,10 @@
+.avatar-container {
+  position: relative;
+  display: inline-block;
+  height: 90%;
+  width: auto;
+  vertical-align: middle;
+}
 /*
  * vim: ft=less
  */
@@ -115,16 +122,18 @@
   border-radius: 12px;
 }
 .image {
-  height: 80px;
-  width: 80px;
-  max-height: 80%;
-  max-width: 80%;
+  height: 90%;
+  width: auto;
+  max-width: 90%;
+  max-height: 90%;
+  aspect-ratio: 1/1;
   border-radius: 50%;
   object-fit: cover;
   margin-right: 18px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   display: inline-block;
   vertical-align: middle;
+  align-self: center;
 }
 
 .body-image {
@@ -148,13 +157,17 @@
 }
 
 .app-icon {
-  width: 24px;
-  height: 24px;
-  margin-right: 8px;
+  width: 28px;
+  height: 28px;
   border-radius: 6px;
   object-fit: cover;
-  display: inline-block;
-  vertical-align: middle;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  background: #282a36;
+  border: 2px solid #bd93f9;
+  z-index: 2;
 }
 
 .time {
