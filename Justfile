@@ -295,6 +295,43 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
+# Reinstall and restore Secure Boot bootloader artifacts on the host
+[group('Utility')]
+secure-boot-repair:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    if [[ ! -d /sys/firmware/efi ]]; then
+        echo "System is not booted in UEFI mode; Secure Boot repair is not applicable."
+        exit 1
+    fi
+
+    if [[ ! -d /boot/efi/EFI/fedora ]]; then
+        echo "Missing /boot/efi/EFI/fedora; cannot restore shim fallback files."
+        exit 1
+    fi
+
+    just sudoif dnf5 reinstall -y shim-x64 grub2-efi-x64 grub2-efi-x64-modules grub2-efi-x64-cdboot bootupd
+    just sudoif mkdir -p /boot/efi/EFI/BOOT
+
+    if [[ -f /boot/efi/EFI/fedora/shimx64.efi ]]; then
+        just sudoif cp -vf /boot/efi/EFI/fedora/shimx64.efi /boot/efi/EFI/BOOT/BOOTX64.EFI
+    else
+        echo "shimx64.efi not found in /boot/efi/EFI/fedora"
+        exit 1
+    fi
+
+    if [[ -f /boot/efi/EFI/fedora/fbx64.efi ]]; then
+        just sudoif cp -vf /boot/efi/EFI/fedora/fbx64.efi /boot/efi/EFI/BOOT/fbx64.efi
+    else
+        echo "fbx64.efi not found in /boot/efi/EFI/fedora"
+        exit 1
+    fi
+
+    just sudoif bootupctl update || true
+    mokutil --sb-state || true
+    echo "Secure Boot artifacts restored. Reboot and re-enable Secure Boot in firmware if needed."
+
 
 # Runs shell check on all Bash scripts
 lint:
