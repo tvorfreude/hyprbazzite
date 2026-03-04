@@ -209,7 +209,7 @@ QuickSettings() {
 }
 PowerMenu() {
     local theme="$HOME/.config/rofi/config-powermenu.rasi"
-    local options="  Shutdown\n  Reboot\n  Suspend\n  Lock\n  Logout"
+    local options="  Shutdown\n  Reboot\n  Suspend\n⏾  Hibernate\n  Lock\n  Logout"
     local choice
     choice=$(echo -e "$options" | rofi -dmenu -p "⏻ Power Menu" -i -config "$theme")
     case "$choice" in
@@ -221,6 +221,9 @@ PowerMenu() {
             ;;
         *Suspend*)
             systemctl suspend
+            ;;
+        *Hibernate*)
+            systemctl hibernate
             ;;
         *Lock*)
             hyprlock
