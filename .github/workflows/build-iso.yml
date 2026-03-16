@@ -1,0 +1,108 @@
+---
+name: Build ISO
+
+# Trigger options:
+#   1. Manually via Actions → "Build ISO" → "Run workflow" (any branch).
+#   2. By commenting '/build-iso' on a pull request (repo owners, members, and
+#      collaborators only). The ISO is built from the PR's head branch.
+on:
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+env:
+  IMAGE_NAME: "${{ github.event.repository.name }}"
+
+jobs:
+  build-iso:
+    name: Build and upload ISO
+    runs-on: ubuntu-24.04
+
+    # Run on:
+    #   • manual dispatch, OR
+    #   • a '/build-iso' comment posted on a PR by a maintainer / collaborator
+    if: >-
+      github.event_name == 'workflow_dispatch' || (
+        github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request != null &&
+        contains(github.event.comment.body, '/build-iso') &&
+        contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      )
+
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: write  # needed to post the 👍 reaction
+
+    steps:
+      # Acknowledge the slash command so the author knows the build started
+      - name: React to comment
+        if: github.event_name == 'issue_comment'
+        run: >-
+          gh api
+          repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions
+          -X POST -f content='+1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # Free up disk space – ISOs can exceed 4 GB
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6 # v1
+
+      # When triggered from a PR comment, resolve the PR's head branch name
+      - name: Get PR head ref
+        if: github.event_name == 'issue_comment'
+        id: pr_ref
+        run: |
+          PR_REF=$(gh pr view ${{ github.event.issue.number }} \
+            --repo ${{ github.repository }} \
+            --json headRefName --jq '.headRefName')
+          echo "ref=${PR_REF}" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # These stage versions are pinned by https://github.com/renovatebot/renovate
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          # Check out the PR branch when triggered via comment; default ref otherwise
+          ref: ${{ github.event_name == 'issue_comment' && steps.pr_ref.outputs.ref || github.ref }}
+
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+
+      - name: Build container image
+        id: build_image
+        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
+        with:
+          containerfiles: |
+            ./Containerfile
+          image: ${{ env.IMAGE_NAME }}
+          tags: latest
+          oci: false
+
+      - name: Build ISO with bootc-image-builder
+        # buildah stores locally built images under the "localhost/" registry prefix,
+        # so the containers-storage reference below matches the image built above.
+        run: |
+          mkdir -p /tmp/iso-output
+          sudo podman run \
+            --rm \
+            --privileged \
+            --pull=newer \
+            --security-opt label=type:unconfined_t \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            -v /tmp/iso-output:/output \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type iso \
+            --output /output \
+            containers-storage:localhost/${{ env.IMAGE_NAME }}:latest
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ env.IMAGE_NAME }}-iso
+          path: /tmp/iso-output/
+          retention-days: 7
+          if-no-files-found: error
