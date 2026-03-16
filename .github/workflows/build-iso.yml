@@ -103,8 +103,8 @@ jobs:
           sudo podman image exists "$IMAGE_REF"
 
       - name: Build ISO with bootc-image-builder
-        # buildah stores locally built images under the "localhost/" registry prefix,
-        # so the containers-storage reference below matches the image built above.
+        # Use a plain local image reference; root podman storage is prepared in
+        # the previous step so bootc-image-builder can resolve localhost/<image>:<tag>.
         run: |
           mkdir -p /tmp/iso-output
           mkdir -p /tmp/iso-config
@@ -122,7 +122,7 @@ jobs:
             --rootfs xfs \
             --config /config/iso.toml \
             --output /output \
-            containers-storage:localhost/${{ env.IMAGE_NAME }}:latest
+            localhost/${{ env.IMAGE_NAME }}:latest
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
