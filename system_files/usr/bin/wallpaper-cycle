@@ -23,14 +23,31 @@ cycle_now() {
 # Trap USR1 signal for manual cycle
 trap 'cycle_now' USR1
 
+# Function to listen for monitor hotplug events and trigger cycle_now
+monitor_hotplug() {
+        udevadm monitor --udev --subsystem-match=drm | \
+        while read -r line; do
+                if echo "$line" | grep -q 'change'; then
+                        cycle_now
+                fi
+        done
+}
+
 # Initial delay to ensure daemon is ready config
 sleep 2
 cycle_now
 
+# Start monitor hotplug listener in background
+monitor_hotplug &
+HOTPLUG_PID=$!
+
 # Infinite loop with interruptible sleep
 while true; do
-  # Sleep in background so 'wait' can be interrupted by trap
-  sleep 900 &
-  wait $!
-  cycle_now
+    # Sleep in background so 'wait' can be interrupted by trap
+    sleep 900 &
+    wait $!
+    cycle_now
 done
+
+# Cleanup hotplug listener on exit
+trap "kill $HOTPLUG_PID 2>/dev/null" EXIT
