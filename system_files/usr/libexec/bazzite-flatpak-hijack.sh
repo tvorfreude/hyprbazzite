@@ -3,10 +3,23 @@
 # --- HIJACKED INSTALLER LOGIC START ---
 echo "[HIJACK] Running custom Flatpak installer logic (Injected)..."
 
-# 1. REMOVE ALL EXISTING APPS (DANGER ZONE)
 echo "[HIJACK] Removing all existing Flatpaks..."
-# Uncomment to enable wiping
-# flatpak list --app --columns=application | xargs -r flatpak uninstall --system -y
+# 1. REMOVE ALL EXISTING APPS (DANGER ZONE)
+REMOVE_FLATPAKS=false
+while getopts "d" opt; do
+    case $opt in
+        d)
+            REMOVE_FLATPAKS=true
+            ;;
+    esac
+done
+
+echo "[HIJACK] Removing all existing Flatpaks..."
+if [ "$REMOVE_FLATPAKS" = true ]; then
+    flatpak list --app --columns=application | xargs -r flatpak uninstall --system -y
+else
+    echo "[HIJACK] Skipping Flatpak removal (use -d to enable)."
+fi
 
 # Check for internet connection with retry prompt (GUI)
 check_internet() {
@@ -51,7 +64,7 @@ send_progress_notification() {
     for user in $(users | tr ' ' '\n' | sort -u); do
         local uid=$(id -u "$user")
         local bus_address="unix:path=/run/user/$uid/bus"
-        
+
         if [ -e "/run/user/$uid/bus" ]; then
             # Using -p (print id) and -r (replace id) to update the same notification
             # Using -h int:value:$percentage for the progress bar hint
@@ -88,12 +101,12 @@ echo "[HIJACK] Installing custom Flatpaks..."
 for app in "${CUSTOM_FLATPAKS[@]}"; do
     let CURRENT_APP=CURRENT_APP+1
     PERCENTAGE=$((CURRENT_APP * 100 / TOTAL_APPS))
-    
+
     echo "[HIJACK] Installing $app ($CURRENT_APP/$TOTAL_APPS)..."
-    
+
     # Update notification before starting install
     NOTIFICATION_ID=$(send_progress_notification "System Provisioning" $PERCENTAGE "Installing $app ($CURRENT_APP/$TOTAL_APPS)..." "normal" "$NOTIFICATION_ID")
-    
+
     flatpak install --system -y flathub "$app" || echo "[HIJACK] Failed to install $app"
 done
 
@@ -104,6 +117,10 @@ flatpak override --system --filesystem=home com.visualstudio.code
 
 echo "[HIJACK] Applying Discord Wayland override..."
 flatpak override --system --socket=wayland com.discordapp.Discord
+
+echo "[HIJACK] Applying Zen browser download fix..."
+# Allow Zen browser to access Downloads and host filesystem for file downloads
+flatpak override --system --filesystem=xdg-download --filesystem=host app.zen_browser.zen
 
 echo "[HIJACK] Applying global font and theme overrides for all Flatpaks..."
 flatpak override --system --filesystem=xdg-config/fontconfig:ro
