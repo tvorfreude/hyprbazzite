@@ -234,7 +234,6 @@ window#waybar.empty #window {
 	padding-left: 8px;
 	padding-right: 8px;
 	min-width: 45px;
-	text-align: center;
 }
 
 #memory {
