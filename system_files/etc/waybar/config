@@ -27,7 +27,8 @@
 	"modules-center": [
 		"group/app_drawer",
 		"custom/separator#dot-line",
-		"hyprland/workspaces#rw"
+		"hyprland/workspaces#rw",
+		"user/keyboard",
 	],
 	"modules-right": [
 		"group/laptop",

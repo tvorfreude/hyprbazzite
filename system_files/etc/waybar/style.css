@@ -233,7 +233,7 @@ window#waybar.empty #window {
 	/* Dracula cyan */
 	padding-left: 8px;
 	padding-right: 8px;
-	min-width: 45px;
+	min-width: 20px;
 }
 
 #memory {
