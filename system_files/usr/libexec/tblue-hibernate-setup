@@ -28,12 +28,27 @@ find_swap_device() {
     return 1
 }
 
+is_crypt_swap_device() {
+    local dev="$1"
+    local dtype
+
+    dtype=$(lsblk -no TYPE "$dev" 2>/dev/null | head -n1 || true)
+    [[ "$dtype" == "crypt" ]]
+}
+
 add_resume_karg_if_needed() {
     local karg="$1"
 
     if command -v rpm-ostree >/dev/null 2>&1; then
-        local current
+        local current existing_resume
         current=$(rpm-ostree kargs 2>/dev/null || true)
+
+        existing_resume=$(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | head -n1 || true)
+        if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
+            log "Existing resume arg detected ($existing_resume); not overriding with $karg"
+            return 0
+        fi
+
         if grep -qw -- "$karg" <<<"$current"; then
             log "Kernel arg already present: $karg"
             return 0
@@ -45,8 +60,15 @@ add_resume_karg_if_needed() {
     fi
 
     if command -v grubby >/dev/null 2>&1; then
-        local current
+        local current existing_resume
         current=$(grubby --info=ALL 2>/dev/null | grep -Eo 'resume=[^[:space:]"]+' | head -n1 || true)
+
+        existing_resume="$current"
+        if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
+            log "Existing resume arg detected ($existing_resume); not overriding with $karg"
+            return 0
+        fi
+
         if [[ "$current" == "$karg" ]]; then
             log "Kernel arg already present: $karg"
             return 0
@@ -61,8 +83,56 @@ add_resume_karg_if_needed() {
     return 1
 }
 
+cleanup_conflicting_resume_kargs() {
+    local current changed=0
+    local -a resume_args=()
+    local -a uuid_resume_args=()
+    local arg has_non_uuid=0
+
+    if ! command -v rpm-ostree >/dev/null 2>&1; then
+        return 0
+    fi
+
+    current=$(rpm-ostree kargs 2>/dev/null || true)
+    while IFS= read -r arg; do
+        [[ -z "$arg" ]] && continue
+        resume_args+=("$arg")
+        if [[ "$arg" == resume=UUID=* ]]; then
+            uuid_resume_args+=("$arg")
+        else
+            has_non_uuid=1
+        fi
+    done < <(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | awk '!seen[$0]++')
+
+    if [[ ${#resume_args[@]} -lt 2 || ${#uuid_resume_args[@]} -eq 0 || $has_non_uuid -eq 0 ]]; then
+        return 0
+    fi
+
+    for arg in "${uuid_resume_args[@]}"; do
+        rpm-ostree kargs --delete-if-present="$arg"
+        log "Removed conflicting kernel arg via rpm-ostree: $arg"
+        changed=1
+    done
+
+    if [[ $changed -eq 1 ]]; then
+        return 10
+    fi
+
+    return 0
+}
+
 main() {
-    local swap_dev swap_uuid karg needs_reboot=0
+    local swap_dev swap_uuid karg needs_reboot=0 rc=0
+
+    rc=0
+    if cleanup_conflicting_resume_kargs; then
+        :
+    else
+        rc=$?
+        if [[ $rc -eq 10 ]]; then
+            needs_reboot=1
+        fi
+    fi
 
     swap_dev=$(find_swap_device || true)
     if [[ -z "${swap_dev:-}" ]]; then
@@ -73,6 +143,12 @@ main() {
 
     if [[ ! -b "$swap_dev" ]]; then
         log "Swap target is not a block device ($swap_dev); automatic resume setup skipped."
+        mark_done
+        exit 0
+    fi
+
+    if is_crypt_swap_device "$swap_dev"; then
+        log "Swap device appears encrypted ($swap_dev); skipping automatic resume=UUID setup."
         mark_done
         exit 0
     fi
