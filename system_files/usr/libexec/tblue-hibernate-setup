@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SWAPFILE_PATH="/var/swapfile"
+
 log() {
     echo "[tblue-hibernate-setup] $*"
 }
@@ -11,42 +13,134 @@ mark_done() {
 }
 
 find_swap_device() {
-    local dev
+    local target
 
-    dev=$(swapon --noheadings --raw --output NAME,TYPE 2>/dev/null | awk '$2 != "zram" {print $1; exit}')
-    if [[ -n "$dev" ]]; then
-        echo "$dev"
+    target=$(swapon --noheadings --raw --output NAME,TYPE 2>/dev/null | awk '$2 != "zram" {print $1; exit}')
+    if [[ -n "$target" ]]; then
+        echo "$target"
         return 0
     fi
 
-    dev=$(blkid -t TYPE=swap -o device 2>/dev/null | head -n1 || true)
-    if [[ -n "$dev" ]]; then
-        echo "$dev"
+    target=$(blkid -t TYPE=swap -o device 2>/dev/null | head -n1 || true)
+    if [[ -n "$target" ]]; then
+        echo "$target"
         return 0
     fi
 
     return 1
 }
 
-is_crypt_swap_device() {
-    local dev="$1"
-    local dtype
+ensure_swapfile_fstab_entry() {
+    if grep -Eq '^[[:space:]]*/var/swapfile[[:space:]]+none[[:space:]]+swap([[:space:],]|$)' /etc/fstab 2>/dev/null; then
+        return 0
+    fi
 
-    dtype=$(lsblk -no TYPE "$dev" 2>/dev/null | head -n1 || true)
-    [[ "$dtype" == "crypt" ]]
+    printf '%s\n' '/var/swapfile none swap defaults 0 0' >> /etc/fstab
+}
+
+swap_size_gib_from_ram() {
+    local mem_kib mem_gib swap_gib
+
+    mem_kib=$(awk '/MemTotal:/ {print $2; exit}' /proc/meminfo)
+    mem_gib=$(( (mem_kib + 1024*1024 - 1) / (1024*1024) ))
+    swap_gib="$mem_gib"
+
+    (( swap_gib < 8 )) && swap_gib=8
+    (( swap_gib > 64 )) && swap_gib=64
+
+    echo "$swap_gib"
+}
+
+create_swapfile_if_needed() {
+    local size_gib fs_type
+
+    if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+        echo "$SWAPFILE_PATH"
+        return 0
+    fi
+
+    size_gib=$(swap_size_gib_from_ram)
+
+    if [[ ! -f "$SWAPFILE_PATH" ]]; then
+        fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
+
+        if [[ "$fs_type" == "btrfs" ]]; then
+            truncate -s 0 "$SWAPFILE_PATH"
+            chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
+            if command -v btrfs >/dev/null 2>&1; then
+                btrfs property set "$SWAPFILE_PATH" compression none >/dev/null 2>&1 || true
+            fi
+            fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+        else
+            fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+        fi
+
+        chmod 600 "$SWAPFILE_PATH"
+        mkswap "$SWAPFILE_PATH" >/dev/null
+        log "Created swapfile at $SWAPFILE_PATH (${size_gib}G)"
+    fi
+
+    ensure_swapfile_fstab_entry
+    swapon "$SWAPFILE_PATH" >/dev/null 2>&1 || true
+
+    if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+        echo "$SWAPFILE_PATH"
+        return 0
+    fi
+
+    return 1
+}
+
+swap_target_uuid() {
+    local target="$1"
+    local source
+
+    if [[ -b "$target" ]]; then
+        blkid -s UUID -o value "$target" 2>/dev/null || true
+        return 0
+    fi
+
+    source=$(findmnt -no SOURCE -T "$target" 2>/dev/null || true)
+    if [[ -n "$source" && -b "$source" ]]; then
+        blkid -s UUID -o value "$source" 2>/dev/null || true
+        return 0
+    fi
+
+    return 1
+}
+
+swapfile_resume_offset() {
+    local file="$1"
+    local first_extent
+
+    if ! command -v filefrag >/dev/null 2>&1; then
+        return 1
+    fi
+
+    first_extent=$(filefrag -v "$file" 2>/dev/null | awk '$1 ~ /^0:/ {print $4; exit}' | sed -E 's/\.\..*$//' | tr -d ':')
+    if [[ -z "$first_extent" || ! "$first_extent" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+
+    echo "$first_extent"
 }
 
 add_resume_karg_if_needed() {
     local karg="$1"
+    local guard_resume=0
+
+    [[ "$karg" == resume=* ]] && guard_resume=1
 
     if command -v rpm-ostree >/dev/null 2>&1; then
         local current existing_resume
         current=$(rpm-ostree kargs 2>/dev/null || true)
 
-        existing_resume=$(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | head -n1 || true)
-        if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
-            log "Existing resume arg detected ($existing_resume); not overriding with $karg"
-            return 0
+        if [[ $guard_resume -eq 1 ]]; then
+            existing_resume=$(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | head -n1 || true)
+            if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
+                log "Existing resume arg detected ($existing_resume); not overriding with $karg"
+                return 0
+            fi
         fi
 
         if grep -qw -- "$karg" <<<"$current"; then
@@ -63,10 +157,12 @@ add_resume_karg_if_needed() {
         local current existing_resume
         current=$(grubby --info=ALL 2>/dev/null | grep -Eo 'resume=[^[:space:]"]+' | head -n1 || true)
 
-        existing_resume="$current"
-        if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
-            log "Existing resume arg detected ($existing_resume); not overriding with $karg"
-            return 0
+        if [[ $guard_resume -eq 1 ]]; then
+            existing_resume="$current"
+            if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
+                log "Existing resume arg detected ($existing_resume); not overriding with $karg"
+                return 0
+            fi
         fi
 
         if [[ "$current" == "$karg" ]]; then
@@ -122,7 +218,7 @@ cleanup_conflicting_resume_kargs() {
 }
 
 main() {
-    local swap_dev swap_uuid karg needs_reboot=0 rc=0
+    local swap_target swap_uuid resume_offset karg needs_reboot=0 rc=0
 
     rc=0
     if cleanup_conflicting_resume_kargs; then
@@ -134,28 +230,19 @@ main() {
         fi
     fi
 
-    swap_dev=$(find_swap_device || true)
-    if [[ -z "${swap_dev:-}" ]]; then
-        log "No non-zram swap device found; hibernate resume is not configured."
-        mark_done
-        exit 0
+    swap_target=$(find_swap_device || true)
+    if [[ -z "${swap_target:-}" ]]; then
+        swap_target=$(create_swapfile_if_needed || true)
+        if [[ -z "${swap_target:-}" ]]; then
+            log "No non-zram swap found and swapfile creation failed; hibernate resume is not configured."
+            mark_done
+            exit 0
+        fi
     fi
 
-    if [[ ! -b "$swap_dev" ]]; then
-        log "Swap target is not a block device ($swap_dev); automatic resume setup skipped."
-        mark_done
-        exit 0
-    fi
-
-    if is_crypt_swap_device "$swap_dev"; then
-        log "Swap device appears encrypted ($swap_dev); skipping automatic resume=UUID setup."
-        mark_done
-        exit 0
-    fi
-
-    swap_uuid=$(blkid -s UUID -o value "$swap_dev" 2>/dev/null || true)
+    swap_uuid=$(swap_target_uuid "$swap_target" || true)
     if [[ -z "$swap_uuid" ]]; then
-        log "Could not read UUID for swap device $swap_dev; skipping resume kernel arg."
+        log "Could not read UUID for swap target $swap_target; skipping resume kernel arg."
         mark_done
         exit 0
     fi
@@ -167,6 +254,22 @@ main() {
         rc=$?
         if [[ $rc -eq 10 ]]; then
             needs_reboot=1
+        fi
+    fi
+
+    if [[ -f "$swap_target" ]]; then
+        resume_offset=$(swapfile_resume_offset "$swap_target" || true)
+        if [[ -n "$resume_offset" ]]; then
+            if add_resume_karg_if_needed "resume_offset=$resume_offset"; then
+                :
+            else
+                rc=$?
+                if [[ $rc -eq 10 ]]; then
+                    needs_reboot=1
+                fi
+            fi
+        else
+            log "Could not determine resume_offset for swapfile ($swap_target); hibernate may not resume from swapfile."
         fi
     fi
 
