@@ -49,8 +49,6 @@
 		"orientation": "inherit",
 		"modules": [
 			"backlight",
-			"custom/power-profiles-daemon",
-			"custom/temperature",
 			"battery",
 		]
 	},

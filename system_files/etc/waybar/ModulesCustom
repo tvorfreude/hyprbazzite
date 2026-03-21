@@ -39,7 +39,7 @@
 		"format": "󰌌",
 		"on-click": "/etc/hypr/scripts/waybar-osk-click.sh",
 		"tooltip": true,
-		"tooltip-format": "On-screen keyboard\nClick: Toggle open / close"
+		"tooltip-format": "On-screen keyboard\u000AClick: Toggle open / close"
 	},
 	"custom/headset-battery": {
 		"format": "󰠇 {}%",

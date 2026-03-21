@@ -121,7 +121,7 @@
 		"format": " {:%I:%M %p}", // AM PM format
 		//"format": "  {:%H:%M}",// 24H
 		"format-alt": "{:%A  |  %H:%M  |  %e %B}",
-		"tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+		"tooltip-format": "<big>{:%Y %B}</big>\u000A<tt><small>{calendar}</small></tt>"
 	},
 	"clock#3": {
 		"format": "{:%I:%M %p - %d/%b}", //for AM/PM
@@ -133,13 +133,13 @@
 		"format": "{:%B | %a %d, %Y | %I:%M %p}", // AM PM format
 		//"format": "{:%B | %a %d, %Y | %H:%M}",// 24H
 		"format-alt": "{:%a %b %d, %G}",
-		"tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
+		"tooltip-format": "<big>{:%B %Y}</big>\u000A<tt><small>{calendar}</small></tt>",
 	},
 	"clock#5": {
 		"format": "{:%A, %I:%M %P}", // AM PM format
 		//"format": "{:%a %d | %H:%M}",// 24H
 		"format-alt": "{:%A, %d %B, %Y (%R)}",
-		"tooltip-format": "<big>{:%B %Y}</big>\n<tt><small>{calendar}</small></tt>",
+		"tooltip-format": "<big>{:%B %Y}</big>\u000A<tt><small>{calendar}</small></tt>",
 	},
 	"cpu": {
 		"format": "{usage}% 󰍛",
@@ -232,7 +232,7 @@
 		"on-scroll-down": "$HOME/.config/hypr/scripts/Volume.sh --dec",
 		"smooth-scrolling-threshold": 1,
 		"tooltip": true,
-		"tooltip-format": "{status_icon} {dynamic}\nLeft Click: previous\nMid Click: Pause\nRight Click: Next",
+		"tooltip-format": "{status_icon} {dynamic}\u000ALeft Click: previous\u000AMid Click: Pause\u000ARight Click: Next",
 		"player-icons": {
 			"chromium": "",
 			"default": "",
