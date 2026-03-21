@@ -92,11 +92,17 @@ build $target_image=image_name $tag=default_tag:
     #!/usr/bin/env bash
 
     BUILD_ARGS=()
-    git_head_short="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-    if [[ -n "$(git status -s)" ]]; then
-        git_head_short="${git_head_short}-dirty"
+    git_head_short="$(git rev-parse --short=7 HEAD 2>/dev/null || true)"
+    if [[ -z "${git_head_short}" && -n "${GITHUB_SHA:-}" ]]; then
+        git_head_short="${GITHUB_SHA:0:7}"
     fi
+    if [[ -z "${git_head_short}" ]]; then
+        git_head_short="unknown"
+    fi
+    build_stamp="$(date -u +%d%m%y)"
+
     BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=${git_head_short}")
+    BUILD_ARGS+=("--build-arg" "BUILD_STAMP=${build_stamp}")
 
     podman build \
         "${BUILD_ARGS[@]}" \

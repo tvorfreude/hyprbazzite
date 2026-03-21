@@ -28,23 +28,40 @@ has_ryzenadj() { command -v ryzenadj >/dev/null 2>&1; }
 # Helper: check for AMD PBO/eco-mode
 has_amdctl() { command -v amdctl >/dev/null 2>&1; }
 
-find_sysfs_tdp_file() {
-    local f
+is_strix_halo_cpu() {
+    local model_lc
+    model_lc=$(printf '%s' "$CPU_MODEL" | tr '[:upper:]' '[:lower:]')
+    [[ "$model_lc" =~ (ryzen[[:space:]]+ai[[:space:]]+max|strix[[:space:]]+halo) ]]
+}
 
-    # Prefer amdgpu hwmon nodes on AMD APUs/GPUs (Strix Halo path).
+find_sysfs_tdp_file() {
+    local f h name
+
+    # Prefer CPU/package-oriented hwmon nodes when available.
     for h in /sys/class/hwmon/hwmon*; do
         [ -d "$h" ] || continue
         [ -r "$h/name" ] || continue
-        if [ "$(cat "$h/name" 2>/dev/null || true)" = "amdgpu" ] && [ -f "$h/power1_cap" ]; then
-            echo "$h/power1_cap"
-            return 0
-        fi
+        [ -f "$h/power1_cap" ] || continue
+
+        name=$(cat "$h/name" 2>/dev/null || true)
+        case "$name" in
+            k10temp|zenpower|fam15h_power|coretemp)
+                echo "$h/power1_cap"
+                return 0
+                ;;
+        esac
     done
 
-    f=$(find /sys/class/hwmon -type f -name 'power1_cap' 2>/dev/null | head -n1)
-    if [ -n "$f" ]; then
-        echo "$f"
-        return 0
+    # Strix Halo APUs may expose only amdgpu power cap controls for the package policy.
+    if is_strix_halo_cpu; then
+        for h in /sys/class/hwmon/hwmon*; do
+            [ -d "$h" ] || continue
+            [ -r "$h/name" ] || continue
+            if [ "$(cat "$h/name" 2>/dev/null || true)" = "amdgpu" ] && [ -f "$h/power1_cap" ]; then
+                echo "$h/power1_cap"
+                return 0
+            fi
+        done
     fi
 
     f=$(find /sys/class/powercap -type f -name 'constraint_0_power_limit_uw' 2>/dev/null | head -n1)
@@ -66,7 +83,14 @@ supports_ryzenadj_control() {
     local info
     has_ryzenadj || return 1
     info=$(ryzenadj --info 2>&1 || true)
-    printf '%s' "$info" | grep -qi 'STAPM LIMIT'
+
+    # Newer Ryzen AI Max platforms may expose different limit labels.
+    if printf '%s' "$info" | grep -Eqi 'unsupported model|only ryzen mobile series are supported'; then
+        return 1
+    fi
+
+    # Accept common power-limit labels from old/new ryzenadj outputs.
+    printf '%s' "$info" | grep -Eqi '(stapm|fast|slow|ppt)[[:space:]_:-]*limit'
 }
 
 supports_amdctl_control() {
@@ -256,8 +280,13 @@ get_tdp_current_watts() {
     backend=$(get_backend || true)
     case "$backend" in
         ryzenadj)
-            watts=$(ryzenadj --info 2>/dev/null | awk -F': *' '/STAPM LIMIT/ {print $2; exit}' | grep -Eo '[0-9]+' | head -n1)
+            # Prefer STAPM when present, otherwise fall back to any known limit.
+            watts=$(ryzenadj --info 2>/dev/null | awk -F': *' '/STAPM LIMIT|STAPM[ _:-]*LIMIT/ {print $2; found=1; exit} END{if (!found) exit 0}' | grep -Eo '[0-9]+' | head -n1 || true)
+            if [ -z "$watts" ]; then
+                watts=$(ryzenadj --info 2>/dev/null | awk -F': *' '/FAST LIMIT|SLOW LIMIT|PPT LIMIT|FAST[ _:-]*LIMIT|SLOW[ _:-]*LIMIT|PPT[ _:-]*LIMIT/ {print $2; exit}' | grep -Eo '[0-9]+' | head -n1 || true)
+            fi
             [ -n "$watts" ] || return 1
+            # ryzenadj reports limits in mW.
             echo $((watts / 1000))
             ;;
         amdctl)

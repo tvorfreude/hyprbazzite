@@ -5,18 +5,22 @@ COPY build_files /
 # Base Image
 FROM ghcr.io/ublue-os/bazzite:stable
 ARG SHA_HEAD_SHORT=unknown
+ARG BUILD_STAMP
 
 # Bazzite-style provisioning (ship defaults in /usr)
 COPY system_files /
 COPY secure-boot-keys/secureboot.crt /usr/share/tblue-secureboot/secureboot.pem
 
 RUN build_commit="${SHA_HEAD_SHORT:-unknown}" && \
+    build_stamp="${BUILD_STAMP:-$(date -u +%d%m%y)}" && \
     build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)" && \
+    build_id="${build_commit}-${build_stamp}" && \
     mkdir -p /usr/share/tblue && \
-    printf 'TBLUE_GIT_COMMIT=%s\nTBLUE_BUILD_DATE=%s\n' "$build_commit" "$build_date" > /usr/share/tblue/build-info && \
+    printf 'TBLUE_GIT_COMMIT=%s\nTBLUE_BUILD_DATE=%s\nTBLUE_BUILD_ID=%s\n' "$build_commit" "$build_date" "$build_id" > /usr/share/tblue/build-info && \
     grep -q '^TBLUE_GIT_COMMIT=' /usr/lib/os-release || echo "TBLUE_GIT_COMMIT=$build_commit" >> /usr/lib/os-release && \
     grep -q '^TBLUE_BUILD_DATE=' /usr/lib/os-release || echo "TBLUE_BUILD_DATE=$build_date" >> /usr/lib/os-release && \
-    sed -i "s/^PRETTY_NAME=\"\(.*\)\"$/PRETTY_NAME=\"\1 (${build_commit})\"/" /usr/lib/os-release
+    grep -q '^TBLUE_BUILD_ID=' /usr/lib/os-release || echo "TBLUE_BUILD_ID=$build_id" >> /usr/lib/os-release && \
+    sed -i "s/^PRETTY_NAME=\"\(.*\)\"$/PRETTY_NAME=\"\1 (${build_id})\"/" /usr/lib/os-release
 
 RUN mkdir -p /usr/share/ublue-os && \
     curl -fsSL -o /usr/share/ublue-os/sb_pubkey.der https://github.com/ublue-os/akmods/raw/main/certs/public_key.der && \
