@@ -5,7 +5,7 @@ SWAP_SUBVOL_PATH="/var/swap"
 SWAPFILE_PATH="/var/swap/swapfile"
 
 log() {
-    echo "[tblue-hibernate-setup] $*"
+    echo "[tblue-hibernate-setup] $*" >&2
 }
 
 mark_done() {
@@ -87,11 +87,11 @@ create_swapfile_if_needed() {
 
         if [[ "$fs_type" == "btrfs" ]]; then
             if [[ ! -d "$SWAP_SUBVOL_PATH" ]]; then
-                btrfs subvolume create "$SWAP_SUBVOL_PATH"
+                btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
             fi
 
             if command -v btrfs >/dev/null 2>&1; then
-                btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH"
+                btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH" >/dev/null
             else
                 truncate -s 0 "$SWAPFILE_PATH"
                 chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
@@ -124,7 +124,7 @@ create_swapfile_if_needed() {
 
 swap_target_uuid() {
     local target="$1"
-    local source
+    local source fs_uuid
 
     if [[ -b "$target" ]]; then
         blkid -s UUID -o value "$target" 2>/dev/null || true
@@ -137,7 +137,26 @@ swap_target_uuid() {
         return 0
     fi
 
+    fs_uuid=$(findmnt -no UUID -T "$target" 2>/dev/null || true)
+    if [[ -n "$fs_uuid" ]]; then
+        echo "$fs_uuid"
+        return 0
+    fi
+
     return 1
+}
+
+resume_arg_is_valid() {
+    local resume_arg="$1"
+    local value
+
+    value="${resume_arg#resume=}"
+    if [[ "$value" == UUID=* ]]; then
+        [[ -e "/dev/disk/by-uuid/${value#UUID=}" ]]
+        return
+    fi
+
+    [[ -b "$value" ]]
 }
 
 swapfile_resume_offset() {
@@ -177,8 +196,13 @@ add_resume_karg_if_needed() {
         if [[ $guard_resume -eq 1 ]]; then
             existing_resume=$(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | head -n1 || true)
             if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
-                log "Existing resume arg detected ($existing_resume); not overriding with $karg"
-                return 0
+                if resume_arg_is_valid "$existing_resume"; then
+                    log "Existing resume arg detected ($existing_resume); not overriding with $karg"
+                    return 0
+                fi
+
+                rpm-ostree kargs --delete-if-present="$existing_resume"
+                log "Removed invalid existing resume arg: $existing_resume"
             fi
         fi
 
@@ -193,14 +217,20 @@ add_resume_karg_if_needed() {
     fi
 
     if command -v grubby >/dev/null 2>&1; then
-        local current existing_resume
+        local current existing_resume resume_value
         current=$(grubby --info=ALL 2>/dev/null | grep -Eo 'resume=[^[:space:]"]+' | head -n1 || true)
 
         if [[ $guard_resume -eq 1 ]]; then
             existing_resume="$current"
             if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
-                log "Existing resume arg detected ($existing_resume); not overriding with $karg"
-                return 0
+                if resume_arg_is_valid "$existing_resume"; then
+                    log "Existing resume arg detected ($existing_resume); not overriding with $karg"
+                    return 0
+                fi
+
+                resume_value="${existing_resume#resume=}"
+                grubby --update-kernel=ALL --remove-args="resume=${resume_value}" >/dev/null 2>&1 || true
+                log "Removed invalid existing resume arg: $existing_resume"
             fi
         fi
 
