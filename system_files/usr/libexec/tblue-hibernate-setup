@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SWAPFILE_PATH="/var/swapfile"
+SWAP_SUBVOL_PATH="/var/swap"
+SWAPFILE_PATH="/var/swap/swapfile"
 
 log() {
     echo "[tblue-hibernate-setup] $*"
@@ -31,11 +32,31 @@ find_swap_device() {
 }
 
 ensure_swapfile_fstab_entry() {
-    if grep -Eq '^[[:space:]]*/var/swapfile[[:space:]]+none[[:space:]]+swap([[:space:],]|$)' /etc/fstab 2>/dev/null; then
+    if grep -Eq '^[[:space:]]*/var/swap/swapfile[[:space:]]+none[[:space:]]+swap([[:space:],]|$)' /etc/fstab 2>/dev/null; then
         return 0
     fi
 
-    printf '%s\n' '/var/swapfile none swap defaults 0 0' >> /etc/fstab
+    printf '%s\n' '/var/swap/swapfile none swap defaults,nofail 0 0' >> /etc/fstab
+}
+
+ensure_swap_selinux_context() {
+    if ! command -v semanage >/dev/null 2>&1; then
+        return 0
+    fi
+
+    semanage fcontext -a -t var_t "$SWAP_SUBVOL_PATH(/.*)?" 2>/dev/null || true
+    semanage fcontext -a -t swapfile_t "$SWAPFILE_PATH" 2>/dev/null || true
+    restorecon -R "$SWAP_SUBVOL_PATH" 2>/dev/null || true
+    restorecon "$SWAPFILE_PATH" 2>/dev/null || true
+}
+
+disable_zram_for_hibernate() {
+    mkdir -p /etc/systemd
+    : > /etc/systemd/zram-generator.conf
+
+    if swapon --noheadings --raw --output NAME 2>/dev/null | grep -q '^/dev/zram'; then
+        swapoff /dev/zram0 2>/dev/null || true
+    fi
 }
 
 swap_size_gib_from_ram() {
@@ -65,22 +86,32 @@ create_swapfile_if_needed() {
         fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
 
         if [[ "$fs_type" == "btrfs" ]]; then
-            truncate -s 0 "$SWAPFILE_PATH"
-            chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
-            if command -v btrfs >/dev/null 2>&1; then
-                btrfs property set "$SWAPFILE_PATH" compression none >/dev/null 2>&1 || true
+            if [[ ! -d "$SWAP_SUBVOL_PATH" ]]; then
+                btrfs subvolume create "$SWAP_SUBVOL_PATH"
             fi
-            fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+
+            if command -v btrfs >/dev/null 2>&1; then
+                btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH"
+            else
+                truncate -s 0 "$SWAPFILE_PATH"
+                chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
+                fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+                chmod 600 "$SWAPFILE_PATH"
+                mkswap "$SWAPFILE_PATH" >/dev/null
+            fi
         else
+            mkdir -p "$SWAP_SUBVOL_PATH"
             fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+            chmod 600 "$SWAPFILE_PATH"
+            mkswap "$SWAPFILE_PATH" >/dev/null
         fi
 
-        chmod 600 "$SWAPFILE_PATH"
-        mkswap "$SWAPFILE_PATH" >/dev/null
+        ensure_swap_selinux_context
         log "Created swapfile at $SWAPFILE_PATH (${size_gib}G)"
     fi
 
     ensure_swapfile_fstab_entry
+    disable_zram_for_hibernate
     swapon "$SWAPFILE_PATH" >/dev/null 2>&1 || true
 
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
@@ -112,6 +143,14 @@ swap_target_uuid() {
 swapfile_resume_offset() {
     local file="$1"
     local first_extent
+
+    if command -v btrfs >/dev/null 2>&1 && [[ "$(findmnt -no FSTYPE -T "$file" 2>/dev/null || true)" == "btrfs" ]]; then
+        first_extent=$(btrfs inspect-internal map-swapfile -r "$file" 2>/dev/null | head -n1 || true)
+        if [[ -n "$first_extent" && "$first_extent" =~ ^[0-9]+$ ]]; then
+            echo "$first_extent"
+            return 0
+        fi
+    fi
 
     if ! command -v filefrag >/dev/null 2>&1; then
         return 1
@@ -246,6 +285,8 @@ main() {
         mark_done
         exit 0
     fi
+
+    disable_zram_for_hibernate
 
     karg="resume=UUID=$swap_uuid"
     if add_resume_karg_if_needed "$karg"; then
