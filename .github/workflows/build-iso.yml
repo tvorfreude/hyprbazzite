@@ -72,9 +72,16 @@ jobs:
         run: |
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
 
+      - name: Prepare environment
+        id: vars
+        run: |
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+          # Generate the short SHA here
+          echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Build container image
         id: build_image
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
+        uses: redhat-actions/buildah-build@v2
         with:
           containerfiles: |
             ./Containerfile
@@ -82,7 +89,8 @@ jobs:
           tags: latest
           oci: false
           build-args: |
-            SHA_HEAD_SHORT=${{ github.sha::7 }}
+            # Use the output from the Prepare environment step
+            SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
             BUILD_STAMP=${{ github.run_id }}
 
       - name: Make image available to root podman storage
