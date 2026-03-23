@@ -1,11 +1,16 @@
+
 [Unit]
-Description=TBlue Hibernate first-boot setup
+Description=TBlue Hibernate first-boot provisioning
 After=local-fs.target
-ConditionPathExists=!/var/lib/tblue/hibernate-setup.done
+DefaultDependencies=yes
 
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/tblue-hibernate-setup
+RemainAfterExit=yes
+TimeoutSec=0
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

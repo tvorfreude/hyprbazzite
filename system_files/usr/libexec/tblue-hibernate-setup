@@ -4,235 +4,48 @@ set -euo pipefail
 SWAP_SUBVOL_PATH="/var/swap"
 SWAPFILE_PATH="/var/swap/swapfile"
 
-log() {
-    echo "[tblue-hibernate-setup] $*" >&2
-}
+log() { echo "[tblue-hibernate] $*" >&2; }
 
-debug() {
-    echo "[tblue-hibernate-setup][DEBUG] $*" >&2
-}
-
-mark_done() {
-    mkdir -p /var/lib/tblue
-    touch /var/lib/tblue/hibernate-setup.done
-}
-
-ensure_swapfile_fstab_entry() {
-    if grep -Eq "^[[:space:]]*$SWAPFILE_PATH[[:space:]]+none[[:space:]]+swap([[:space:],]|$)" /etc/fstab 2>/dev/null; then
-        return 0
-    fi
-    log "Adding swapfile to /etc/fstab"
-    printf '%s\n' "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
-}
-
-ensure_selinux_contexts() {
-    if ! command -v semanage >/dev/null 2>&1; then
-        log "Warning: semanage not found, skipping SELinux labeling."
-        return 0
+create_swap_on_var() {
+    # 1. Create Subvolume if missing
+    if ! btrfs subvolume show "$SWAP_SUBVOL_PATH" >/dev/null 2>&1; then
+        [[ -d "$SWAP_SUBVOL_PATH" ]] && rm -rf "$SWAP_SUBVOL_PATH"
+        btrfs subvolume create "$SWAP_SUBVOL_PATH"
     fi
 
-    log "Applying SELinux labels to prevent 'Access Denied'..."
+    # 2. Create the swapfile using the Btrfs-optimized command
+    if [[ ! -f "$SWAPFILE_PATH" ]]; then
+        local mem_gib
+        mem_gib=$(awk '/MemTotal:/ {print int($2/1024/1024 + 2)}' /proc/meminfo)
+        log "Creating ${mem_gib}G swapfile..."
+        btrfs filesystem mkswapfile --size "${mem_gib}G" "$SWAPFILE_PATH"
+    fi
+
+    # 3. Apply labels (The policy is in /usr, the file is on /var)
+    chmod 600 "$SWAPFILE_PATH"
+    restorecon -RF "$SWAP_SUBVOL_PATH"
     
-    # 1. Clear any existing local definitions to avoid conflicts
-    semanage fcontext -d "$SWAP_SUBVOL_PATH(/.*)?" 2>/dev/null || true
-    semanage fcontext -d "$SWAPFILE_PATH" 2>/dev/null || true
-
-    # 2. Assign 'swapfile_t' to the directory AND everything inside it
-    semanage fcontext -a -t swapfile_t "$SWAP_SUBVOL_PATH(/.*)?" 2>/dev/null || true
-    semanage fcontext -a -t swapfile_t "$SWAPFILE_PATH" 2>/dev/null || true
-    
-    # 3. Force a recursive relabel of the path
-    restorecon -RFv "$SWAP_SUBVOL_PATH" 2>/dev/null || true
-
-    # 4. Create and install a local policy module for systemd-logind
-    # This specifically addresses the 'denied { search }' error for swapfile_t directories
-    if command -v checkmodule >/dev/null 2>&1; then
-        log "Generating local SELinux policy module to allow logind access..."
-        local tmpdir
-        tmpdir=$(mktemp -d)
-        
-        cat <<EOF > "$tmpdir/tblue_hibernate.te"
-module tblue_hibernate 1.0;
-require {
-    type systemd_logind_t;
-    type swapfile_t;
-    class dir search;
-}
-allow systemd_logind_t swapfile_t:dir search;
-EOF
-
-        checkmodule -M -m -o "$tmpdir/tblue_hibernate.mod" "$tmpdir/tblue_hibernate.te" >/dev/null
-        semodule_package -o "$tmpdir/tblue_hibernate.pp" -m "$tmpdir/tblue_hibernate.mod"
-        semodule -i "$tmpdir/tblue_hibernate.pp"
-        rm -rf "$tmpdir"
-        log "SELinux policy module 'tblue_hibernate' installed."
-    else
-        log "Warning: 'checkmodule' not found. Custom SELinux policy not installed."
+    if ! swapon --show | grep -q "$SWAPFILE_PATH"; then
+        mkswap "$SWAPFILE_PATH" 2>/dev/null || true
+        swapon "$SWAPFILE_PATH"
     fi
-}
-
-disable_zram_for_hibernate() {
-    if [[ -d /etc/systemd ]]; then
-        mkdir -p /etc/systemd/zram-generator.conf.d
-        echo "[zram0]" > /etc/systemd/zram-generator.conf.d/disable.conf
-        # Also clear main config if it exists
-        [[ -f /etc/systemd/zram-generator.conf ]] && : > /etc/systemd/zram-generator.conf
-    fi
-
-    if swapon --noheadings --raw --output NAME 2>/dev/null | grep -q '^/dev/zram'; then
-        log "Disabling active zram..."
-        swapoff /dev/zram0 2>/dev/null || true
-    fi
-}
-
-swap_size_gib_from_ram() {
-    local mem_kib mem_gib swap_gib
-    mem_kib=$(awk '/MemTotal:/ {print $2; exit}' /proc/meminfo)
-    mem_gib=$(( (mem_kib + 1024*1024 - 1) / (1024*1024) ))
-    swap_gib="$mem_gib"
-
-    (( swap_gib < 8 )) && swap_gib=8
-    (( swap_gib > 64 )) && swap_gib=64
-    echo "$swap_gib"
-}
-
-create_swapfile_if_needed() {
-    local size_gib fs_type
-    
-    # Check if active
-    if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
-        debug "Swapfile already active."
-        ensure_selinux_contexts
-        return 0
-    fi
-
-    size_gib=$(swap_size_gib_from_ram)
-    fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
-
-    if [[ "$fs_type" == "btrfs" ]]; then
-        if ! btrfs subvolume show "$SWAP_SUBVOL_PATH" >/dev/null 2>&1; then
-            debug "Creating btrfs subvolume at $SWAP_SUBVOL_PATH"
-            [[ -d "$SWAP_SUBVOL_PATH" ]] && rm -rf "$SWAP_SUBVOL_PATH"
-            btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
-        fi
-
-        if [[ ! -f "$SWAPFILE_PATH" ]]; then
-            if btrfs filesystem --help 2>&1 | grep -q "mkswapfile"; then
-                btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH"
-            else
-                truncate -s 0 "$SWAPFILE_PATH"
-                chattr +C "$SWAPFILE_PATH"
-                fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
-                chmod 600 "$SWAPFILE_PATH"
-                mkswap "$SWAPFILE_PATH"
-            fi
-        fi
-    else
-        mkdir -p "$SWAP_SUBVOL_PATH"
-        if [[ ! -f "$SWAPFILE_PATH" ]]; then
-            fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
-            chmod 600 "$SWAPFILE_PATH"
-            mkswap "$SWAPFILE_PATH"
-        fi
-    fi
-
-    ensure_selinux_contexts
-    ensure_swapfile_fstab_entry
-    
-    debug "Activating swapfile..."
-    swapon "$SWAPFILE_PATH" || log "Warning: swapon failed."
-}
-
-swapfile_resume_offset() {
-    local file="$1"
-    if [[ "$(findmnt -no FSTYPE -T "$file")" == "btrfs" ]]; then
-        btrfs inspect-internal map-swapfile -r "$file" 2>/dev/null | head -n1
-    else
-        filefrag -v "$file" 2>/dev/null | awk '$1 ~ /^0:/ {print $4; exit}' | sed -E 's/\.\..*$//' | tr -d ':'
-    fi
-}
-
-add_resume_karg_if_needed() {
-    local karg="$1"
-    local tool=""
-    
-    if command -v rpm-ostree >/dev/null 2>&1; then tool="rpm-ostree";
-    elif command -v grubby >/dev/null 2>&1; then tool="grubby";
-    else return 1; fi
-
-    local current
-    if [[ "$tool" == "rpm-ostree" ]]; then
-        current=$(rpm-ostree kargs)
-    else
-        current=$(grubby --info=ALL | grep -Po 'args=.*' || true)
-    fi
-
-    if echo "$current" | grep -qw -- "$karg"; then
-        return 0
-    fi
-
-    if [[ "$tool" == "rpm-ostree" ]]; then
-        rpm-ostree kargs --append-if-missing="$karg"
-    else
-        grubby --update-kernel=ALL --args="$karg"
-    fi
-    return 10
-}
-
-ensure_dracut_resume_module() {
-    local changed=0
-    
-    if [[ ! -f /etc/dracut.conf.d/resume.conf ]]; then
-        log "Adding Dracut resume module configuration..."
-        mkdir -p /etc/dracut.conf.d
-        echo 'add_dracutmodules+=" resume "' > /etc/dracut.conf.d/resume.conf
-        changed=1
-    fi
-
-    if command -v rpm-ostree >/dev/null 2>&1; then
-        if ! rpm-ostree initramfs 2>/dev/null | grep -q "Enabled: yes"; then
-            log "Enabling rpm-ostree initramfs and adding resume module..."
-            rpm-ostree initramfs --enable --arg="--add" --arg="resume"
-            changed=1
-        fi
-    fi
-    
-    return $changed
 }
 
 main() {
-    [[ $EUID -ne 0 ]] && echo "This script must be run as root" && exit 1
-    
-    local needs_reboot=0
-    
-    create_swapfile_if_needed
-    disable_zram_for_hibernate
+    create_swap_on_var
 
-    local swap_uuid
-    swap_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
-    
-    if add_resume_karg_if_needed "resume=UUID=$swap_uuid"; then :
-    elif [[ $? -eq 10 ]]; then needs_reboot=1; fi
-
-    local offset
-    offset=$(swapfile_resume_offset "$SWAPFILE_PATH")
-    if [[ -n "$offset" ]]; then
-        if add_resume_karg_if_needed "resume_offset=$offset"; then :
-        elif [[ $? -eq 10 ]]; then needs_reboot=1; fi
+    # Add to fstab if missing
+    if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
+        echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
     fi
 
-    if ensure_dracut_resume_module; then
-        needs_reboot=1
-    fi
+    # Set Kernel Args
+    local uuid offset
+    uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
+    offset=$(btrfs inspect-internal map-swapfile -r "$SWAPFILE_PATH" | head -n1)
 
-    if [[ $needs_reboot -eq 1 ]]; then
-        mkdir -p /var/lib/tblue
-        touch /var/lib/tblue/hibernate-reboot-required
-        log "Configuration updated. REBOOT REQUIRED."
-    fi
-
-    mark_done
-    log "Setup complete. The SELinux policy should now allow hibernation."
+    # Use rpm-ostree for the kargs - this works on bootc
+    rpm-ostree kargs --append-if-missing="resume=UUID=$uuid" --append-if-missing="resume_offset=$offset"
 }
 
 main "$@"
