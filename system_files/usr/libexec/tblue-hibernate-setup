@@ -25,21 +25,33 @@ ensure_swapfile_fstab_entry() {
     printf '%s\n' "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
 }
 
-ensure_swap_selinux_context() {
+ensure_selinux_contexts() {
     if ! command -v semanage >/dev/null 2>&1; then
+        log "Warning: semanage not found, skipping SELinux labeling."
         return 0
     fi
+
+    log "Applying SELinux labels to $SWAP_SUBVOL_PATH and $SWAPFILE_PATH..."
+    
+    # Label the directory so systemd can 'search' it
+    semanage fcontext -a -t swapfile_t "$SWAP_SUBVOL_PATH(/.*)?" 2>/dev/null || true
+    # Specifically label the file
     semanage fcontext -a -t swapfile_t "$SWAPFILE_PATH" 2>/dev/null || true
-    restorecon "$SWAPFILE_PATH" 2>/dev/null || true
+    
+    # Force apply the labels
+    restorecon -RF "$SWAP_SUBVOL_PATH" 2>/dev/null || true
 }
 
 disable_zram_for_hibernate() {
     if [[ -d /etc/systemd ]]; then
-        : > /etc/systemd/zram-generator.conf
+        mkdir -p /etc/systemd/zram-generator.conf.d
+        echo "[zram0]" > /etc/systemd/zram-generator.conf.d/disable.conf
+        # Also clear main config if it exists
+        [[ -f /etc/systemd/zram-generator.conf ]] && : > /etc/systemd/zram-generator.conf
     fi
 
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -q '^/dev/zram'; then
-        log "Disabling zram..."
+        log "Disabling active zram..."
         swapoff /dev/zram0 2>/dev/null || true
     fi
 }
@@ -57,47 +69,49 @@ swap_size_gib_from_ram() {
 
 create_swapfile_if_needed() {
     local size_gib fs_type
+    
+    # Check if active
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+        debug "Swapfile already active."
         return 0
-    fi
-
-    if [[ -f "$SWAPFILE_PATH" ]]; then
-        swapon "$SWAPFILE_PATH" 2>/dev/null && return 0
     fi
 
     size_gib=$(swap_size_gib_from_ram)
     fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
 
     if [[ "$fs_type" == "btrfs" ]]; then
-        [[ ! -d "$SWAP_SUBVOL_PATH" ]] && btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
-        if command -v btrfs >/dev/null 2>&1; then
-            btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH" >/dev/null
-        else
-            truncate -s 0 "$SWAPFILE_PATH"
-            chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
-            fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
-            chmod 600 "$SWAPFILE_PATH"
-            mkswap "$SWAPFILE_PATH" >/dev/null
+        # Check if subvolume exists, if not create it
+        if ! btrfs subvolume show "$SWAP_SUBVOL_PATH" >/dev/null 2>&1; then
+            debug "Creating btrfs subvolume at $SWAP_SUBVOL_PATH"
+            [[ -d "$SWAP_SUBVOL_PATH" ]] && rm -rf "$SWAP_SUBVOL_PATH"
+            btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
+        fi
+
+        if [[ ! -f "$SWAPFILE_PATH" ]]; then
+            if btrfs filesystem --help 2>&1 | grep -q "mkswapfile"; then
+                btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH"
+            else
+                truncate -s 0 "$SWAPFILE_PATH"
+                chattr +C "$SWAPFILE_PATH"
+                fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+                chmod 600 "$SWAPFILE_PATH"
+                mkswap "$SWAPFILE_PATH"
+            fi
         fi
     else
         mkdir -p "$SWAP_SUBVOL_PATH"
-        fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
-        chmod 600 "$SWAPFILE_PATH"
-        mkswap "$SWAPFILE_PATH" >/dev/null
+        if [[ ! -f "$SWAPFILE_PATH" ]]; then
+            fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+            chmod 600 "$SWAPFILE_PATH"
+            mkswap "$SWAPFILE_PATH"
+        fi
     fi
 
-    ensure_swap_selinux_context
+    ensure_selinux_contexts
     ensure_swapfile_fstab_entry
-    swapon "$SWAPFILE_PATH"
-}
-
-resume_arg_is_valid() {
-    local value="${1#resume=}"
-    if [[ "$value" == UUID=* ]]; then
-        [[ -e "/dev/disk/by-uuid/${value#UUID=}" ]]
-        return
-    fi
-    [[ -b "$value" ]]
+    
+    debug "Activating swapfile..."
+    swapon "$SWAPFILE_PATH" || log "Warning: swapon failed."
 }
 
 swapfile_resume_offset() {
@@ -148,31 +162,25 @@ main() {
     swap_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
     
     # Set Resume UUID
-    if add_resume_karg_if_needed "resume=UUID=$swap_uuid"; then
-        :
-    elif [[ $? -eq 10 ]]; then
-        needs_reboot=1
-    fi
+    if add_resume_karg_if_needed "resume=UUID=$swap_uuid"; then :
+    elif [[ $? -eq 10 ]]; then needs_reboot=1; fi
 
     # Set Offset
     local offset
     offset=$(swapfile_resume_offset "$SWAPFILE_PATH")
     if [[ -n "$offset" ]]; then
-        if add_resume_karg_if_needed "resume_offset=$offset"; then
-            :
-        elif [[ $? -eq 10 ]]; then
-            needs_reboot=1
-        fi
+        if add_resume_karg_if_needed "resume_offset=$offset"; then :
+        elif [[ $? -eq 10 ]]; then needs_reboot=1; fi
     fi
 
     if [[ $needs_reboot -eq 1 ]]; then
         mkdir -p /var/lib/tblue
         touch /var/lib/tblue/hibernate-reboot-required
-        log "Reboot required to apply kernel arguments."
+        log "Configuration updated. REBOOT REQUIRED to apply kernel args."
     fi
 
     mark_done
-    log "Setup complete."
+    log "Setup complete. Try 'systemctl hibernate' after your next reboot."
 }
 
 main "$@"
