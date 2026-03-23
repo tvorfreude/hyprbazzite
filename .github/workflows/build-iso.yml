@@ -82,7 +82,7 @@ jobs:
           tags: latest
           oci: false
           build-args: |
-            SHA_HEAD_SHORT=${{ github.sha }}
+            SHA_HEAD_SHORT=${{ github.sha::7 }}
             BUILD_STAMP=${{ github.run_id }}
 
       - name: Make image available to root podman storage
