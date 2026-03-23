@@ -133,8 +133,22 @@ create_swapfile_if_needed() {
 
 swap_target_uuid() {
     local target="$1"
-    local source fs_uuid
+    local source fs_uuid luks_device luks_uuid
 
+    # Detect LUKS-encrypted root (composefs/ostree with LUKS)
+    # /dev/mapper/luks-<UUID> where UUID is the LUKS partition UUID
+    luks_device=$(ls /dev/mapper/luks-* 2>/dev/null | head -n1 || true)
+    if [[ -n "$luks_device" ]]; then
+        # Extract UUID from device name: luks-b678311b-eea8-451c-a58f-1d6badae0024 -> b678311b-eea8-451c-a58f-1d6badae0024
+        luks_uuid="${luks_device#/dev/mapper/luks-}"
+        if blkid -U "$luks_uuid" >/dev/null 2>&1; then
+            log "Detected LUKS partition UUID: $luks_uuid"
+            echo "$luks_uuid"
+            return 0
+        fi
+    fi
+
+    # Fallback: try standard filesystem UUID detection (non-LUKS systems)
     if [[ -b "$target" ]]; then
         blkid -s UUID -o value "$target" 2>/dev/null || true
         return 0
