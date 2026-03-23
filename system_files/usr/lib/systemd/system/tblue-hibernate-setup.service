@@ -2,8 +2,6 @@
 [Unit]
 Description=TBlue Hibernate first-boot provisioning
 After=local-fs.target
-Before=swap.target
-DefaultDependencies=no
 
 [Service]
 Type=oneshot
