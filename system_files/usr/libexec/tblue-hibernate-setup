@@ -17,430 +17,162 @@ mark_done() {
     touch /var/lib/tblue/hibernate-setup.done
 }
 
-find_swap_device() {
-    local target
-
-    target=$(swapon --noheadings --raw --output NAME,TYPE 2>/dev/null | awk '$2 != "zram" {print $1; exit}')
-    if [[ -n "$target" ]]; then
-        echo "$target"
-        return 0
-    fi
-
-    target=$(blkid -t TYPE=swap -o device 2>/dev/null | head -n1 || true)
-    if [[ -n "$target" ]]; then
-        echo "$target"
-        return 0
-    fi
-
-    return 1
-}
-
 ensure_swapfile_fstab_entry() {
-    if grep -Eq '^[[:space:]]*/var/swap/swapfile[[:space:]]+none[[:space:]]+swap([[:space:],]|$)' /etc/fstab 2>/dev/null; then
+    if grep -Eq "^[[:space:]]*$SWAPFILE_PATH[[:space:]]+none[[:space:]]+swap([[:space:],]|$)" /etc/fstab 2>/dev/null; then
         return 0
     fi
-
-    printf '%s\n' '/var/swap/swapfile none swap defaults,nofail 0 0' >> /etc/fstab
+    log "Adding swapfile to /etc/fstab"
+    printf '%s\n' "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
 }
 
 ensure_swap_selinux_context() {
     if ! command -v semanage >/dev/null 2>&1; then
         return 0
     fi
-
-    # Ensure the swapfile always has the correct SELinux context for hibernation
     semanage fcontext -a -t swapfile_t "$SWAPFILE_PATH" 2>/dev/null || true
     restorecon "$SWAPFILE_PATH" 2>/dev/null || true
 }
 
 disable_zram_for_hibernate() {
-    mkdir -p /etc/systemd
-    : > /etc/systemd/zram-generator.conf
+    if [[ -d /etc/systemd ]]; then
+        : > /etc/systemd/zram-generator.conf
+    fi
 
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -q '^/dev/zram'; then
+        log "Disabling zram..."
         swapoff /dev/zram0 2>/dev/null || true
     fi
 }
 
 swap_size_gib_from_ram() {
     local mem_kib mem_gib swap_gib
-
     mem_kib=$(awk '/MemTotal:/ {print $2; exit}' /proc/meminfo)
     mem_gib=$(( (mem_kib + 1024*1024 - 1) / (1024*1024) ))
     swap_gib="$mem_gib"
 
     (( swap_gib < 8 )) && swap_gib=8
     (( swap_gib > 64 )) && swap_gib=64
-
     echo "$swap_gib"
 }
 
 create_swapfile_if_needed() {
     local size_gib fs_type
-
-    debug "Checking if swapfile is already active..."
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
-        debug "Swapfile is already active."
-        ensure_swap_selinux_context
-        echo "$SWAPFILE_PATH"
         return 0
     fi
 
-    debug "Checking if swapfile exists but not active..."
     if [[ -f "$SWAPFILE_PATH" ]]; then
-        debug "Swapfile exists, trying to activate."
-        swapon "$SWAPFILE_PATH" >/dev/null 2>&1 || true
-        ensure_swap_selinux_context
-        if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
-            debug "Swapfile activated."
-            echo "$SWAPFILE_PATH"
-            return 0
-        fi
+        swapon "$SWAPFILE_PATH" 2>/dev/null && return 0
     fi
 
     size_gib=$(swap_size_gib_from_ram)
-    debug "Calculated swapfile size: ${size_gib}G"
+    fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
 
-    if [[ ! -f "$SWAPFILE_PATH" ]]; then
-        fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
-        debug "Filesystem type for /var: $fs_type"
-
-        if [[ "$fs_type" == "btrfs" ]]; then
-            if [[ ! -d "$SWAP_SUBVOL_PATH" ]]; then
-                debug "Creating btrfs subvolume at $SWAP_SUBVOL_PATH"
-                btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
-            fi
-
-            if command -v btrfs >/dev/null 2>&1; then
-                debug "Using btrfs mkswapfile for $SWAPFILE_PATH"
-                btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH" >/dev/null
-            else
-                debug "Using fallback swapfile creation for btrfs"
-                truncate -s 0 "$SWAPFILE_PATH"
-                chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
-                fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
-                chmod 600 "$SWAPFILE_PATH"
-                mkswap "$SWAPFILE_PATH" >/dev/null
-            fi
+    if [[ "$fs_type" == "btrfs" ]]; then
+        [[ ! -d "$SWAP_SUBVOL_PATH" ]] && btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
+        if command -v btrfs >/dev/null 2>&1; then
+            btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH" >/dev/null
         else
-            debug "Creating swapfile on non-btrfs filesystem"
-            mkdir -p "$SWAP_SUBVOL_PATH"
+            truncate -s 0 "$SWAPFILE_PATH"
+            chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
             fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
             chmod 600 "$SWAPFILE_PATH"
             mkswap "$SWAPFILE_PATH" >/dev/null
         fi
-
-        ensure_swap_selinux_context
-        log "Created swapfile at $SWAPFILE_PATH (${size_gib}G)"
+    else
+        mkdir -p "$SWAP_SUBVOL_PATH"
+        fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
+        chmod 600 "$SWAPFILE_PATH"
+        mkswap "$SWAPFILE_PATH" >/dev/null
     fi
 
+    ensure_swap_selinux_context
     ensure_swapfile_fstab_entry
-    disable_zram_for_hibernate
-    debug "Trying to activate swapfile..."
-    swapon "$SWAPFILE_PATH" >/dev/null 2>&1 || true
-
-    if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
-        debug "Swapfile is now active."
-        echo "$SWAPFILE_PATH"
-        return 0
-    fi
-
-    debug "Failed to activate swapfile."
-    return 1
-}
-
-swap_target_uuid() {
-    local target="$1"
-    local btrfs_dev btrfs_uuid luks_device luks_uuid fs_uuid
-
-    # If swapfile is on Btrfs, get the parent FS UUID (not the LUKS UUID)
-    if [[ "$(findmnt -no FSTYPE -T "$target" 2>/dev/null)" == "btrfs" ]]; then
-        btrfs_dev=$(findmnt -no SOURCE -T "$target" | sed 's/\[.*//')
-        btrfs_uuid=$(btrfs filesystem show "$btrfs_dev" 2>/dev/null | awk '/uuid:/ {print $2; exit}')
-        if [[ -n "$btrfs_uuid" ]]; then
-            log "Detected Btrfs FS UUID for swapfile: $btrfs_uuid"
-            echo "$btrfs_uuid"
-            return 0
-        fi
-    fi
-
-    # Fallback: LUKS UUID if not Btrfs
-    luks_device=$(ls /dev/mapper/luks-* 2>/dev/null | head -n1 || true)
-    if [[ -n "$luks_device" ]]; then
-        luks_uuid="${luks_device#/dev/mapper/luks-}"
-        if blkid -U "$luks_uuid" >/dev/null 2>&1; then
-            log "Detected LUKS partition UUID: $luks_uuid"
-            echo "$luks_uuid"
-            return 0
-        fi
-    fi
-
-    # Fallback: try standard filesystem UUID detection (non-LUKS systems)
-    if [[ -b "$target" ]]; then
-        blkid -s UUID -o value "$target" 2>/dev/null || true
-        return 0
-    fi
-
-    source=$(findmnt -no SOURCE -T "$target" 2>/dev/null || true)
-    if [[ -n "$source" && -b "$source" ]]; then
-        blkid -s UUID -o value "$source" 2>/dev/null || true
-        return 0
-    fi
-
-    fs_uuid=$(findmnt -no UUID -T "$target" 2>/dev/null || true)
-    if [[ -n "$fs_uuid" ]]; then
-        echo "$fs_uuid"
-        return 0
-    fi
-
-    return 1
+    swapon "$SWAPFILE_PATH"
 }
 
 resume_arg_is_valid() {
-    local resume_arg="$1"
-    local value
-
-    value="${resume_arg#resume=}"
+    local value="${1#resume=}"
     if [[ "$value" == UUID=* ]]; then
         [[ -e "/dev/disk/by-uuid/${value#UUID=}" ]]
         return
     fi
-
     [[ -b "$value" ]]
 }
 
 swapfile_resume_offset() {
     local file="$1"
-    local first_extent
-
-    if command -v btrfs >/dev/null 2>&1 && [[ "$(findmnt -no FSTYPE -T "$file" 2>/dev/null || true)" == "btrfs" ]]; then
-        first_extent=$(btrfs inspect-internal map-swapfile -r "$file" 2>/dev/null | head -n1 || true)
-        if [[ -n "$first_extent" && "$first_extent" =~ ^[0-9]+$ ]]; then
-            echo "$first_extent"
-            return 0
-        fi
+    if [[ "$(findmnt -no FSTYPE -T "$file")" == "btrfs" ]]; then
+        btrfs inspect-internal map-swapfile -r "$file" 2>/dev/null | head -n1
+    else
+        filefrag -v "$file" 2>/dev/null | awk '$1 ~ /^0:/ {print $4; exit}' | sed -E 's/\.\..*$//' | tr -d ':'
     fi
-
-    if ! command -v filefrag >/dev/null 2>&1; then
-        return 1
-    fi
-
-    first_extent=$(filefrag -v "$file" 2>/dev/null | awk '$1 ~ /^0:/ {print $4; exit}' | sed -E 's/\.\..*$//' | tr -d ':')
-    if [[ -z "$first_extent" || ! "$first_extent" =~ ^[0-9]+$ ]]; then
-        return 1
-    fi
-
-    echo "$first_extent"
 }
 
 add_resume_karg_if_needed() {
     local karg="$1"
-    local guard_resume=0
+    local tool=""
+    
+    if command -v rpm-ostree >/dev/null 2>&1; then tool="rpm-ostree";
+    elif command -v grubby >/dev/null 2>&1; then tool="grubby";
+    else return 1; fi
 
-    [[ "$karg" == resume=* ]] && guard_resume=1
+    local current
+    if [[ "$tool" == "rpm-ostree" ]]; then
+        current=$(rpm-ostree kargs)
+    else
+        current=$(grubby --info=ALL | grep -Po 'args=.*' || true)
+    fi
 
-    if command -v rpm-ostree >/dev/null 2>&1; then
-        local current existing_resume
-        current=$(rpm-ostree kargs 2>/dev/null || true)
+    if echo "$current" | grep -qw -- "$karg"; then
+        return 0
+    fi
 
-        if [[ $guard_resume -eq 1 ]]; then
-            existing_resume=$(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | head -n1 || true)
-            if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
-                if resume_arg_is_valid "$existing_resume"; then
-                    log "Existing resume arg detected ($existing_resume); not overriding with $karg"
-                    return 0
-                fi
-
-                rpm-ostree kargs --delete-if-present="$existing_resume"
-                log "Removed invalid existing resume arg: $existing_resume"
-            fi
-        fi
-
-        if grep -qw -- "$karg" <<<"$current"; then
-            log "Kernel arg already present: $karg"
-            return 0
-        fi
-
+    if [[ "$tool" == "rpm-ostree" ]]; then
         rpm-ostree kargs --append-if-missing="$karg"
-        log "Added kernel arg via rpm-ostree: $karg"
-        return 10
-    fi
-
-    if command -v grubby >/dev/null 2>&1; then
-        local current existing_resume resume_value
-        current=$(grubby --info=ALL 2>/dev/null | grep -Eo 'resume=[^[:space:]"]+' | head -n1 || true)
-
-        if [[ $guard_resume -eq 1 ]]; then
-            existing_resume="$current"
-            if [[ -n "$existing_resume" && "$existing_resume" != "$karg" ]]; then
-                if resume_arg_is_valid "$existing_resume"; then
-                    log "Existing resume arg detected ($existing_resume); not overriding with $karg"
-                    return 0
-                fi
-
-                resume_value="${existing_resume#resume=}"
-                grubby --update-kernel=ALL --remove-args="resume=${resume_value}" >/dev/null 2>&1 || true
-                log "Removed invalid existing resume arg: $existing_resume"
-            fi
-        fi
-
-        if [[ "$current" == "$karg" ]]; then
-            log "Kernel arg already present: $karg"
-            return 0
-        fi
-
+    else
         grubby --update-kernel=ALL --args="$karg"
-        log "Added kernel arg via grubby: $karg"
-        return 10
     fi
-
-    log "No supported bootloader tool found (rpm-ostree/grubby)."
-    return 1
-}
-
-cleanup_conflicting_resume_kargs() {
-    local current changed=0
-    local -a resume_args=()
-    local -a uuid_resume_args=()
-    local arg has_non_uuid=0
-
-    if ! command -v rpm-ostree >/dev/null 2>&1; then
-        return 0
-    fi
-
-    current=$(rpm-ostree kargs 2>/dev/null || true)
-    while IFS= read -r arg; do
-        [[ -z "$arg" ]] && continue
-        resume_args+=("$arg")
-        if [[ "$arg" == resume=UUID=* ]]; then
-            uuid_resume_args+=("$arg")
-        else
-            has_non_uuid=1
-        fi
-    done < <(grep -Eo 'resume=[^[:space:]]+' <<<"$current" | awk '!seen[$0]++')
-
-    if [[ ${#resume_args[@]} -lt 2 || ${#uuid_resume_args[@]} -eq 0 || $has_non_uuid -eq 0 ]]; then
-        return 0
-    fi
-
-    for arg in "${uuid_resume_args[@]}"; do
-        rpm-ostree kargs --delete-if-present="$arg"
-        log "Removed conflicting kernel arg via rpm-ostree: $arg"
-        changed=1
-    done
-
-    if [[ $changed -eq 1 ]]; then
-        return 10
-    fi
-
-    return 0
+    return 10
 }
 
 main() {
-    local swap_target swap_uuid resume_offset karg needs_reboot=0 rc=0
-
-    rc=0
-    if cleanup_conflicting_resume_kargs; then
-        :
-    else
-        rc=$?
-        if [[ $rc -eq 10 ]]; then
-            needs_reboot=1
-        fi
-    fi
-
-
-    # Ensure swapfile is created and active, then robustly get UUID and offset
-    debug "Starting main hibernation setup logic"
-    # Always use the actual swapfile path for UUID and offset detection
-    # Always use $SWAPFILE_PATH for all further operations
-    for i in {1..5}; do
-        debug "Attempt $i: Ensuring swapfile exists and is active..."
-        if [[ ! -f "$SWAPFILE_PATH" ]]; then
-            debug "Swapfile does not exist, creating..."
-            create_swapfile_if_needed || true
-        fi
-        if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
-            debug "Swapfile is active."
-            break
-        else
-            debug "Swapfile not active, trying to activate..."
-            sudo swapon "$SWAPFILE_PATH" 2>/dev/null || true
-        fi
-        sleep 1
-    done
-    if [[ ! -f "$SWAPFILE_PATH" ]]; then
-        log "Swapfile does not exist after retries; hibernate resume is not configured."
-        mark_done
-        exit 0
-    fi
-
-    # Get UUID of parent filesystem for swapfile
-    swap_uuid=""
-    for i in {1..5}; do
-        debug "Attempt $i: Getting swap UUID for $SWAPFILE_PATH..."
-        swap_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH" 2>/dev/null || true)
-        debug "swap_uuid: $swap_uuid"
-        if [[ -n "$swap_uuid" ]]; then
-            debug "Got swap UUID: $swap_uuid"
-            break
-        fi
-        sleep 1
-    done
-    if [[ -z "$swap_uuid" ]]; then
-        log "Could not read UUID for swapfile $SWAPFILE_PATH after retries; skipping resume kernel arg."
-        mark_done
-        exit 0
-    fi
-
+    [[ $EUID -ne 0 ]] && echo "This script must be run as root" && exit 1
+    
+    local needs_reboot=0
+    
+    create_swapfile_if_needed
     disable_zram_for_hibernate
 
-    karg="resume=UUID=$swap_uuid"
-    debug "Setting kernel arg: $karg"
-    if add_resume_karg_if_needed "$karg"; then
-        debug "Kernel arg set: $karg"
-    else
-        rc=$?
-        debug "add_resume_karg_if_needed failed with rc=$rc"
-        if [[ $rc -eq 10 ]]; then
-            needs_reboot=1
-        fi
+    local swap_uuid
+    swap_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
+    
+    # Set Resume UUID
+    if add_resume_karg_if_needed "resume=UUID=$swap_uuid"; then
+        :
+    elif [[ $? -eq 10 ]]; then
+        needs_reboot=1
     fi
 
-    # Always attempt to set resume_offset for swapfile
-    resume_offset=""
-    for i in {1..5}; do
-        debug "Attempt $i: Getting resume_offset for $SWAPFILE_PATH..."
-        resume_offset=$(swapfile_resume_offset "$SWAPFILE_PATH" || true)
-        debug "resume_offset: $resume_offset"
-        if [[ -n "$resume_offset" ]]; then
-            debug "Got resume_offset: $resume_offset"
-            break
+    # Set Offset
+    local offset
+    offset=$(swapfile_resume_offset "$SWAPFILE_PATH")
+    if [[ -n "$offset" ]]; then
+        if add_resume_karg_if_needed "resume_offset=$offset"; then
+            :
+        elif [[ $? -eq 10 ]]; then
+            needs_reboot=1
         fi
-        sleep 1
-    done
-    if [[ -n "$resume_offset" ]]; then
-        debug "Setting kernel arg: resume_offset=$resume_offset"
-        if add_resume_karg_if_needed "resume_offset=$resume_offset"; then
-            debug "Kernel arg set: resume_offset=$resume_offset"
-        else
-            rc=$?
-            debug "add_resume_karg_if_needed for resume_offset failed with rc=$rc"
-            if [[ $rc -eq 10 ]];n+                needs_reboot=1
-            fi
-        fi
-    else
-        log "Could not determine resume_offset for swapfile ($SWAPFILE_PATH) after retries; hibernate may not resume from swapfile."
     fi
 
     if [[ $needs_reboot -eq 1 ]]; then
         mkdir -p /var/lib/tblue
         touch /var/lib/tblue/hibernate-reboot-required
-        log "Hibernate resume configured. Reboot required to apply new kernel arg."
+        log "Reboot required to apply kernel arguments."
     fi
 
     mark_done
-    log "Completed."
+    log "Setup complete."
 }
 
 main "$@"
