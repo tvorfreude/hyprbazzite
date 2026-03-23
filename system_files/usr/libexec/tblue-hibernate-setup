@@ -42,8 +42,33 @@ ensure_selinux_contexts() {
     semanage fcontext -a -t swapfile_t "$SWAPFILE_PATH" 2>/dev/null || true
     
     # 3. Force a recursive relabel of the path
-    # Using -F (force) ensures that even if it thinks it's correct, it resets it
     restorecon -RFv "$SWAP_SUBVOL_PATH" 2>/dev/null || true
+
+    # 4. Create and install a local policy module for systemd-logind
+    # This specifically addresses the 'denied { search }' error for swapfile_t directories
+    if command -v checkmodule >/dev/null 2>&1; then
+        log "Generating local SELinux policy module to allow logind access..."
+        local tmpdir
+        tmpdir=$(mktemp -d)
+        
+        cat <<EOF > "$tmpdir/tblue_hibernate.te"
+module tblue_hibernate 1.0;
+require {
+    type systemd_logind_t;
+    type swapfile_t;
+    class dir search;
+}
+allow systemd_logind_t swapfile_t:dir search;
+EOF
+
+        checkmodule -M -m -o "$tmpdir/tblue_hibernate.mod" "$tmpdir/tblue_hibernate.te" >/dev/null
+        semodule_package -o "$tmpdir/tblue_hibernate.pp" -m "$tmpdir/tblue_hibernate.mod"
+        semodule -i "$tmpdir/tblue_hibernate.pp"
+        rm -rf "$tmpdir"
+        log "SELinux policy module 'tblue_hibernate' installed."
+    else
+        log "Warning: 'checkmodule' not found. Custom SELinux policy not installed."
+    fi
 }
 
 disable_zram_for_hibernate() {
@@ -165,7 +190,6 @@ ensure_dracut_resume_module() {
     fi
 
     if command -v rpm-ostree >/dev/null 2>&1; then
-        # Check if initramfs is actually enabled
         if ! rpm-ostree initramfs 2>/dev/null | grep -q "Enabled: yes"; then
             log "Enabling rpm-ostree initramfs and adding resume module..."
             rpm-ostree initramfs --enable --arg="--add" --arg="resume"
@@ -187,11 +211,9 @@ main() {
     local swap_uuid
     swap_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
     
-    # Set Resume UUID
     if add_resume_karg_if_needed "resume=UUID=$swap_uuid"; then :
     elif [[ $? -eq 10 ]]; then needs_reboot=1; fi
 
-    # Set Offset
     local offset
     offset=$(swapfile_resume_offset "$SWAPFILE_PATH")
     if [[ -n "$offset" ]]; then
@@ -210,7 +232,7 @@ main() {
     fi
 
     mark_done
-    log "Setup complete. Run 'sudo restorecon -Rv /var/swap' then try 'systemctl hibernate'."
+    log "Setup complete. The SELinux policy should now allow hibernation."
 }
 
 main "$@"
