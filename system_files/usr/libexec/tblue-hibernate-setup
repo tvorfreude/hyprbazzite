@@ -8,6 +8,10 @@ log() {
     echo "[tblue-hibernate-setup] $*" >&2
 }
 
+debug() {
+    echo "[tblue-hibernate-setup][DEBUG] $*" >&2
+}
+
 mark_done() {
     mkdir -p /var/lib/tblue
     touch /var/lib/tblue/hibernate-setup.done
@@ -74,35 +78,44 @@ swap_size_gib_from_ram() {
 create_swapfile_if_needed() {
     local size_gib fs_type
 
+    debug "Checking if swapfile is already active..."
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+        debug "Swapfile is already active."
         ensure_swap_selinux_context
         echo "$SWAPFILE_PATH"
         return 0
     fi
 
-    # Swapfile might exist from previous run but not be active yet; try to activate it
+    debug "Checking if swapfile exists but not active..."
     if [[ -f "$SWAPFILE_PATH" ]]; then
+        debug "Swapfile exists, trying to activate."
         swapon "$SWAPFILE_PATH" >/dev/null 2>&1 || true
         ensure_swap_selinux_context
         if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+            debug "Swapfile activated."
             echo "$SWAPFILE_PATH"
             return 0
         fi
     fi
 
     size_gib=$(swap_size_gib_from_ram)
+    debug "Calculated swapfile size: ${size_gib}G"
 
     if [[ ! -f "$SWAPFILE_PATH" ]]; then
         fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
+        debug "Filesystem type for /var: $fs_type"
 
         if [[ "$fs_type" == "btrfs" ]]; then
             if [[ ! -d "$SWAP_SUBVOL_PATH" ]]; then
+                debug "Creating btrfs subvolume at $SWAP_SUBVOL_PATH"
                 btrfs subvolume create "$SWAP_SUBVOL_PATH" >/dev/null
             fi
 
             if command -v btrfs >/dev/null 2>&1; then
+                debug "Using btrfs mkswapfile for $SWAPFILE_PATH"
                 btrfs filesystem mkswapfile --size "${size_gib}G" "$SWAPFILE_PATH" >/dev/null
             else
+                debug "Using fallback swapfile creation for btrfs"
                 truncate -s 0 "$SWAPFILE_PATH"
                 chattr +C "$SWAPFILE_PATH" 2>/dev/null || true
                 fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
@@ -110,6 +123,7 @@ create_swapfile_if_needed() {
                 mkswap "$SWAPFILE_PATH" >/dev/null
             fi
         else
+            debug "Creating swapfile on non-btrfs filesystem"
             mkdir -p "$SWAP_SUBVOL_PATH"
             fallocate -l "${size_gib}G" "$SWAPFILE_PATH"
             chmod 600 "$SWAPFILE_PATH"
@@ -122,13 +136,16 @@ create_swapfile_if_needed() {
 
     ensure_swapfile_fstab_entry
     disable_zram_for_hibernate
+    debug "Trying to activate swapfile..."
     swapon "$SWAPFILE_PATH" >/dev/null 2>&1 || true
 
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+        debug "Swapfile is now active."
         echo "$SWAPFILE_PATH"
         return 0
     fi
 
+    debug "Failed to activate swapfile."
     return 1
 }
 
@@ -332,19 +349,44 @@ main() {
         fi
     fi
 
-    swap_target=$(find_swap_device || true)
-    if [[ -z "${swap_target:-}" ]]; then
-        swap_target=$(create_swapfile_if_needed || true)
+
+    # Ensure swapfile is created and active, then robustly get UUID and offset
+    debug "Starting main hibernation setup logic"
+    swap_target=""
+    for i in {1..5}; do
+        debug "Attempt $i: Finding swap device..."
+        swap_target=$(find_swap_device || true)
+        debug "swap_target: $swap_target"
         if [[ -z "${swap_target:-}" ]]; then
-            log "No non-zram swap found and swapfile creation failed; hibernate resume is not configured."
-            mark_done
-            exit 0
+            debug "No swap device found, trying to create swapfile..."
+            swap_target=$(create_swapfile_if_needed || true)
+            debug "create_swapfile_if_needed returned: $swap_target"
         fi
+        if [[ -n "$swap_target" ]]; then
+            debug "Found or created swap device: $swap_target"
+            break
+        fi
+        sleep 1
+    done
+    if [[ -z "${swap_target:-}" ]]; then
+        log "No non-zram swap found and swapfile creation failed; hibernate resume is not configured."
+        mark_done
+        exit 0
     fi
 
-    swap_uuid=$(swap_target_uuid "$swap_target" || true)
+    swap_uuid=""
+    for i in {1..5}; do
+        debug "Attempt $i: Getting swap UUID for $swap_target..."
+        swap_uuid=$(swap_target_uuid "$swap_target" || true)
+        debug "swap_uuid: $swap_uuid"
+        if [[ -n "$swap_uuid" ]]; then
+            debug "Got swap UUID: $swap_uuid"
+            break
+        fi
+        sleep 1
+    done
     if [[ -z "$swap_uuid" ]]; then
-        log "Could not read UUID for swap target $swap_target; skipping resume kernel arg."
+        log "Could not read UUID for swap target $swap_target after retries; skipping resume kernel arg."
         mark_done
         exit 0
     fi
@@ -352,28 +394,42 @@ main() {
     disable_zram_for_hibernate
 
     karg="resume=UUID=$swap_uuid"
+    debug "Setting kernel arg: $karg"
     if add_resume_karg_if_needed "$karg"; then
-        :
+        debug "Kernel arg set: $karg"
     else
         rc=$?
+        debug "add_resume_karg_if_needed failed with rc=$rc"
         if [[ $rc -eq 10 ]]; then
             needs_reboot=1
         fi
     fi
 
     if [[ -f "$swap_target" ]]; then
-        resume_offset=$(swapfile_resume_offset "$swap_target" || true)
+        resume_offset=""
+        for i in {1..5}; do
+            debug "Attempt $i: Getting resume_offset for $swap_target..."
+            resume_offset=$(swapfile_resume_offset "$swap_target" || true)
+            debug "resume_offset: $resume_offset"
+            if [[ -n "$resume_offset" ]]; then
+                debug "Got resume_offset: $resume_offset"
+                break
+            fi
+            sleep 1
+        done
         if [[ -n "$resume_offset" ]]; then
+            debug "Setting kernel arg: resume_offset=$resume_offset"
             if add_resume_karg_if_needed "resume_offset=$resume_offset"; then
-                :
+                debug "Kernel arg set: resume_offset=$resume_offset"
             else
                 rc=$?
+                debug "add_resume_karg_if_needed for resume_offset failed with rc=$rc"
                 if [[ $rc -eq 10 ]]; then
                     needs_reboot=1
                 fi
             fi
         else
-            log "Could not determine resume_offset for swapfile ($swap_target); hibernate may not resume from swapfile."
+            log "Could not determine resume_offset for swapfile ($swap_target) after retries; hibernate may not resume from swapfile."
         fi
     fi
 
