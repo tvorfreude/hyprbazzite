@@ -31,15 +31,19 @@ ensure_selinux_contexts() {
         return 0
     fi
 
-    log "Applying SELinux labels to $SWAP_SUBVOL_PATH and $SWAPFILE_PATH..."
+    log "Applying SELinux labels to prevent 'Access Denied'..."
     
-    # Label the directory so systemd can 'search' it
+    # 1. Clear any existing local definitions to avoid conflicts
+    semanage fcontext -d "$SWAP_SUBVOL_PATH(/.*)?" 2>/dev/null || true
+    semanage fcontext -d "$SWAPFILE_PATH" 2>/dev/null || true
+
+    # 2. Assign 'swapfile_t' to the directory AND everything inside it
     semanage fcontext -a -t swapfile_t "$SWAP_SUBVOL_PATH(/.*)?" 2>/dev/null || true
-    # Specifically label the file
     semanage fcontext -a -t swapfile_t "$SWAPFILE_PATH" 2>/dev/null || true
     
-    # Force apply the labels
-    restorecon -RF "$SWAP_SUBVOL_PATH" 2>/dev/null || true
+    # 3. Force a recursive relabel of the path
+    # Using -F (force) ensures that even if it thinks it's correct, it resets it
+    restorecon -RFv "$SWAP_SUBVOL_PATH" 2>/dev/null || true
 }
 
 disable_zram_for_hibernate() {
@@ -73,6 +77,7 @@ create_swapfile_if_needed() {
     # Check if active
     if swapon --noheadings --raw --output NAME 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
         debug "Swapfile already active."
+        ensure_selinux_contexts
         return 0
     fi
 
@@ -80,7 +85,6 @@ create_swapfile_if_needed() {
     fs_type=$(findmnt -no FSTYPE -T /var 2>/dev/null || echo "")
 
     if [[ "$fs_type" == "btrfs" ]]; then
-        # Check if subvolume exists, if not create it
         if ! btrfs subvolume show "$SWAP_SUBVOL_PATH" >/dev/null 2>&1; then
             debug "Creating btrfs subvolume at $SWAP_SUBVOL_PATH"
             [[ -d "$SWAP_SUBVOL_PATH" ]] && rm -rf "$SWAP_SUBVOL_PATH"
@@ -150,11 +154,9 @@ add_resume_karg_if_needed() {
     return 10
 }
 
-# New function to handle the initramfs requirement for Atomic/Bazzite
 ensure_dracut_resume_module() {
     local changed=0
     
-    # 1. Create the dracut config file
     if [[ ! -f /etc/dracut.conf.d/resume.conf ]]; then
         log "Adding Dracut resume module configuration..."
         mkdir -p /etc/dracut.conf.d
@@ -162,10 +164,9 @@ ensure_dracut_resume_module() {
         changed=1
     fi
 
-    # 2. Tell rpm-ostree to enable initramfs building with the resume module
-    # We use the --arg syntax which is more reliable on recent versions
     if command -v rpm-ostree >/dev/null 2>&1; then
-        if ! rpm-ostree initramfs | grep -q "Enabled: yes"; then
+        # Check if initramfs is actually enabled
+        if ! rpm-ostree initramfs 2>/dev/null | grep -q "Enabled: yes"; then
             log "Enabling rpm-ostree initramfs and adding resume module..."
             rpm-ostree initramfs --enable --arg="--add" --arg="resume"
             changed=1
@@ -198,7 +199,6 @@ main() {
         elif [[ $? -eq 10 ]]; then needs_reboot=1; fi
     fi
 
-    # Ensure initramfs can actually handle the resume (fixes Black Screen)
     if ensure_dracut_resume_module; then
         needs_reboot=1
     fi
@@ -206,11 +206,11 @@ main() {
     if [[ $needs_reboot -eq 1 ]]; then
         mkdir -p /var/lib/tblue
         touch /var/lib/tblue/hibernate-reboot-required
-        log "Configuration updated. REBOOT REQUIRED to apply kernel args and initramfs changes."
+        log "Configuration updated. REBOOT REQUIRED."
     fi
 
     mark_done
-    log "Setup complete. Try 'systemctl hibernate' after your next reboot."
+    log "Setup complete. Run 'sudo restorecon -Rv /var/swap' then try 'systemctl hibernate'."
 }
 
 main "$@"
