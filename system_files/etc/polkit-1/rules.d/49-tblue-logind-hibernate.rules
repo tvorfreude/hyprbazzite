@@ -2,11 +2,13 @@ polkit.addRule(function(action, subject) {
     var allowed = [
         "org.freedesktop.login1.hibernate",
         "org.freedesktop.login1.hibernate-multiple-sessions",
+        "org.freedesktop.login1.hibernate-ignore-inhibit",
         "org.freedesktop.login1.suspend-then-hibernate",
-        "org.freedesktop.login1.suspend-then-hibernate-multiple-sessions"
+        "org.freedesktop.login1.suspend-then-hibernate-multiple-sessions",
+        "org.freedesktop.login1.suspend-then-hibernate-ignore-inhibit"
     ];
 
-    if (allowed.indexOf(action.id) >= 0 && subject.active && subject.local && subject.isInGroup("wheel")) {
+    if (allowed.indexOf(action.id) >= 0 && (subject.user == "root" || subject.isInGroup("wheel"))) {
         return polkit.Result.YES;
     }
 });
