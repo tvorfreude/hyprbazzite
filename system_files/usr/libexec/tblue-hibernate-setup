@@ -41,13 +41,14 @@ main() {
 
     # 2. Get the decrypted device path and physical offset
     local dec_uuid offset
-    dec_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
+    dix rec_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
 
     # Verify we didn't get an empty string
     if [[ -z "$dec_uuid" ]]; then
         log "Error: Could not determine Decrypted UUID"
         exit 1
-    fi    offset=$(btrfs inspect-internal map-swapfile -r "$SWAPFILE_PATH" | head -n1)
+    fi
+    offset=$(btrfs inspect-internal map-swapfile -r "$SWAPFILE_PATH" | head -n1)
 
     log "Targeting resume device: $dec_uuid at offset: $offset"
 
