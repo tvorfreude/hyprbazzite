@@ -56,7 +56,7 @@ main() {
     # We use --replace to overwrite any old resume/offset attempts
     # and --append-if-missing for the safety flags.
     rpm-ostree kargs \
-        --replace="resume=$dec_uuid" \
+        --replace="resume=UUID=$dec_uuid" \
         --replace="resume_offset=$offset" \
         --append-if-missing="rootwait" \
         --append-if-missing="resume_delay=5"
