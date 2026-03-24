@@ -1,22 +1,4 @@
-module tblue_hibernate 1.5;
 
-require {
-    type systemd_sleep_t;
-    type systemd_logind_t;
-    type swapfile_t;
-    class dir { search read open getattr };
-    class file { read write open getattr ioctl lock };
-    # The 'secret sauce' for BTRFS/LUKS
-    class capability { sys_admin };
-}
+module tblue_hibernate 1.6;
 
-# 1. Allow logind to verify the swap exists
-allow systemd_logind_t swapfile_t:dir { search read open getattr };
-allow systemd_logind_t swapfile_t:file { getattr };
-
-# 2. Allow systemd-sleep to map and write the image
-allow systemd_sleep_t swapfile_t:dir { search read open getattr };
-allow systemd_sleep_t swapfile_t:file { read write open getattr ioctl lock };
-
-# 3. Grant the capability to map block addresses on BTRFS
-allow systemd_sleep_t self:capability { sys_admin };
+# (No rules needed for hybrid sleep)

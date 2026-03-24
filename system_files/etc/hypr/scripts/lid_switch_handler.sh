@@ -24,8 +24,8 @@ case "$action" in
             exit 0
         fi
 
-        # No external display: suspend as expected on lid close.
-        systemctl suspend
+        # No external display: hybrid sleep as expected on lid close.
+        systemctl hybrid-sleep
         ;;
     open)
         # Restore internal panel using preferred mode/position when lid reopens.
