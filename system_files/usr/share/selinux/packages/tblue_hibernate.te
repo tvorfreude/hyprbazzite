@@ -1,16 +1,22 @@
-module tblue_hibernate 1.3;
+module tblue_hibernate 1.4;
 
 require {
-    type systemd_logind_t;
     type systemd_sleep_t;
+    type systemd_logind_t;
     type swapfile_t;
-    class dir { search read open };
-    class file { read write open getattr };
+    type devpts_t;
+    class dir { search read open getattr };
+    class file { read write open getattr ioctl lock };
 }
 
-# Permission for logind to verify swap exists
-allow systemd_logind_t swapfile_t:dir { search read open };
+# 1. Allow logind to see the swap path
+allow systemd_logind_t swapfile_t:dir { search read open getattr };
+allow systemd_logind_t swapfile_t:file { getattr };
 
-# Permission for systemd-sleep to write the hibernation image
-allow systemd_sleep_t swapfile_t:dir { search read open };
-allow systemd_sleep_t swapfile_t:file { read write open getattr };
+# 2. Allow systemd-sleep the heavy lifting
+allow systemd_sleep_t swapfile_t:dir { search read open getattr };
+allow systemd_sleep_t swapfile_t:file { read write open getattr ioctl lock };
+
+# 3. Required for BTRFS swapfile mapping (the 'Permission Denied' fix)
+# This allows the sleep process to ask the filesystem for the physical disk blocks
+allow systemd_sleep_t self:capability { sys_admin };
