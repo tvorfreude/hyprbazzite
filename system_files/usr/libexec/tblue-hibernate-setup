@@ -1,14 +1,42 @@
 
+
 #!/usr/bin/env bash
 set -euo pipefail
 
+SWAPFILE_PATH="/var/swap/swapfile"
 log() { echo "[tblue-hybrid-sleep] $*" >&2; }
 
-# Remove any hibernate/resume kernel args
-rpm-ostree kargs --delete-if-present="resume=" --delete-if-present="resume_offset=" --delete-if-present="resume_delay="
+# 1. Ensure swapfile exists and is in fstab
+if [[ ! -f "$SWAPFILE_PATH" ]]; then
+    log "Error: swapfile $SWAPFILE_PATH does not exist. Please create it first."
+    exit 1
+fi
+if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
+    echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
+fi
 
-# Enable hybrid sleep
-log "Enabling hybrid sleep (suspend-then-hibernate) as default."
+# 2. Get the decrypted device path and physical offset
+dec_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
+if [[ -z "$dec_uuid" ]]; then
+    log "Error: Could not determine Decrypted UUID"
+    exit 1
+fi
+offset=$(btrfs inspect-internal map-swapfile -r "$SWAPFILE_PATH" | head -n1)
+if [[ -z "$offset" ]]; then
+    log "Error: Could not determine swapfile offset"
+    exit 1
+fi
+
+log "Setting resume=UUID=$dec_uuid and resume_offset=$offset for hybrid sleep."
+
+# 3. Set kernel arguments for hybrid sleep
+rpm-ostree kargs \
+    --replace="resume=UUID=$dec_uuid" \
+    --replace="resume_offset=$offset" \
+    --append-if-missing="rootwait" \
+    --append-if-missing="resume_delay=5"
+
+# 4. Enable hybrid sleep, disable hibernation
 if grep -q "^AllowSuspend" /etc/systemd/sleep.conf; then
     sed -i 's/^AllowSuspend.*/AllowSuspend=yes/' /etc/systemd/sleep.conf
 else
