@@ -12,10 +12,19 @@ ARG BUILD_STAMP
 COPY system_files /
 COPY secure-boot-keys/secureboot.crt /usr/share/tblue-secureboot/secureboot.pem
 
-# Compile and install the SELinux policy module for hibernation
+
+# 1. Install the tools needed to compile SELinux
+# Note: On Bazzite/Fedora, 'checkpolicy' provides checkmodule
+RUN dnf install -y checkpolicy policycoreutils
+
+# 2. Compile the module
+# We place the final .pp file in /usr/share/selinux/packages/ where the system expects it
 RUN checkmodule -M -m -o /tmp/tblue_hibernate.mod /usr/share/selinux/packages/tblue_hibernate.te && \
     semodule_package -o /usr/share/selinux/packages/tblue_hibernate.pp -m /tmp/tblue_hibernate.mod && \
-    semodule -i /usr/share/selinux/packages/tblue_hibernate.pp
+    rm /tmp/tblue_hibernate.mod
+
+# 3. Ensure the file has the correct permissions for the system to read it
+RUN chmod 644 /usr/share/selinux/packages/tblue_hibernate.pp
 
 # Rebuild the initramfs for the installed kernel(s) with the resume module
 RUN KVER=$(ls /lib/modules | head -n 1) && \
