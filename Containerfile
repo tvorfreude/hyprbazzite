@@ -30,7 +30,7 @@ RUN --mount=type=cache,dst=/var/cache \
     thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 network-manager-applet pavucontrol \
     xdg-desktop-portal-hyprland xdg-desktop-portal-gnome lxqt-policykit \
     gnome-keyring seahorse blueman breeze-icon-theme checkpolicy policycoreutils \
-    libsecret libsecret-devel gcr gcr-devel qt5ct rom-properties lutris jetbrains-mono \
+    libsecret libsecret-devel gcr gcr-devel qt5ct rom-properties lutris jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp brightnessctl playerctl imv swappy systemd-devel steam-devices mpv btop cliphist && \
     dnf5 -y autoremove && \
     dnf5 -y clean all
