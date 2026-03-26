@@ -92,8 +92,7 @@ RUN mkdir -p /etc/skel/.var/app/com.visualstudio.code/config/Code/User && \
 # 5. Permissions and Service Enablement
 RUN chmod +x /usr/bin/wallpaper-cycle && \
     find /usr/libexec/ -type f -exec chmod +x {} + && \
-    # Updated path to match the new Golden Source location
-    find /usr/lib/tblue/etc/hypr/scripts/ -type f -exec chmod +x {} + && \
+    find /usr/lib/hyprbazzite/etc/hypr/scripts/ -type f -exec chmod +x {} + && \
     systemctl enable hhd.service sddm.service \
                    tblue-hibernate-setup.service \
                    tblue-sync-desktop-config.service
