@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 notify() {
     if command -v notify-send >/dev/null 2>&1; then

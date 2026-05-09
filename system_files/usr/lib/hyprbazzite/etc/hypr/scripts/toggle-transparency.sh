@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 TRANS_STATE="/tmp/hypr_transparency_off"
 
 if [ -f "$TRANS_STATE" ]; then

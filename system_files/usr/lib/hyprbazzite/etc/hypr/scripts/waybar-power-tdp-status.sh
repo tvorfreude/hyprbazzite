@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 json_escape() {
     local s="$1"

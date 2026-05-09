@@ -1,8 +1,9 @@
 #!/bin/bash
+set -euo pipefail
 # Screenshot script with Actions
 # Usage: screenshot.sh [full|area]
 
-MODE="$1"
+MODE="${1:-full}"
 FILE="$HOME/Pictures/Screenshots/$(date +'%Y-%m-%d_%H-%M-%S').png"
 mkdir -p "$HOME/Pictures/Screenshots"
 
@@ -28,7 +29,8 @@ if [ -f "$FILE" ]; then
             swappy -f "$FILE"
             ;;
         "show")
-            thunar "$HOME/Pictures/Screenshots"
+            # Use xdg-open for universality over thunar
+            xdg-open "$HOME/Pictures/Screenshots"
             ;;
     esac
 fi

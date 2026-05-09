@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # tdp-profile-selector.sh: Interactive TDP selector for AMD CPUs
 # Uses tdp-control.sh to list and set TDP
 

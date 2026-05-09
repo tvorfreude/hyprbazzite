@@ -1,0 +1,7 @@
+# Polkit rule to allow users in the 'wheel' group to use TDP control without password
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" && 
+        subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

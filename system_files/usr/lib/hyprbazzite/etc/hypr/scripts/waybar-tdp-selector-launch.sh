@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 if /etc/hypr/scripts/tdp-control.sh supports >/dev/null 2>&1; then
     exec /etc/hypr/scripts/tdp-profile-selector.sh
