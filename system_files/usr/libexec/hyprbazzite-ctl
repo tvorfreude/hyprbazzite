@@ -86,6 +86,21 @@ osk_toggle() {
     fi
 }
 
+# --- Power Module ---
+power_action() {
+    local action="$1"
+    case "$action" in
+        shutdown) systemctl poweroff ;;
+        reboot) systemctl reboot ;;
+        suspend) systemctl suspend ;;
+        hybrid-sleep) systemctl suspend-then-hibernate ;;
+        lock) hyprlock ;;
+        logout) hyprctl dispatch exit ;;
+        menu) /etc/hypr/scripts/power-menu.sh ;;
+        *) echo "Unknown power action: $action"; exit 1 ;;
+    esac
+}
+
 # --- Power Profile Module ---
 power_profile_cycle() {
     local current
@@ -108,6 +123,7 @@ power_profile_cycle() {
         exit 1
     fi
 }
+
 
 # --- Power Module ---
 power_action() {
@@ -185,12 +201,46 @@ main() {
     shift
 
     case "$module" in
+        automation)
+            case "${1:-}" in
+                dnd) automation_dnd ;;
+                osk) automation_osk ;;
+                temp) automation_temp ;;
+                *) echo "Unknown automation action"; exit 1 ;;
+            esac
+            ;;
         tdp)
             case "${1:-}" in
                 get) tdp_get_current ;;
                 set) tdp_set "${2:-}" ;;
+                profile) exec /etc/hypr/scripts/tdp-profile-selector.sh ;;
                 *) echo "Unknown TDP action"; exit 1 ;;
             esac
+            ;;
+        osk)
+            case "${1:-}" in
+                toggle) osk_toggle ;;
+                *) echo "Unknown OSK action"; exit 1 ;;
+            esac
+            ;;
+        power)
+            case "${1:-}" in
+                profile) power_profile_cycle ;;
+                *) power_action "${1:-}" ;;
+            esac
+            ;;
+        screenshot)
+            screenshot_take "${1:-full}"
+            ;;
+        lid)
+            lid_handle "${1:-}"
+            ;;
+        *)
+            echo "Unknown module: $module"
+            exit 1
+            ;;
+    esac
+
             ;;
         osk)
             case "${1:-}" in
