@@ -4,7 +4,7 @@
 {
 	"custom/temperature": {
 		"return-type": "json",
-		"exec": "bash /etc/hypr/scripts/waybar-temp-auto.sh",
+		"exec": "/usr/libexec/hyprbazzite-ctl automation temp",
 		"interval": 10,
 		"on-click-right": "$HOME/.config/hypr/scripts/WaybarScripts.sh --nvtop"
 	},
