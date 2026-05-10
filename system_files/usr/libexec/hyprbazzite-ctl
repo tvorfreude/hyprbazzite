@@ -70,6 +70,22 @@ tdp_set() {
     notify "TDP Updated" "Set to ${watts}W via $backend"
 }
 
+tdp_menu() {
+    local current
+    current=$(tdp_get_current | grep -o '[0-9]\+' | head -n1 || echo "unknown")
+    
+    # Typical TDP range for laptops (10W to 45W). 
+    # In a real world scenario, we could use 'ryzenadj --info' to find bounds.
+    local options="10W\n15W\n25W\n35W\n45W"
+    local choice
+    choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Set TDP (Current: ${current}W)")
+    
+    if [ -n "$choice" ]; then
+        local watts=$(echo "$choice" | grep -o '[0-9]\+')
+        tdp_set "$watts"
+    fi
+}
+
 # --- OSK Module ---
 osk_toggle() {
     local bin="wvkbd"
@@ -87,6 +103,22 @@ osk_toggle() {
 }
 
 # --- Power Module ---
+power_menu() {
+    local options="󰐥 Shutdown\n󰑐 Reboot\n󰒲 Suspend\n󰓅 Hybrid-Sleep\n󰌾 Lock\n󰗼 Logout"
+    local choice
+    choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "System Power")
+    
+    case "$choice" in
+        *"Shutdown"*) power_action shutdown ;;
+        *"Reboot"*) power_action reboot ;;
+        *"Suspend"*) power_action suspend ;;
+        *"Hybrid-Sleep"*) power_action hybrid-sleep ;;
+        *"Lock"*) power_action lock ;;
+        *"Logout"*) power_action logout ;;
+        *) return 0 ;;
+    esac
+}
+
 power_action() {
     local action="$1"
     case "$action" in
@@ -96,7 +128,6 @@ power_action() {
         hybrid-sleep) systemctl suspend-then-hibernate ;;
         lock) hyprlock ;;
         logout) hyprctl dispatch exit ;;
-        menu) /etc/hypr/scripts/power-menu.sh ;;
         *) echo "Unknown power action: $action"; exit 1 ;;
     esac
 }
@@ -251,6 +282,7 @@ main() {
         power)
             case "${1:-}" in
                 profile) power_profile_cycle ;;
+                menu) power_menu ;;
                 *) power_action "${1:-}" ;;
             esac
             ;;
@@ -258,7 +290,7 @@ main() {
             case "${1:-}" in
                 get) tdp_get_current ;;
                 set) tdp_set "${2:-}" ;;
-                profile) exec /etc/hypr/scripts/tdp-profile-selector.sh ;;
+                profile) tdp_menu ;;
                 *) echo "Unknown TDP action"; exit 1 ;;
             esac
             ;;
