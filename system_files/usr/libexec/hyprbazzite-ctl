@@ -101,6 +101,22 @@ power_profile_cycle() {
     fi
 }
 
+# --- Power Module ---
+power_action() {
+    local action="$1"
+    case "$action" in
+        shutdown) systemctl poweroff ;;
+        reboot) systemctl reboot ;;
+        suspend) systemctl suspend ;;
+        hybrid-sleep) systemctl suspend-then-hibernate ;;
+        lock) hyprlock ;;
+        logout) hyprctl dispatch exit ;;
+        menu) /etc/hypr/scripts/power-menu.sh ;;
+        *) echo "Unknown power action: $action"; exit 1 ;;
+    esac
+}
+
+
 # --- Screenshot Module ---
 screenshot_take() {
     local mode="${1:-full}"
