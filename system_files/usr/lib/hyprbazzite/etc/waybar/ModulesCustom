@@ -31,13 +31,13 @@
 	},
 	"custom/power": {
 		"format": "⏻",
-		"on-click": "/etc/hypr/scripts/power-menu.sh",
+		"on-click": "/usr/libexec/hyprbazzite-ctl power menu",
 		"tooltip": true,
 		"tooltip-format": "Power Menu",
 	},
 	"custom/keyboard": {
 		"format": "󰌌",
-		"on-click": "/etc/hypr/scripts/waybar-osk-click.sh",
+		"on-click": "/usr/libexec/hyprbazzite-ctl osk toggle",
 		"tooltip": true,
 		"tooltip-format": "On-screen keyboard\u000AClick: Toggle open / close"
 	},

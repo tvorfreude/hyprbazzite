@@ -16,14 +16,14 @@ hypr-refresh-links:
 
 # Quick TDP Profiles
 hypr-tdp-eco:
-    /usr/lib/hyprbazzite/etc/hypr/scripts/tdp-control.sh profile eco
+    /usr/libexec/hyprbazzite-ctl tdp set 35
 
 hypr-tdp-balanced:
-    /usr/lib/hyprbazzite/etc/hypr/scripts/tdp-control.sh profile balanced
+    /usr/libexec/hyprbazzite-ctl tdp set 54
 
 hypr-tdp-perf:
-    /usr/lib/hyprbazzite/etc/hypr/scripts/tdp-control.sh profile performance
+    /usr/libexec/hyprbazzite-ctl tdp set 65
 
 # Show current TDP status
 hypr-tdp-status:
-    /usr/lib/hyprbazzite/etc/hypr/scripts/tdp-control.sh get
+    /usr/libexec/hyprbazzite-ctl tdp get

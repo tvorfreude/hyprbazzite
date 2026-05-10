@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Hyprbazzite Control Center (hyprbazzite-ctl)
+# A unified manager for TDP, OSK, Power, and System settings.
+# ==============================================================================
+
+# --- Shared Helpers ---
+log() { echo "[hyprbazzite-ctl] $*" >&2; }
+
+notify() {
+    local title="$1"
+    local msg="$2"
+    local urgency="${3:-normal}"
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -u "$urgency" "$title" "$msg"
+    fi
+}
+
+# --- TDP Module ---
+tdp_get_backend() {
+    if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
+    if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
+    if [ -d /sys/class/hwmon ]; then echo "sysfs"; return 0; fi
+    return 1
+}
+
+tdp_get_current() {
+    local backend
+    backend=$(tdp_get_backend || echo "unknown")
+    case "$backend" in
+        ryzenadj) ryzenadj --info | grep -E 'TDP|CPU Name' ;;
+        amdctl) amdctl info | grep -i 'power limit\|cpu model' ;;
+        sysfs) 
+            local cap_file
+            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" | head -n1)
+            if [ -n "$cap_file" ]; then
+                echo "Current TDP: $(( $(cat "$cap_file") / 1000000 ))W"
+            else
+                echo "TDP not found in sysfs"
+            fi
+            ;;
+        *) echo "TDP control unsupported" ;;
+    esac
+}
+
+tdp_set() {
+    local watts="$1"
+    local backend
+    backend=$(tdp_get_backend || { notify "Error" "TDP backend not found"; exit 1; })
+    
+    case "$backend" in
+        ryzenadj) sudo ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
+        amdctl) sudo amdctl set power-limit "$watts" ;;
+        sysfs) 
+            local cap_file
+            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" | head -n1)
+            echo $((watts * 1000000)) | sudo tee "$cap_file" >/dev/null
+            ;;
+    esac
+    notify "TDP Updated" "Set to ${watts}W via $backend"
+}
+
+# --- OSK Module ---
+osk_toggle() {
+    local bin="wvkbd"
+    if command -v wvkbd-mobintl >/dev/null 2>&1; then bin="wvkbd-mobintl"; fi
+    
+    if pgrep -x "$bin" >/dev/null 2>&1; then
+        pkill -x "$bin"
+        notify "Keyboard" "OSK hidden"
+    else
+        "$bin" --hidden -H 420 -L 320 >/dev/null 2>&1 &
+        sleep 0.2
+        pkill -USR2 -x "$bin" >/dev/null 2>&1 || true
+        notify "Keyboard" "OSK shown"
+    fi
+}
+
+# --- Power Profile Module ---
+power_profile_cycle() {
+    local current
+    current=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null | awk -F'"' '{print $2}')
+    
+    local next
+    case "$current" in
+        power-saver) next='balanced' ;;
+        balanced) next='performance' ;;
+        performance) next='power-saver' ;;
+        *) next='balanced' ;;
+    esac
+
+    if busctl --system set-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile s "$next" >/dev/null 2>&1; then
+        notify "Power Profile" "Switched to ${next}"
+    elif command -v tuned-adm >/dev/null 2>&1 && sudo -n tuned-adm profile balanced >/dev/null 2>&1; then
+        notify "Power Profile" "Switched to balanced via tuned-adm"
+    else
+        notify "Error" "Could not switch power profile"
+        exit 1
+    fi
+}
+
+# --- Screenshot Module ---
+screenshot_take() {
+    local mode="${1:-full}"
+    local file="$HOME/Pictures/Screenshots/$(date +'%Y-%m-%d_%H-%M-%S').png"
+    mkdir -p "$HOME/Pictures/Screenshots"
+
+    if [ "$mode" == "area" ]; then
+        grim -g "$(slurp)" "$file"
+    else
+        grim "$file"
+    fi
+
+    if [ -f "$file" ]; then
+        wl-copy < "$file"
+        notify "Screenshot Taken" "Saved to clipboard."
+    fi
+}
+
+# --- Lid Module ---
+lid_handle() {
+    local action="$1"
+    local internal_output
+    internal_output=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1)
+    local external_count
+    external_count=$(hyprctl -j monitors 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
+
+    case "$action" in
+        close)
+            if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
+                hyprctl keyword monitor "$internal_output,disable"
+            else
+                systemctl hybrid-sleep
+            fi
+            ;;
+        open)
+            if [[ -n "$internal_output" ]]; then
+                hyprctl reload
+            fi
+            ;;
+        *) echo "Usage: hyprbazzite-ctl lid {close|open}"; exit 1 ;;
+    esac
+}
+
+# --- Main Entry Point ---
+main() {
+    if [[ $# -eq 0 ]]; then
+        echo "Usage: hyprbazzite-ctl [module] [action] [args...]]"
+        echo "Modules:"
+        echo "  tdp [get|set <watts>]"
+        echo "  osk toggle"
+        echo "  power [shutdown|reboot|suspend|hybrid-sleep|lock|logout]"
+        echo "  screenshot [full|area]"
+        echo "  lid [close|open]"
+        exit 0
+    fi
+
+    local module="$1"
+    shift
+
+    case "$module" in
+        tdp)
+            case "${1:-}" in
+                get) tdp_get_current ;;
+                set) tdp_set "${2:-}" ;;
+                *) echo "Unknown TDP action"; exit 1 ;;
+            esac
+            ;;
+        osk)
+            case "${1:-}" in
+                toggle) osk_toggle ;;
+                *) echo "Unknown OSK action"; exit 1 ;;
+            esac
+            ;;
+        power)
+            case "${1:-}" in
+                profile) power_profile_cycle ;;
+                *) power_action "${1:-}" ;;
+            esac
+            ;;
+        tdp)
+            case "${1:-}" in
+                get) tdp_get_current ;;
+                set) tdp_set "${2:-}" ;;
+                profile) exec /etc/hypr/scripts/tdp-profile-selector.sh ;;
+                *) echo "Unknown TDP action"; exit 1 ;;
+            esac
+            ;;
+
+        screenshot)
+            screenshot_take "${1:-full}"
+            ;;
+        lid)
+            lid_handle "${1:-}"
+            ;;
+        *)
+            echo "Unknown module: $module"
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

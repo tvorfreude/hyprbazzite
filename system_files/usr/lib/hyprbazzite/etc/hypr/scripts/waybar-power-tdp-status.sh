@@ -32,7 +32,7 @@ tdp_reason=""
 tdp_supported=0
 
 if [ -x /etc/hypr/scripts/tdp-control.sh ]; then
-    current_tdp=$(/etc/hypr/scripts/tdp-control.sh current 2>/dev/null || true)
+    current_tdp=$(/usr/libexec/hyprbazzite-ctl tdp get 2>/dev/null || true)
     if [ -n "${current_tdp:-}" ] && [[ "$current_tdp" =~ ^[0-9]+$ ]]; then
         tdp="${current_tdp}W"
         tdp_supported=1

@@ -296,8 +296,8 @@
 		"return-type": "json",
 		"exec": "bash /etc/hypr/scripts/waybar-power-tdp-status.sh",
 		"interval": 2,
-		"on-click": "bash /etc/hypr/scripts/waybar-power-profile-cycle.sh",
-		"on-click-right": "bash /etc/hypr/scripts/waybar-tdp-selector-launch.sh"
+		"on-click": "/usr/libexec/hyprbazzite-ctl power profile",
+		"on-click-right": "/usr/libexec/hyprbazzite-ctl tdp profile"
 	},
 	"pulseaudio": {
 		"format": "{icon} {volume}%",
