@@ -1,3 +1,8 @@
+require("autostart")
+require("envs")
+require("monitors")
+require("bindings")
+
 hl.config({
 
 	general = {
@@ -122,12 +127,5 @@ hl.config({
             clickfinger_behavior = true,
             scroll_factor = 0.4,
         },
-    },
-
-	source = {
-        "/etc/hypr/monitors.lua",
-        "/etc/hypr/bindings.lua",
-        "/etc/hypr/envs.lua",
-        "/etc/hypr/autostart.lua",
     },
 })
