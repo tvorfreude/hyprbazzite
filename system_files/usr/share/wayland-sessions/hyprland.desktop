@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Hyprland
 Comment=Hyprland (direct)
-Exec=start-hyprland -- --config /etc/hypr/hyprland.conf
+Exec=start-hyprland -- --config /etc/hypr/hyprland.lua
 Type=Application
 DesktopNames=Hyprland
