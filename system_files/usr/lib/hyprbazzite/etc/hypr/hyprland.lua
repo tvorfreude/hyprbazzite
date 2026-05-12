@@ -1,11 +1,10 @@
 hl.config({
-	["debug:disable_logs"] = false,
 
 	general = {
         gaps_in = 5,
         gaps_out = 10,
         border_size = 2,
-        ["col.active_border"] = "rgba(bd93f9ee) rgba(8be9fdee) 45deg",
+        ["col.active_border"] = "rgba(bd93f9ee)",
         ["col.inactive_border"] = "rgba(44475aaa)",
         resize_on_border = false,
         allow_tearing = false,
