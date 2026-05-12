@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ==============================================================================
+# ===============================================================================
 # Hyprbazzite Control Center (hyprbazzite-ctl)
 # A unified manager for TDP, OSK, Power, and System settings.
 # ==============================================================================
@@ -73,13 +73,9 @@ tdp_set() {
 tdp_menu() {
     local current
     current=$(tdp_get_current | grep -o '[0-9]\+' | head -n1 || echo "unknown")
-    
-    # Typical TDP range for laptops (10W to 45W). 
-    # In a real world scenario, we could use 'ryzenadj --info' to find bounds.
     local options="10W\n15W\n25W\n35W\n45W"
     local choice
     choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Set TDP (Current: ${current}W)")
-    
     if [ -n "$choice" ]; then
         local watts=$(echo "$choice" | grep -o '[0-9]\+')
         tdp_set "$watts"
@@ -90,7 +86,6 @@ tdp_menu() {
 osk_toggle() {
     local bin="wvkbd"
     if command -v wvkbd-mobintl >/dev/null 2>&1; then bin="wvkbd-mobintl"; fi
-    
     if pgrep -x "$bin" >/dev/null 2>&1; then
         pkill -x "$bin"
         notify "Keyboard" "OSK hidden"
@@ -107,7 +102,6 @@ power_menu() {
     local options="󰐥 Shutdown\n󰑐 Reboot\n󰒲 Suspend\n󰓅 Hybrid-Sleep\n󰌾 Lock\n󰗼 Logout"
     local choice
     choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "System Power")
-    
     case "$choice" in
         *"Shutdown"*) power_action shutdown ;;
         *"Reboot"*) power_action reboot ;;
@@ -132,11 +126,9 @@ power_action() {
     esac
 }
 
-# --- Power Profile Module ---
 power_profile_cycle() {
     local current
     current=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null | awk -F'"' '{print $2}')
-    
     local next
     case "$current" in
         power-saver) next='balanced' ;;
@@ -144,7 +136,6 @@ power_profile_cycle() {
         performance) next='power-saver' ;;
         *) next='balanced' ;;
     esac
-
     if busctl --system set-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile s "$next" >/dev/null 2>&1; then
         notify "Power Profile" "Switched to ${next}"
     elif command -v tuned-adm >/dev/null 2>&1 && sudo -n tuned-adm profile balanced >/dev/null 2>&1; then
@@ -155,35 +146,113 @@ power_profile_cycle() {
     fi
 }
 
-
-# --- Power Module ---
-power_action() {
-    local action="$1"
-    case "$action" in
-        shutdown) systemctl poweroff ;;
-        reboot) systemctl reboot ;;
-        suspend) systemctl suspend ;;
-        hybrid-sleep) systemctl suspend-then-hibernate ;;
-        lock) hyprlock ;;
-        logout) hyprctl dispatch exit ;;
-        menu) /etc/hypr/scripts/power-menu.sh ;;
-        *) echo "Unknown power action: $action"; exit 1 ;;
-    esac
+# --- Automation Module ---
+automation_dnd() {
+    if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+        echo "Hyprland instance signature not found." >&2
+        exit 1
+    fi
+    socat -U - UNIX-CONNECT:/tmp/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock | while read -r line; do
+        case "$line" in
+            fullscreen\>\>1) swaync-client --dnd-on ;;
+            fullscreen\>\>0) swaync-client --dnd-off ;;
+        esac
+    done
 }
 
+automation_osk() {
+    local conf="/etc/hypr/wvkbd.conf"
+    [ -f "$conf" ] && . "$conf"
+    local layout="${WVKBD_LAYOUT:-mobintl}"
+    local font="${WVKBD_FONT:-JetBrains Mono 20}"
+    local bg="${WVKBD_BG:-282a36}"
+    local fg="${WVKBD_FG:-44475a}"
+    local fg_sp="${WVKBD_FG_SP:-bd93f9}"
+    local press="${WVKBD_PRESS:-6272a4}"
+    local press_sp="${WVKBD_PRESS_SP:-ff79c6}"
+    local text="${WVKBD_TEXT:-f8f8f2}"
+    local text_sp="${WVKBD_TEXT_SP:-f8f8f2}"
+    local alpha="${WVKBD_ALPHA:-230}"
+    local height="${WVKBD_HEIGHT:-420}"
+    local height_land="${WVKBD_HEIGHT_LANDSCAPE:-320}"
+    local layers="${WVKBD_LAYERS:-fullwide,special,emoji,nav}"
+    local land_layers="${WVKBD_LANDSCAPE_LAYERS:-landscape,landscapespecial,emoji,nav}"
+    local anchor="${WVKBD_ANCHOR:-bottom}"
+    local state_file="${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor"
+    [ -f "$state_file" ] && anchor=$(cat "$state_file" 2>/dev/null || echo "$anchor")
+    local bin=""
+    command -v wvkbd-mobintl >/dev/null 2>&1 && bin="wvkbd-mobintl" || (command -v wvkbd >/dev/null 2>&1 && bin="wvkbd") || exit 0
+    sync_state() {
+        if compgen -G "/dev/input/by-id/*-event-kbd" >/dev/null; then
+            pkill -x "$bin" >/dev/null 2>&1 || true
+        else
+            if ! pgrep -x "$bin" >/dev/null 2>&1; then
+                "$bin" --hidden -H "$height" -L "$height_land" -l "$layers" --landscape-layers "$land_layers" --fn "$font" --alpha "$alpha" --bg "$bg" --fg "$fg" --fg-sp "$fg_sp" --press "$press" --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 &
+            fi
+        fi
+    }
+    sync_state
+    hyprctl keyword windowrule "float on, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+    if [ "$anchor" = "top" ]; then
+        hyprctl keyword windowrule "move 0 0, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+    else
+        hyprctl keyword windowrule "move 0 50%, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+    fi
+    udevadm monitor --udev --subsystem-match=input --property | while read -r line; do
+        [[ "$line" =~ ACTION=(add|remove|change) ]] && sync_state
+    done
+}
+
+automation_temp() {
+    local best_temp_mc="" best_source="" best_score=-1
+    score_source() {
+        local src_lc=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+        if [[ "$src_lc" =~ (tctl|cpu|package|x86_pkg_temp|coretemp|k10temp|zenpower|soc_thermal) ]]; then echo 300
+        elif [[ "$src_lc" =~ acpitz ]]; then echo 180
+        elif [[ "$src_lc" =~ (junction|edge|amdgpu|gpu) ]]; then echo 120
+        elif [[ "$src_lc" =~ (nvme|ssd) ]]; then echo 90
+        else echo 60; fi
+    }
+    for zone in /sys/class/thermal/thermal_zone*; do
+        [ -r "$zone/temp" ] || continue
+        local temp_mc=$(cat "$zone/temp" 2>/dev/null || true)
+        local type=$(cat "$zone/type" 2>/dev/null || echo "unknown")
+        local score=$(score_source "$type")
+        if (( score > best_score )); then best_score=$score; best_temp_mc=$temp_mc; best_source="thermal:${type}"; fi
+    done
+    for hw in /sys/class/hwmon/hwmon*; do
+        [ -d "$hw" ] || continue
+        local name=$(cat "$hw/name" 2>/dev/null || echo "unknown")
+        for input in "$hw"/temp*_input; do
+            [ -r "$input" ] || continue
+            local temp_mc=$(cat "$input" 2>/dev/null || true)
+            local label=$(cat "${input%_input}_label" 2>/dev/null || echo "temp")
+            local score=$(score_source "$name")
+            if (( score > best_score )); then best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"; fi
+        done
+    done
+    if [[ -z "$best_temp_mc" ]]; then
+        text="N/A 󰔏"; tooltip="Unavailable"; class="missing"
+    else
+        local temp_c=$((best_temp_mc / 1000))
+        local icon="󰈸"; class="cool"
+        (( temp_c >= 70 )) && { icon="󰔄"; class="warm"; }
+        (( temp_c >= 85 )) && { icon="󰸁"; class="hot"; }
+        text="${temp_c}°C ${icon}"; tooltip="Sensor: $best_source"
+    fi
+    printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' "$(json_escape "$text")" "$(json_escape "$tooltip")" "$class"
+}
 
 # --- Screenshot Module ---
 screenshot_take() {
     local mode="${1:-full}"
     local file="$HOME/Pictures/Screenshots/$(date +'%Y-%m-%d_%H-%M-%S').png"
     mkdir -p "$HOME/Pictures/Screenshots"
-
     if [ "$mode" == "area" ]; then
         grim -g "$(slurp)" "$file"
     else
         grim "$file"
     fi
-
     if [ -f "$file" ]; then
         wl-copy < "$file"
         notify "Screenshot Taken" "Saved to clipboard."
@@ -197,7 +266,6 @@ lid_handle() {
     internal_output=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1)
     local external_count
     external_count=$(hyprctl -j monitors 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
-
     case "$action" in
         close)
             if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
@@ -218,11 +286,12 @@ lid_handle() {
 # --- Main Entry Point ---
 main() {
     if [[ $# -eq 0 ]]; then
-        echo "Usage: hyprbazzite-ctl [module] [action] [args...]]"
+        echo "Usage: hyprbazzite-ctl [module] [action] [args...]"
         echo "Modules:"
-        echo "  tdp [get|set <watts>]"
+        echo "  automation [dnd|osk|temp]"
+        echo "  tdp [get|set <watts>|profile]"
         echo "  osk toggle"
-        echo "  power [shutdown|reboot|suspend|hybrid-sleep|lock|logout]"
+        echo "  power [profile|menu|shutdown|reboot|suspend|hybrid-sleep|lock|logout]"
         echo "  screenshot [full|area]"
         echo "  lid [close|open]"
         exit 0
@@ -244,34 +313,9 @@ main() {
             case "${1:-}" in
                 get) tdp_get_current ;;
                 set) tdp_set "${2:-}" ;;
-                profile) exec /etc/hypr/scripts/tdp-profile-selector.sh ;;
+                profile) tdp_menu ;;
                 *) echo "Unknown TDP action"; exit 1 ;;
             esac
-            ;;
-        osk)
-            case "${1:-}" in
-                toggle) osk_toggle ;;
-                *) echo "Unknown OSK action"; exit 1 ;;
-            esac
-            ;;
-        power)
-            case "${1:-}" in
-                profile) power_profile_cycle ;;
-                *) power_action "${1:-}" ;;
-            esac
-            ;;
-        screenshot)
-            screenshot_take "${1:-full}"
-            ;;
-        lid)
-            lid_handle "${1:-}"
-            ;;
-        *)
-            echo "Unknown module: $module"
-            exit 1
-            ;;
-    esac
-
             ;;
         osk)
             case "${1:-}" in
@@ -286,15 +330,6 @@ main() {
                 *) power_action "${1:-}" ;;
             esac
             ;;
-        tdp)
-            case "${1:-}" in
-                get) tdp_get_current ;;
-                set) tdp_set "${2:-}" ;;
-                profile) tdp_menu ;;
-                *) echo "Unknown TDP action"; exit 1 ;;
-            esac
-            ;;
-
         screenshot)
             screenshot_take "${1:-full}"
             ;;
