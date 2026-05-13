@@ -1,109 +1,77 @@
 -- ===== VARIABLES =====
+local mainMod = "SUPER"
 local terminal = "kitty"
 local browser = "flatpak run io.github.zen_browser.zen"
 local filemanager = "thunar"
-local scriptsDir = "/etc/hypr/scripts"
 
-hl.config({
-    -- ===== KEYBINDINGS WITH DESCRIPTIONS (bindd) =====
-    bindd = {
-        -- APPLICATION LAUNCHING
-        "SUPER, return, Terminal, exec, " .. terminal,
-        "SUPER, B, Browser, exec, " .. browser,
-        "SUPER, F, File manager, exec, " .. filemanager,
-        "SUPER, SPACE, App launcher, exec, wofi --show drun --conf /etc/wofi/config --style /etc/wofi/style.css",
-        "SUPER, E, Text editor, exec, " .. terminal .. " -e nvim",
+-- APPLICATION LAUNCHING
+hl.bind(mainMod .. " + return", hl.dsp.exec_cmd(terminal))
+hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd(browser))
+hl.bind(mainMod .. " + F",      hl.dsp.exec_cmd(filemanager))
+hl.bind(mainMod .. " + SPACE",  hl.dsp.exec_cmd("wofi --show drun --conf /etc/wofi/config --style /etc/wofi/style.css"))
+hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
 
-        -- WINDOW MANAGEMENT
-        "SUPER, W, Close window, killactive",
-        "SUPER, V, Toggle float, togglefloating",
-        "SUPER, J, Cycle next, layoutmsg, cyclenext",
-        "SUPER, P, Pseudo fullscreen, pseudo",
-        "SUPER SHIFT, F, Fullscreen, fullscreen",
-        "SUPER ALT, F, Fullscreen fake, fullscreen, 1",
+-- WINDOW MANAGEMENT
+hl.bind(mainMod .. " + W",       hl.dsp.window.close())
+hl.bind(mainMod .. " + V",       hl.dsp.window.float({ action = "toggle" }))
+hl.bind(mainMod .. " + J",       hl.dsp.layout("cyclenext"))
+hl.bind(mainMod .. " + P",       hl.dsp.window.pseudo())
+hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen(0))
+hl.bind(mainMod .. " + ALT + F",   hl.dsp.window.fullscreen(1))
 
-        -- FOCUS MOVEMENT
-        "SUPER, left, Focus left, movefocus, l",
-        "SUPER, right, Focus right, movefocus, r",
-        "SUPER, up, Focus up, movefocus, u",
-        "SUPER, down, Focus down, movefocus, d",
-        "ALT, Tab, Cycle next, cyclenext",
+-- FOCUS MOVEMENT
+hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
+hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
+hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
+hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
+hl.bind("ALT + Tab",           hl.dsp.layout("cyclenext"))
 
-        -- WORKSPACE NAVIGATION
-        "SUPER, 1, Workspace 1, workspace, 1",
-        "SUPER, 2, Workspace 2, workspace, 2",
-        "SUPER, 3, Workspace 3, workspace, 3",
-        "SUPER, 4, Workspace 4, workspace, 4",
-        "SUPER, 5, Workspace 5, workspace, 5",
-        "SUPER, 6, Workspace 6, workspace, 6",
-        "SUPER, 7, Workspace 7, workspace, 7",
-        "SUPER, 8, Workspace 8, workspace, 8",
-        "SUPER, 9, Workspace 9, workspace, 9",
-        "SUPER, 0, Workspace 10, workspace, 10",
+-- WORKSPACE NAVIGATION (Looping 1-10)
+for i = 1, 10 do
+    local key = i % 10
+    hl.bind(mainMod .. " + " .. key,           hl.dsp.focus({ workspace = i }))
+    hl.bind(mainMod .. " + SHIFT + " .. key,   hl.dsp.window.move({ workspace = i }))
+end
 
-        "SUPER SHIFT, 1, Move to workspace 1, movetoworkspace, 1",
-        "SUPER SHIFT, 2, Move to workspace 2, movetoworkspace, 2",
-        "SUPER SHIFT, 3, Move to workspace 3, movetoworkspace, 3",
-        "SUPER SHIFT, 4, Move to workspace 4, movetoworkspace, 4",
-        "SUPER SHIFT, 5, Move to workspace 5, movetoworkspace, 5",
-        "SUPER SHIFT, 6, Move to workspace 6, movetoworkspace, 6",
-        "SUPER SHIFT, 7, Move to workspace 7, movetoworkspace, 7",
-        "SUPER SHIFT, 8, Move to workspace 8, movetoworkspace, 8",
-        "SUPER SHIFT, 9, Move to workspace 9, movetoworkspace, 9",
-        "SUPER SHIFT, 0, Move to workspace 10, movetoworkspace, 10",
+-- MOUSE WORKSPACE SCROLLING
+hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
+hl.bind(mainMod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
-        "SUPER, mouse_down, Next workspace, workspace, e+1",
-        "SUPER, mouse_up, Previous workspace, workspace, e-1",
+-- WINDOW MOVING / SWAPPING
+hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ direction = "left" }))
+hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
+hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
+hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
 
-        -- WINDOW MOVING/SWAPPING
-        "SUPER SHIFT, left, Swap left, swapwindow, l",
-        "SUPER SHIFT, right, Swap right, swapwindow, r",
-        "SUPER SHIFT, up, Swap up, swapwindow, u",
-        "SUPER SHIFT, down, Swap down, swapwindow, d",
+-- WINDOW RESIZING
+hl.bind(mainMod .. " + minus", hl.dsp.window.resize({ size = "-100 0" }))
+hl.bind(mainMod .. " + equal", hl.dsp.window.resize({ size = "100 0" }))
+hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.window.resize({ size = "0 -100" }))
+hl.bind(mainMod .. " + SHIFT + equal", hl.dsp.window.resize({ size = "0 100" }))
 
-        -- WINDOW RESIZING
-        "SUPER, minus, Resize minus, resizeactive, -100 0",
-        "SUPER, equal, Resize plus, resizeactive, 100 0",
-        "SUPER SHIFT, minus, Resize minus height, resizeactive, 0 -100",
-        "SUPER SHIFT, equal, Resize plus height, resizeactive, 0 100",
+-- SCREENSHOTS
+hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+hl.bind(mainMod .. " + CTRL + S",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
 
-        -- SCREENSHOTS
-        "SUPER SHIFT, S, Screenshot region, exec, /usr/libexec/hyprbazzite-ctl screenshot area",
-        "SUPER CTRL, S, Screenshot full, exec, /usr/libexec/hyprbazzite-ctl screenshot full",
+-- SYSTEM
+hl.bind(mainMod .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
+hl.bind(mainMod .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
+hl.bind(mainMod .. " + SHIFT + K", hl.dsp.exec_cmd("/etc/hypr/scripts/swap-osk-half.sh"))
+hl.bind(mainMod .. " + O",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
+hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
 
-        -- SYSTEM
-        "SUPER ALT, L, Lock screen, exec, hyprlock",
-        "SUPER, K, Toggle on-screen keyboard, exec, /usr/libexec/hyprbazzite-ctl osk toggle",
-        "SUPER SHIFT, K, Swap keyboard half, exec, /etc/hypr/scripts/swap-osk-half.sh",
-    },
+-- MULTIMEDIA (Repeating and Locked)
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"), { locked = true, repeating = true })
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"),       { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessUp",   hl.dsp.exec_cmd("brightnessctl set +5%"),                        { locked = true, repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 5%-"),                        { locked = true, repeating = true })
 
-    -- ===== REPEATABLE BINDINGS (binde) =====
-    binde = {
-        ", XF86AudioRaiseVolume, exec, wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
-        ", XF86AudioLowerVolume, exec, wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-",
-        ", XF86MonBrightnessUp, exec, brightnessctl set +5%",
-        ", XF86MonBrightnessDown, exec, brightnessctl set 5%-",
-    },
+-- MULTIMEDIA (Standard)
+hl.bind("XF86AudioMute",  hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"), { locked = true })
+hl.bind("XF86AudioPlay",  hl.dsp.exec_cmd("playerctl play-pause"),                       { locked = true })
+hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),                             { locked = true })
+hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),                         { locked = true })
 
-    -- ===== STANDARD BINDINGS (bind) =====
-    bind = {
-        ", XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-        ", XF86AudioPlay, exec, playerctl play-pause",
-        ", XF86AudioNext, exec, playerctl next",
-        ", XF86AudioPrev, exec, playerctl previous",
-        "SUPER, O, exec, /usr/libexec/hyprbazzite-ctl transparency toggle",
-        "SUPER SHIFT, V, exec, cliphist list | wofi --dmenu | cliphist decode | wl-copy",
-    },
-
-    -- ===== MOUSE BINDINGS (bindmd for mouse + description) =====
-    bindmd = {
-        "SUPER, mouse:272, Move window, movewindow",
-        "SUPER, mouse:273, Resize window, resizewindow",
-    },
-
-    -- ===== SWITCHES (bindl) =====
-    bindl = {
-        ", switch:on:Lid Switch, exec, /usr/libexec/hyprbazzite-ctl lid close",
-        ", switch:off:Lid Switch, exec, /usr/libexec/hyprbazzite-ctl lid open",
-    },
-})
+-- MOUSE BINDINGS
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
