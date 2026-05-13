@@ -21,7 +21,8 @@ hl.monitor({
     scale = 1, 
     vrr = 2, -- 2 is 'Always', 1 is 'Fullscreen only'
     cm = "hdr",
-    sdrbrightness = 1.35
+    sdrbrightness = 2.5,
+    sdrsaturation = 1.05
 })
 
 -- External Gigabyte M27U (Left side, 4K, 10-bit, HDR, VRR)
@@ -33,7 +34,8 @@ hl.monitor({
     bitdepth = 10,
     vrr = 2,
     cm = "hdr",
-    sdrbrightness = 1.37
+    sdrbrightness = 2.8, 
+    sdrsaturation = 1.05
 })
 
 -- External LG (Above)
