@@ -29,13 +29,3 @@ hl.env("XDG_SESSION_DESKTOP", "Hyprland")
 hl.env("XDG_SESSION_TYPE", "wayland")
 hl.env("GDK_SCALE", "1")
 hl.env("XCOMPOSEFILE", os.getenv("HOME") .. "/.XCompose")
-
--- SYSTEM CONFIG (Legacy/XWayland/Ecosystem)
-hl.config({
-    xwayland = {
-        force_zero_scaling = true,
-    },
-    ecosystem = {
-        no_update_news = true,
-    },
-})
