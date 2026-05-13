@@ -19,10 +19,13 @@ hl.monitor({
     mode = "1920x1080@164.92", 
     position = "auto-right", 
     scale = 1, 
-    vrr = 2, -- 2 is 'Always', 1 is 'Fullscreen only'
-    cm = "hdr",
-    sdrbrightness = 2.5,
-    sdrsaturation = 1.05
+    vrr = 2,
+    cm = "auto",
+    sdrbrightness = 2.4,
+    sdrsaturation = 1.02,
+    max_luminance = 400,
+    max_avg_luminance = 300,
+    sdr_max_luminance = 150
 })
 
 -- External Gigabyte M27U (Left side, 4K, 10-bit, HDR, VRR)
@@ -31,11 +34,13 @@ hl.monitor({
     mode = "3840x2160@120.0", 
     position = "auto-left", 
     scale = 1.875, 
-    bitdepth = 10,
     vrr = 2,
-    cm = "hdr",
-    sdrbrightness = 2.8, 
-    sdrsaturation = 1.05
+    cm = "auto",
+    sdrbrightness = 2.8,
+    sdrsaturation = 1.05,
+    max_luminance = 600,
+    max_avg_luminance = 400,
+    sdr_max_luminance = 180
 })
 
 -- External LG (Above)
