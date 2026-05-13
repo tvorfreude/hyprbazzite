@@ -44,10 +44,10 @@ hl.bind(mainMod .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
 hl.bind(mainMod .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
 
 -- WINDOW RESIZING
-hl.bind(mainMod .. " + minus", hl.dsp.window.resize({ size = "-100 0" }))
-hl.bind(mainMod .. " + equal", hl.dsp.window.resize({ size = "100 0" }))
-hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.window.resize({ size = "0 -100" }))
-hl.bind(mainMod .. " + SHIFT + equal", hl.dsp.window.resize({ size = "0 100" }))
+hl.bind(mainMod .. " + minus", hl.dsp.window.resize({ x = -100, y = 0 }))
+hl.bind(mainMod .. " + equal", hl.dsp.window.resize({ x = 100, y = 0 }))
+hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.window.resize({ x = 0, y = -100 }))
+hl.bind(mainMod .. " + SHIFT + equal", hl.dsp.window.resize({ x = 0, y = 100 }))
 
 -- SCREENSHOTS
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
