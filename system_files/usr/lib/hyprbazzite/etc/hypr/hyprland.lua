@@ -15,9 +15,10 @@ hl.config({
         allow_tearing = false,
         layout = "dwindle",
     },
+
 	render = {
 			cm_auto_hdr = 1
-	}
+	},
 
 	decoration = {
         rounding = 0,
