@@ -1,28 +1,41 @@
+[Added Associations]
+inode/directory=thunar.desktop;
+text/html=app.zen_browser.zen.desktop;
+text/plain=kitty-open.desktop;
+image/jpeg=imv.desktop;
+video/mp4=mpv.desktop;
+
 [Default Applications]
-text/html=io.github.zen_browser.zen.desktop
-x-scheme-handler/http=io.github.zen_browser.zen.desktop
-x-scheme-handler/https=io.github.zen_browser.zen.desktop
-x-scheme-handler/about=io.github.zen_browser.zen.desktop
-x-scheme-handler/unknown=io.github.zen_browser.zen.desktop
+# Web Browsing & Links (Zen Browser Flatpak)
+x-scheme-handler/http=app.zen_browser.zen.desktop
+x-scheme-handler/https=app.zen_browser.zen.desktop
+x-scheme-handler/about=app.zen_browser.zen.desktop
+text/html=app.zen_browser.zen.desktop
+
+# Chromium Fallback (If needed for specific web apps)
+# x-scheme-handler/http=io.github.ungoogled_software.ungoogled_chromium.desktop
+
+# File Manager & Terminal
 inode/directory=thunar.desktop
-application/x-directory=thunar.desktop
+text/plain=kitty-open.desktop
+application/x-shellscript=kitty-open.desktop
+
+# Media Playback (System-level MPV & IMV)
+video/mp4=mpv.desktop
+video/mkv=mpv.desktop
+video/quicktime=mpv.desktop
+video/x-matroska=mpv.desktop
+audio/mpeg=mpv.desktop
+audio/ogg=mpv.desktop
 image/jpeg=imv.desktop
 image/png=imv.desktop
 image/gif=imv.desktop
 image/webp=imv.desktop
-image/svg+xml=imv.desktop
-video/mp4=mpv.desktop
-video/mkv=mpv.desktop
-video/webm=mpv.desktop
-audio/mpeg=mpv.desktop
-audio/ogg=mpv.desktop
-text/plain=com.visualstudio.code.desktop
-application/pdf=io.github.zen_browser.zen.desktop
 
-[Added Associations]
-text/html=io.github.zen_browser.zen.desktop;
-x-scheme-handler/http=io.github.zen_browser.zen.desktop;
-x-scheme-handler/https=io.github.zen_browser.zen.desktop;
-inode/directory=thunar.desktop;
-image/png=imv.desktop;
-video/mp4=mpv.desktop;
+# Chat & Communication (Discord & Teams Flatpaks)
+x-scheme-handler/discord=com.discordapp.Discord.desktop
+x-scheme-handler/teams=com.github.IsmaelMartinez.teams_for_linux.desktop
+
+# Engineering & Modeling (KiCad & OpenSCAD Flatpaks)
+application/x-kicad-project=org.kicad.KiCad.desktop
+application/x-openscad=org.openscad.OpenSCAD.desktop
