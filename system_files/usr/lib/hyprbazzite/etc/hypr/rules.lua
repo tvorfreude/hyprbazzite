@@ -50,14 +50,26 @@ hl.window_rule({
 
 -- Steam
 hl.window_rule({
-    match = { class = "steam" },
-    float = true,
+    match = { class = "steam", title = "^(Steam)$" },
+    float = false,
     opacity = "1 1"
 })
+
 hl.window_rule({
-    match = { class = "steam", title = "Steam" },
+    match = { class = "steam" },
+    float = true,
     center = true
 })
+
+hl.window_rule({
+    match = { class = "steam", title = "^(Steam Input On-screen Keyboard)$" },
+    float = true,
+    stay_focused = false,
+    pin = true,
+    size = "800 300",
+    center = true
+})
+
 
 -- Handheld / System Utilities
 hl.window_rule({
