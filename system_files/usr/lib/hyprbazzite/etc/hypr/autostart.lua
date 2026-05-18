@@ -8,7 +8,7 @@ hl.on("hyprland.start", function ()
 
     -- UI ELEMENTS
     hl.exec_cmd("waybar --config /etc/waybar/config --style /etc/waybar/style.css")
-    hl.exec_cmd("swaync")
+    hl.exec_cmd("swaync -c /etc/swaync/config.json -s /etc/swaync/style.css")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("fcitx5")
     
