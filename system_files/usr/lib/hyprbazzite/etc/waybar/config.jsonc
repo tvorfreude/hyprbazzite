@@ -1,10 +1,10 @@
 {
 	"include": [
-		"./UserModules.jsonc",
-		"./Modules.jsonc",
-		"./ModulesWorkspaces.jsonc",
-		"./ModulesCustom.jsonc",
-		"./ModulesGroups.jsonc"
+		"/etc/waybar/UserModules.jsonc",
+		"/etc/waybar/Modules.jsonc",
+		"/etc/waybar/ModulesWorkspaces.jsonc",
+		"/etc/waybar/ModulesCustom.jsonc",
+		"/etc/waybar/ModulesGroups.jsonc"
 	],
 	"layer": "top",
 	"mode": "dock",
