@@ -1,10 +1,10 @@
 {
 	"include": [
-		"/etc/waybar/UserModules",
-		"/etc/waybar/Modules",
-		"/etc/waybar/ModulesWorkspaces",
-		"/etc/waybar/ModulesCustom",
-		"/etc/waybar/ModulesGroups",
+		"./UserModules.jsonc",
+		"./Modules.jsonc",
+		"./ModulesWorkspaces.jsonc",
+		"./ModulesCustom.jsonc",
+		"./ModulesGroups.jsonc"
 	],
 	"layer": "top",
 	"mode": "dock",
@@ -22,13 +22,13 @@
 		"idle_inhibitor",
 		"tray",
 		"clock",
-		"hyprland/window",
+		"hyprland/window"
 	],
 	"modules-center": [
 		"group/app_drawer",
 		"custom/keyboard",
 		"custom/separator#dot-line",
-		"hyprland/workspaces#rw",
+		"hyprland/workspaces#rw"
 	],
 	"modules-right": [
 		"group/laptop",
@@ -40,6 +40,6 @@
 		"custom/separator#dot-line",
 		"mpris",
 		"group/notify",
-		"group/status",
+		"group/status"
 	]
 }

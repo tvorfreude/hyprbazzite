@@ -3,37 +3,37 @@
 		"format": "󰉋",
 		"on-click": "thunar",
 		"tooltip": true,
-		"tooltip-format": "File Manager",
+		"tooltip-format": "File Manager"
 	},
 	"custom/tty": {
 		"format": "󰆍",
 		"on-click": "kitty",
 		"tooltip": true,
-		"tooltip-format": "Launch Terminal",
+		"tooltip-format": "Launch Terminal"
 	},
 	"custom/browser": {
 		"format": "󰖟",
 		"on-click": "flatpak run io.github.zen_browser.zen",
 		"tooltip": true,
-		"tooltip-format": "Launch Browser",
+		"tooltip-format": "Launch Browser"
 	},
 	"custom/lock": {
 		"format": "󰌾",
 		"on-click": "hyprlock",
 		"tooltip": true,
-		"tooltip-format": "Lock Screen",
+		"tooltip-format": "Lock Screen"
 	},
 	"custom/menu": {
 		"format": "󰍜",
 		"on-click": "wofi --show drun --conf /etc/wofi/config --style /etc/wofi/style.css",
 		"tooltip": true,
-		"tooltip-format": "App Launcher",
+		"tooltip-format": "App Launcher"
 	},
 	"custom/power": {
 		"format": "⏻",
 		"on-click": "/usr/libexec/hyprbazzite-ctl power menu",
 		"tooltip": true,
-		"tooltip-format": "Power Menu",
+		"tooltip-format": "Power Menu"
 	},
 	"custom/keyboard": {
 		"format": "󰌌",
@@ -52,7 +52,7 @@
 		"format": "󰗼",
 		"on-click": "hyprctl dispatch exit",
 		"tooltip": true,
-		"tooltip-format": "Exit Hyprland",
+		"tooltip-format": "Exit Hyprland"
 	},
 	"custom/notification": {
 		"tooltip": false,

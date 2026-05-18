@@ -17,7 +17,7 @@
 			"custom/file_manager",
 			"custom/tty",
 			"custom/browser",
-			"custom/settings",
+			"custom/settings"
 		]
 	},
 	"group/motherboard": {
@@ -27,7 +27,7 @@
 			"custom/power-profiles-daemon",
 			"memory",
 			"custom/temperature",
-			"disk",
+			"disk"
 		]
 	},
 	"group/mobo_drawer": {
@@ -42,14 +42,14 @@
 			"cpu",
 			"custom/power-profiles-daemon",
 			"memory",
-			"disk",
+			"disk"
 		]
 	},
 	"group/laptop": {
 		"orientation": "inherit",
 		"modules": [
 			"backlight",
-			"battery",
+			"battery"
 		]
 	},
 	"group/audio": {
@@ -61,7 +61,7 @@
 		},
 		"modules": [
 			"pulseaudio",
-			"pulseaudio#microphone",
+			"pulseaudio#microphone"
 		]
 	},
 	"group/connections": {
@@ -73,7 +73,7 @@
 		},
 		"modules": [
 			"network",
-			"bluetooth",
+			"bluetooth"
 		]
 	},
 	"group/status": {
@@ -86,7 +86,7 @@
 		"modules": [
 			"custom/power",
 			"custom/lock",
-			"keyboard-state",
+			"keyboard-state"
 		]
 	},
 	"group/notify": {
@@ -98,7 +98,7 @@
 		},
 		"modules": [
 			"custom/notification",
-			"custom/dot_update",
+			"custom/dot_update"
 		]
 	},
 	"group/power": {
@@ -129,5 +129,5 @@
 			"custom/logout",
 			"custom/reboot"
 		]
-	},
+	}
 }

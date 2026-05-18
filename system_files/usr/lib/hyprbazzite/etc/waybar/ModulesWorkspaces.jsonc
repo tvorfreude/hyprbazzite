@@ -19,8 +19,8 @@
 	},
 	"format-icons": {
 		"active": "",
-		"default": "",
-	},
+		"default": ""
+	}
 },
 // ROMAN Numerals style
 "hyprland/workspaces#roman": {
@@ -44,8 +44,8 @@
 		"7": "VII",
 		"8": "VIII",
 		"9": "IX",
-		"10": "X",
-	},
+		"10": "X"
+	}
 },
 // PACMAN Style
 "hyprland/workspaces#pacman": {
@@ -59,12 +59,11 @@
     "persistent-workspaces": {
       "*": 5
 	},
-	"format": "{icon}",
 	"format-icons": {
             "active": "<span font='12'>󰮯</span>",
             "empty": "<span font='8'></span>",
-            "default": "󰊠",
-	},
+            "default": "󰊠"
+	}
 },
 // Kanji / Japanese style
 "hyprland/workspaces#kanji": {
@@ -85,7 +84,7 @@
 		"7": "七",
 		"8": "八",
 		"9": "九",
-		"10": "十",
+		"10": "十"
 	}
 },
 // for Camilla or Spanish
@@ -116,7 +115,6 @@
   
 //  NUMBERS and ICONS style
 "hyprland/workspaces#4": {
-	"format": "{name}",
 	"format": " {name} {icon} ",
 	//"format": " {icon} ",
 	"show-special": false,
@@ -137,8 +135,8 @@
 		"9": "",
 		"10": "10",
 		"focused": "",
-		"default": "",
-	},
+		"default": ""
+	}
 },
 // numbers styles
 "hyprland/workspaces#numbers": {
@@ -162,8 +160,8 @@
 		"7": "7",
 		"8": "8",
 		"9": "9",
-		"10": "10",
-	},
+		"10": "10"
+	}
 },
 // NUMBERS and ICONS style with window rewrite 
 "hyprland/workspaces#rw": {
@@ -209,7 +207,6 @@
     "title<.*zapzap.*>": " ",
 		"title<.*messenger.*>": " ",
 		"title<.*facebook.*>": " ",
-		"title<.*reddit.*>": " ",
 
 
 		"title<.*ChatGPT.*>": "󰚩 ",
@@ -261,7 +258,7 @@
 		"class<android-studio>": " ",
    	"class<org.pipewire.Helvum>": "󰓃",
     "class<localsend>":"",
-    "class<PrusaSlicer|UltiMaker-Cura|OrcaSlicer>": "󰹛",
+    "class<PrusaSlicer|UltiMaker-Cura|OrcaSlicer>": "󰹛"
 		}
-	},
+	}
 }
