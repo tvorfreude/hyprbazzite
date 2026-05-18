@@ -1,5 +1,5 @@
 # ===== BASE ENV =====
-export QT_QPA_PLATFORMTHEME=qt5ct
+export QT_QPA_PLATFORMTHEME=gtk3
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
 
 # ===== OH-MY-ZSH + STARSHIP =====
