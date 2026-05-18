@@ -81,7 +81,6 @@ echo "[HIJACK] Internet connection established."
 # 2. INSTALL CUSTOM APPS
 # Add your desired applications to this list
 CUSTOM_FLATPAKS=(
-   "com.visualstudio.code"
    "com.discordapp.Discord"
    "org.prismlauncher.PrismLauncher"
    "com.bitwarden.desktop"
@@ -109,11 +108,6 @@ for app in "${CUSTOM_FLATPAKS[@]}"; do
 
     flatpak install --system -y flathub "$app" || echo "[HIJACK] Failed to install $app"
 done
-
-echo "[HIJACK] Applying VS Code overrides..."
-flatpak override --system --filesystem=host --talk-name=org.freedesktop.Flatpak com.visualstudio.code
-flatpak override --system --socket=ssh-auth com.visualstudio.code
-flatpak override --system --filesystem=home com.visualstudio.code
 
 echo "[HIJACK] Applying Discord Wayland override..."
 flatpak override --system --socket=wayland com.discordapp.Discord

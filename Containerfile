@@ -91,12 +91,6 @@ RUN chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
     chmod +x /usr/lib/hyprbazzite/etc/hypr/scripts/*.sh
 
-# VS Code Live Sync (Pointed to /etc/skel)
-RUN mkdir -p /usr/share/hyprbazzite/vscode && \
-    echo '{"terminal.integrated.defaultProfile.linux": "zsh-host"}' > /usr/share/hyprbazzite/vscode/settings.json && \
-    mkdir -p /etc/skel/.var/app/com.visualstudio.code/config/Code/User && \
-    ln -s /usr/share/hyprbazzite/vscode/settings.json /etc/skel/.var/app/com.visualstudio.code/config/Code/User/settings.json
-
 # 7. Permissions and Service Enablement
 RUN chmod +x /usr/bin/wallpaper-cycle && \
     find /usr/libexec/ -type f -exec chmod +x {} + && \
