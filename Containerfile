@@ -28,7 +28,7 @@ RUN --mount=type=cache,dst=/var/cache \
     swww waybar SwayNotificationCenter wofi wvkbd hhd adjustor hhd-ui lact \
     zsh starship lsd sddm git chezmoi kitty nix tmux fastfetch jq ripgrep \
     thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 network-manager-applet pavucontrol \
-    xdg-desktop-portal-hyprland xdg-desktop-portal-gnome lxqt-policykit \
+    xdg-desktop-portal-hyprland lxqt-policykit \
     gnome-keyring seahorse blueman breeze-icon-theme checkpolicy policycoreutils \
     libsecret libsecret-devel gcr gcr-devel qt5ct rom-properties lutris jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp brightnessctl playerctl imv swappy gparted systemd-devel steam-devices mpv btop cliphist && \
