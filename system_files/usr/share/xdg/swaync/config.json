@@ -1,6 +1,5 @@
 {
     "$schema": "/etc/swaync/configSchema.json",
-    "style": "/home/trist/.config/swaync/style.css",
     "positionX": "right",
     "positionY": "top",
     "layer": "overlay",
