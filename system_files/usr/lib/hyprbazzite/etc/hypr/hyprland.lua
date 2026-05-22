@@ -35,7 +35,7 @@ hl.config({
     },
 
     -- Eye Candy & HDR
-    render = { cm_auto_hdr = 1 },
+    render = { cm_enabled = true, cm_auto_hdr = 2 },
     animations = { enabled = true },
     decoration = {
         rounding = 0,
@@ -52,4 +52,5 @@ hl.config({
     -- Legacy/Compatibility
     xwayland = { force_zero_scaling = true },
     ecosystem = { no_update_news = true },
+    debug = { full_cm_proto = true },
 })
