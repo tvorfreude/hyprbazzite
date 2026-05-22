@@ -134,6 +134,15 @@ hl.window_rule({
     opacity = "1.0 override 1.0 override"
 })
 
+-- Special Workspaces (Scratchpads)
+hl.window_rule({
+    match = { class = "scratchpad" },
+    workspace = "special:scratchpad",
+    float = true,
+    size = { "80%", "80%" },
+    center = true
+})
+
 -- Layer Rules
 hl.layer_rule({ match = { namespace = "selection" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "swaync-control-center" }, blur = true })

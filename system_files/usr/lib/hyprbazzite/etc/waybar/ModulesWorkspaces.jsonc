@@ -11,9 +11,9 @@
 	"all-outputs": true,
 	"format": "{icon}",
 	"show-special": false,
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
     "persistent-workspaces": {
       "*": 5
 	},
@@ -28,9 +28,9 @@
 	"all-outputs": true,
 	"format": "{icon}",
 	"show-special": false,
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
     "persistent-workspaces": {
       "*": 5
 	},
@@ -52,9 +52,9 @@
 	"active-only": false,
 	"all-outputs": true,
 	"format": "{icon}",
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
 	"show-special": false,
     "persistent-workspaces": {
       "*": 5
@@ -93,9 +93,9 @@
 	"all-outputs": true,
 	"format": "{icon}",
 	"show-special": false,
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
     "persistent-workspaces": {
       "*": 5
 	},
@@ -118,9 +118,9 @@
 	"format": " {name} {icon} ",
 	//"format": " {icon} ",
 	"show-special": false,
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
 	"all-outputs": true,
 	"sort-by-number": true,
 	"format-icons": {
@@ -144,9 +144,9 @@
 	"all-outputs": true,
 	"format": "{icon}",
 	"show-special": false,
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
     "persistent-workspaces": {
       "*": 5
 	},
@@ -170,9 +170,9 @@
 	"warp-on-scroll": false,
 	"sort-by-number": true,
 	"show-special": false,
-	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = {id} })'",
-	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
-	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-click": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"{id}\" })'",
+	"on-scroll-up": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e-1\" })'",
+	"on-scroll-down": "hyprctl dispatch 'hl.dsp.focus({ workspace = \"e+1\" })'",
 	"persistent-workspaces": {
 		"*": 5
 	  },

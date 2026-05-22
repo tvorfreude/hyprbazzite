@@ -14,7 +14,7 @@ hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
 -- WINDOW MANAGEMENT
 hl.bind(mainMod .. " + W",       hl.dsp.window.close())
 hl.bind(mainMod .. " + V",       hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + J",       hl.dsp.layout("cyclenext"))
+hl.bind(mainMod .. " + J",       hl.dsp.window.cycle_next())
 hl.bind(mainMod .. " + P",       hl.dsp.window.pseudo())
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen(0))
 hl.bind(mainMod .. " + ALT + F",   hl.dsp.window.fullscreen(1))
@@ -24,7 +24,7 @@ hl.bind(mainMod .. " + left",  hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))
 hl.bind(mainMod .. " + up",    hl.dsp.focus({ direction = "up" }))
 hl.bind(mainMod .. " + down",  hl.dsp.focus({ direction = "down" }))
-hl.bind("ALT + Tab",           hl.dsp.layout("cyclenext"))
+hl.bind("ALT + Tab",           hl.dsp.window.cycle_next())
 
 -- WORKSPACE NAVIGATION (Looping 1-10)
 for i = 1, 10 do
@@ -48,6 +48,18 @@ hl.bind(mainMod .. " + minus", hl.dsp.window.resize({ x = -100, y = 0 }))
 hl.bind(mainMod .. " + equal", hl.dsp.window.resize({ x = 100, y = 0 }))
 hl.bind(mainMod .. " + SHIFT + minus", hl.dsp.window.resize({ x = 0, y = -100 }))
 hl.bind(mainMod .. " + SHIFT + equal", hl.dsp.window.resize({ x = 0, y = 100 }))
+
+-- SPECIAL WORKSPACE (Scratchpad)
+hl.bind(mainMod .. " + Q",         hl.dsp.workspace.toggle_special())
+hl.bind(mainMod .. " + SHIFT + Q", function()
+    local window = hl.get_active_window()
+    if window and window.workspace.name:find("^special") then
+        hl.dispatch(hl.dsp.window.move({ workspace = "e+0" }))
+    else
+        hl.dispatch(hl.dsp.window.move({ workspace = "special" }))
+    end
+end)
+hl.bind(mainMod .. " + ALT + Q",   hl.dsp.workspace.toggle_special("scratchpad"))
 
 -- SCREENSHOTS
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))

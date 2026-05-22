@@ -24,6 +24,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("cursor-clip --daemon")
     hl.exec_cmd("sh -c 'pgrep -x nm-applet >/dev/null || nm-applet --indicator'")
     hl.exec_cmd("flatpak run com.bitwarden.desktop")
+    hl.exec_cmd("kitty --class scratchpad")
 
     -- HARDWARE SPECIFIC LOGIC (Lua Native)
     -- This checks for IIO devices (OXP/Handheld rotation)
