@@ -8,7 +8,7 @@ local filemanager = "thunar"
 hl.bind(mainMod .. " + return", hl.dsp.exec_cmd(terminal))
 hl.bind(mainMod .. " + B",      hl.dsp.exec_cmd(browser))
 hl.bind(mainMod .. " + F",      hl.dsp.exec_cmd(filemanager))
-hl.bind(mainMod .. " + SPACE",  hl.dsp.exec_cmd("wofi --show drun --conf /etc/wofi/config --style /etc/wofi/style.css"))
+hl.bind(mainMod .. " + SPACE",  hl.dsp.exec_cmd("wofi -wass"))
 hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
 
 -- WINDOW MANAGEMENT
@@ -66,6 +66,7 @@ hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl
 hl.bind(mainMod .. " + CTRL + S",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
 
 -- SYSTEM
+hl.bind(mainMod .. " + N",         hl.dsp.exec_cmd("swaync-client -t -sw"))
 hl.bind(mainMod .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
 hl.bind(mainMod .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
 hl.bind(mainMod .. " + SHIFT + K", hl.dsp.exec_cmd("/etc/hypr/scripts/swap-osk-half.sh"))
