@@ -4,10 +4,10 @@
     "positionY": "top",
     "layer": "overlay",
     "control-center-layer": "top",
-    "control-center-margin-top": 0,
-    "control-center-margin-bottom": 0,
-    "control-center-margin-right": 0,
-    "control-center-margin-left": 0,
+    "control-center-margin-top": 10,
+    "control-center-margin-bottom": 10,
+    "control-center-margin-right": 10,
+    "control-center-margin-left": 10,
     "notification-2fa-action": true,
     "notification-inline-replies": true,
     "notification-window-width": 440,
@@ -23,12 +23,16 @@
         }
     },
     "widgets": [
+        "buttons-grid",
+        "mpris",
         "title",
         "dnd",
-        "mpris",
         "notifications"
     ],
     "widget-config": {
+        "label": {
+            "text": "Control Center"
+        },
         "title": {
             "text": "Notifications",
             "clear-all-button": true,
@@ -39,6 +43,34 @@
         },
         "mpris": {
             "image-size": 96
+        },
+        "buttons-grid": {
+            "actions": [
+                {
+                    "label": "󰖩",
+                    "command": "nm-connection-editor"
+                },
+                {
+                    "label": "󰂯",
+                    "command": "blueman-manager"
+                },
+                {
+                    "label": "󰕾",
+                    "command": "pavucontrol"
+                },
+                {
+                    "label": "󰍬",
+                    "command": "pavucontrol -t 4"
+                },
+                {
+                    "label": "󰏘",
+                    "command": "wallpaper-cycle"
+                },
+                {
+                    "label": "󰐥",
+                    "command": "/usr/libexec/hyprbazzite-ctl power menu"
+                }
+            ]
         }
     }
 }

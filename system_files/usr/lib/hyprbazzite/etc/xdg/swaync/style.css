@@ -195,6 +195,30 @@
 }
 .widget-label > label {
   font-size: 1.1rem;
+  font-weight: bold;
+  color: #bd93f9;
+  margin: 10px 0px 5px 0px;
+}
+
+.widget-buttons-grid {
+  padding: 8px;
+  margin: 8px;
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.widget-buttons-grid > button {
+  background: #282a36;
+  border: 1px solid #bd93f9;
+  border-radius: 12px;
+  margin: 4px;
+  padding: 10px;
+  font-size: 1.5rem;
+  color: #bd93f9;
+}
+
+.widget-buttons-grid > button:hover {
+  background: @noti-bg-hover;
 }
 
 .widget-mpris-player {
