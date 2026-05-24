@@ -152,7 +152,7 @@ jobs:
       
       - name: Sign Images
         run: |
-          cosign sign --yes ghcr.io/tvorfreude/ublue-hyprbazzite:latest
+          cosign sign --yes ghcr.io/tvorfreude/hyprbazzite:latest
 
       - name: Upload Public Key Artifact
         if: github.event_name != 'pull_request'
