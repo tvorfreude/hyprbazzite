@@ -62,7 +62,6 @@ jobs:
       github.event_name == 'push' || 
       github.event_name == 'pull_request' ||
       needs.check_base_image.outputs.base-updated == 'true'
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.check_base_image.outputs.base-updated == 'true'
     runs-on: ubuntu-24.04
 
     permissions:
