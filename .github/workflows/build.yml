@@ -147,27 +147,12 @@ jobs:
             SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
             BUILD_STAMP=${{ github.run_id }}
 
-      - name: Log in to GHCR
-        uses: redhat-actions/push-to-registry@v2
-        id: push
-        with:
-          registry: ${{ env.IMAGE_REGISTRY }}
-          image: ${{ env.IMAGE_NAME }}
-          tags: ${{ steps.metadata.outputs.tags }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Sign Container Images
-        if: github.event_name != 'pull_request'
+      - name: Log in to GHCR for Cosign
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u ${{ github.actor }} --password-stdin
+      
+      - name: Sign Images
         run: |
-          images=""
-          for tag in ${TAGS}; do
-            images="${images} ${IMAGE_REGISTRY}/${IMAGE_NAME}:${tag}"
-          done
-          cosign sign --key /tmp/cosign.key --yes ${images}
-        env:
-          TAGS: ${{ steps.metadata.outputs.tags }}
-          COSIGN_PASSWORD: ""
+          cosign sign --yes ghcr.io/tvorfreude/ublue-hyprbazzite:latest
 
       - name: Upload Public Key Artifact
         if: github.event_name != 'pull_request'
