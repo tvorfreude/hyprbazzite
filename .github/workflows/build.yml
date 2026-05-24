@@ -4,7 +4,7 @@ on:
     branches:
       - main
   schedule:
-    - cron: '0 */6 * * *'  # Check for updates every 6 hours
+    - cron: '0 2 * * *'
   push:
     branches:
       - main
@@ -27,6 +27,7 @@ concurrency:
 jobs:
   check_base_image:
     name: Check for base image updates
+    if: github.event_name == 'schedule'
     runs-on: ubuntu-24.04
     outputs:
       base-updated: ${{ steps.check.outputs.updated }}
@@ -56,6 +57,11 @@ jobs:
   build_push:
     name: Build and push image
     needs: check_base_image
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'push' || 
+      github.event_name == 'pull_request' ||
+      needs.check_base_image.outputs.base-updated == 'true'
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || needs.check_base_image.outputs.base-updated == 'true'
     runs-on: ubuntu-24.04
 
@@ -143,6 +149,8 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           oci: true
+          extra-args: |
+            --layers=true
           build-args: |
             SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
             BUILD_STAMP=${{ github.run_id }}
