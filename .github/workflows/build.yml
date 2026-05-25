@@ -1,8 +1,5 @@
 name: Build container image
 on:
-  pull_request:
-    branches:
-      - main
   schedule:
     - cron: '0 2 * * *'
   push:
@@ -126,7 +123,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=stable.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=testing.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=testing.pr${{ github.event.pull_request.number }}.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'pull_request' }}
             type=raw,value=testing,enable=${{ github.event_name == 'pull_request' }}
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
