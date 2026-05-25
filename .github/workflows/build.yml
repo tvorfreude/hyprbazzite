@@ -8,8 +8,19 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - '**/README.md'
+    paths:
+      - 'Containerfile'
+      - 'system_files/**'
+      - 'build_files/**'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Containerfile'
+      - 'system_files/**'
+      - 'build_files/**'
+      - '.github/workflows/build.yml'
   workflow_dispatch:
 
 env:
@@ -58,6 +69,7 @@ jobs:
     name: Build and push image
     if: |
       always() && 
+      github.actor != 'dependabot[bot]' &&
       (github.event_name == 'workflow_dispatch' || 
        github.event_name == 'push' || 
        github.event_name == 'pull_request' || 
@@ -169,8 +181,9 @@ jobs:
         run: echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u ${{ github.actor }} --password-stdin
       
       - name: Sign Images
+        if: github.event_name != 'pull_request'
         run: |
-          cosign sign --yes ghcr.io/tvorfreude/hyprbazzite:latest
+          cosign sign --yes "ghcr.io/${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
 
       - name: Upload Public Key Artifact
         if: github.event_name != 'pull_request'
