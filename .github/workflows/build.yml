@@ -95,6 +95,10 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.8.1
 
+      - name: Set short SHA
+        id: vars
+        run: echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Generate Signing Keys
         run: |
           cosign generate-key-pair
@@ -108,11 +112,10 @@ jobs:
         id: metadata
         with:
           tags: |
-            type=raw,value=${{ env.DEFAULT_TAG }}
-            type=raw,value=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
-            type=raw,value={{date 'YYYYMMDD'}}
-            type=sha,enable=${{ github.event_name == 'pull_request' }}
-            type=ref,event=pr
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=stable.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=testing.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=testing,enable=${{ github.event_name == 'pull_request' }}
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
@@ -134,10 +137,6 @@ jobs:
           sep-tags: " "
           sep-annotations: " "
 
-      - name: Set short SHA
-        id: vars
-        run: echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
-
       - name: Build Image
         id: build_image
         uses: redhat-actions/buildah-build@v2
@@ -152,7 +151,7 @@ jobs:
             --layers=true
           build-args: |
             SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
-            BUILD_STAMP=${{ github.run_id }}
+            BUILD_STAMP=${{ steps.metadata.outputs.version }}
             
       - name: Push Image to GHCR
         uses: redhat-actions/push-to-registry@v2
