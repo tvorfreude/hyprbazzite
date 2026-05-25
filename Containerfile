@@ -8,7 +8,7 @@ ARG SHA_HEAD_SHORT=unknown
 ARG BUILD_STAMP
 
 # 1. Metadata setup
-RUN build_id="${BUILD_STAMP:-$(date -u +%Y%m%d)}" && \
+RUN build_id="${BUILD_STAMP:-stable.$(date -u +%Y%m%d)-${SHA_HEAD_SHORT:-unknown}}" && \
     echo "TBLUE_BUILD_ID=$build_id" >> /usr/lib/os-release && \
     sed -i "s/^PRETTY_NAME=.*/PRETTY_NAME=\"HyprBazzite ($build_id)\"/" /usr/lib/os-release && \
     sed -i 's/^NAME=.*/NAME="HyprBazzite"/' /usr/lib/os-release
