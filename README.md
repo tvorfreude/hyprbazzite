@@ -25,7 +25,7 @@ sudo bootc switch ghcr.io/tvorfreude/hyprbazzite:latest
 - `latest`: The most recent stable build from the `main` branch.
 - `stable.YYYYMMDD-SHA`: Versioned stable releases.
 - `testing`: The most recent build from Pull Requests or development branches.
-- `testing.YYYYMMDD-SHA`: Versioned testing releases.
+- `testing.prNO.YYYYMMDD-SHA`: Versioned testing releases.
 
 ## 🛠 Customization
 
