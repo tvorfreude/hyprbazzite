@@ -25,7 +25,7 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y install --skip-unavailable \
     hyprland hyprland-guiutils hyprlock hypridle hyprpaper uwsm hyprland-uwsm \
     swww waybar SwayNotificationCenter wofi wvkbd hhd adjustor hhd-ui lact \
-    zsh starship lsd sddm git chezmoi kitty nix tmux fastfetch jq ripgrep \
+    zsh starship lsd sddm git chezmoi kitty tmux fastfetch jq ripgrep \
     thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 network-manager-applet pavucontrol \
     xdg-desktop-portal-hyprland lxqt-policykit \
     gnome-keyring seahorse blueman breeze-icon-theme checkpolicy policycoreutils \
