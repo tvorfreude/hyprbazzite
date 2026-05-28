@@ -1,3 +1,15 @@
+# Assets stage for downloading and preparing files
+FROM fedora:latest AS assets
+RUN dnf -y install curl unzip
+RUN curl -L -o /tmp/jb-mono.zip https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip && \
+    unzip -o /tmp/jb-mono.zip -d /fonts/
+RUN mkdir -p /themes/Dracula && \
+    curl -L https://github.com/dracula/gtk/archive/master.zip -o /tmp/dracula-gtk.zip && \
+    unzip /tmp/dracula-gtk.zip -d /tmp && \
+    mv /tmp/gtk-master/* /themes/Dracula/
+RUN mkdir -p /qt5ct/colors && \
+    curl -L https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf -o /qt5ct/colors/Dracula.conf
+
 # Allow build scripts to be referenced without being copied into the final image
 FROM scratch AS ctx
 COPY build_files /
@@ -36,6 +48,9 @@ RUN --mount=type=cache,dst=/var/cache \
 
 # 3. Copy Files into image
 COPY system_files/usr/ /usr/
+COPY --from=assets /fonts /usr/share/fonts/
+COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
+COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
 
 # Fix terra-mesa GPG key issue
 RUN sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/null || true && \
@@ -43,16 +58,13 @@ RUN sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/n
 
 # 4. IMPLEMENTING LIVE SYMLINKS (Back to /etc for bootc compliance)
 RUN mkdir -p /usr/share/hyprbazzite/config && \
-    cp -af /usr/lib/hyprbazzite/etc/skel/.config/. /usr/share/hyprbazzite/config/
-
-# bootc wants us to use /etc/skel, not /usr/etc/skel
-RUN mkdir -p /etc/skel/.config && \
+    cp -af /usr/lib/hyprbazzite/etc/skel/.config/. /usr/share/hyprbazzite/config/ && \
+    mkdir -p /etc/skel/.config && \
     for dir in $(ls /usr/share/hyprbazzite/config/); do \
         ln -s /usr/share/hyprbazzite/config/$dir /etc/skel/.config/$dir; \
     done
 
 # 5. Manage Flatpaks (Modified to avoid polluting /var)
-# We place the remote file in /etc instead of running 'flatpak remote-add'
 RUN mkdir -p /etc/flatpak/remotes.d && \
     curl -L https://flathub.org/repo/flathub.flatpakrepo -o /etc/flatpak/remotes.d/flathub.flatpakrepo && \
     flatpak uninstall -y org.mozilla.firefox org.gnome.* 2>/dev/null || true && \
@@ -61,50 +73,30 @@ RUN mkdir -p /etc/flatpak/remotes.d && \
     chmod +x /usr/bin/wallpaper-cycle && \
     echo 'source /usr/libexec/bazzite-flatpak-hijack.sh' >> /usr/libexec/bazzite-flatpak-manager
 
-# 6. Setup user defaults and customization
-RUN dnf5 install -y zsh && \
-    usermod -s /bin/zsh root && \
+# 6. Setup user defaults, customization and permissions
+RUN usermod -s /bin/zsh root && \
     mkdir -p /etc/default && \
-    echo 'SHELL=/bin/zsh' >> /etc/default/useradd
-
-RUN mkdir -p /usr/lib/environment.d/ && \
-    echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /usr/lib/environment.d/10-qtct.conf
-
-RUN curl -L -o /tmp/jb-mono.zip https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip && \
-    unzip -o /tmp/jb-mono.zip -d /usr/share/fonts/ && \
-    rm /tmp/jb-mono.zip && \
-    fc-cache -fv
-
-RUN mkdir -p /usr/share/themes/Dracula && \
-    curl -L https://github.com/dracula/gtk/archive/master.zip -o /tmp/dracula-gtk.zip && \
-    unzip /tmp/dracula-gtk.zip -d /tmp && \
-    mv /tmp/gtk-master/* /usr/share/themes/Dracula/ && \
-    rm -rf /tmp/dracula-gtk.zip /tmp/gtk-master && \
-    mkdir -p /usr/share/qt5ct/colors && \
-    curl -L https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf -o /usr/share/qt5ct/colors/Dracula.conf && \
-    mkdir -p /usr/share/backgrounds/gif_wallpapers
-
-RUN chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
+    echo 'SHELL=/bin/zsh' >> /etc/default/useradd && \
+    mkdir -p /usr/lib/environment.d/ && \
+    echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /usr/lib/environment.d/10-qtct.conf && \
+    fc-cache -fv && \
+    chmod 0644 /usr/share/wayland-sessions/hyprland.desktop && \
     chmod 0644 /usr/share/wayland-sessions/hyprland-uwsm.desktop && \
     chmod -R 0755 /usr/share/sddm/themes && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
-    chmod +x /usr/lib/hyprbazzite/etc/hypr/scripts/*.sh
-
-# 7. Permissions and Service Enablement
-RUN chmod +x /usr/bin/wallpaper-cycle && \
+    chmod +x /usr/lib/hyprbazzite/etc/hypr/scripts/*.sh && \
+    chmod +x /usr/bin/wallpaper-cycle && \
     find /usr/libexec/ -type f -exec chmod +x {} + && \
     find /usr/lib/hyprbazzite/etc/hypr/scripts/ -type f -exec chmod +x {} + && \
     mkdir -p /usr/lib/systemd/system-preset && \
     echo "enable hhd.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable sddm.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable tblue-hibernate-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-sync-desktop-config.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset
-
-# Dconf Source
-RUN mkdir -p /etc/dconf/db/distro.d/ && \
+    echo "enable tblue-sync-desktop-config.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    mkdir -p /etc/dconf/db/distro.d/ && \
     cp /usr/lib/hyprbazzite/etc/dconf/db/distro.d/00-dracula-theme /etc/dconf/db/distro.d/
 
-# 8. Scorched Earth Cleanup for /var (The Linter's main enemy)
+# 7. Scorched Earth Cleanup for /var (The Linter's main enemy)
 RUN rm -rf /var/lib/flatpak/* && \
     rm -rf /var/cache/libdnf5/* && \
     rm -rf /var/lib/dnf && \
