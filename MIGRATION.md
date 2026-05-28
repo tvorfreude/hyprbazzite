@@ -6,7 +6,7 @@ Please run the following in this order
 rpm-ostree rebase ostree-unverified-registry:ghcr.io/tvorfreude/hyprbazzite:latest
 systemctl reboot
 # After reboot
-rpm-ostree rebase ostree-image-signed:docker://ghcr.io/tvorfreude/ublue-hyprbazzite:latest
+rpm-ostree rebase ostree-image-signed:docker://ghcr.io/tvorfreude/hyprbazzite:latest
 systemctl reboot
 # Migration Complete
 ```
