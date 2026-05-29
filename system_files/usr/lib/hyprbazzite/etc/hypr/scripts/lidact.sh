@@ -1,30 +1,39 @@
-#!/bin/bash
-LAPTOP_MONITOR=$(hyprctl monitors all | awk '/Monitor (eDP|LVDS)/ {print $2}' | head -n 1)
+#!/usr/bin/env bash
 
-# Handling for missing instance signature
+# 1. Force the runtime directory (Vital for SSH sessions and hotkey daemons)
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
+
+# 2. Automatically find and expose the Wayland socket for wlr-randr
+if [ -z "$WAYLAND_DISPLAY" ]; then
+    export WAYLAND_DISPLAY=$(command ls -1 "$XDG_RUNTIME_DIR" | grep -E '^wayland-[0-9]+$' | head -n 1)
+fi
+
+# 3. Automatically find and expose the Hyprland instance signature for hyprctl
 if [ -z "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
-    # Point to the modern Hyprland socket directory
-    HYPR_DIR="/run/user/$(id -u)/hypr"
+    HYPR_DIR="$XDG_RUNTIME_DIR/hypr"
     export HYPRLAND_INSTANCE_SIGNATURE=$(command ls -1t "$HYPR_DIR" | head -n 1)
 fi
+
+# 4. Find the laptop's internal display name
+LAPTOP_MONITOR=$(hyprctl monitors all | awk '/Monitor (eDP|LVDS)/ {print $2}' | head -n 1)
 
 if [ -z "$LAPTOP_MONITOR" ]; then
     echo "Error: No laptop monitor found."
     exit 1
 fi
 
-# Check current state using wlr-randr. 
-# We look for the monitor name, then check if the very next lines contain "Enabled: yes"
-if wlr-randr | grep -A 2 "^$LAPTOP_MONITOR" | grep -q "Enabled: yes"; then
+# 5. Check the current monitor state using the hyprctl active list
+if hyprctl monitors | grep -q "Monitor $LAPTOP_MONITOR"; then
     CURRENT_STATE="on"
 else
     CURRENT_STATE="off"
 fi
 
-# Determine what action to take based on arguments ($1)
+# 6. Parse arguments (on, off, or toggle)
 ACTION=$1
 
-# If no argument is passed (or if 'toggle' is explicitly passed), flip the state
 if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     if [ "$CURRENT_STATE" == "on" ]; then
         ACTION="off"
@@ -33,13 +42,13 @@ if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     fi
 fi
 
-# Execute the wlr-randr commands you requested
+# 7. Execute the power command using wlr-randr
 if [ "$ACTION" == "on" ]; then
     wlr-randr --output "$LAPTOP_MONITOR" --on
-    echo "Turned $LAPTOP_MONITOR ON"
+    echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
     wlr-randr --output "$LAPTOP_MONITOR" --off
-    echo "Turned $LAPTOP_MONITOR OFF"
+    echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
     exit 1
