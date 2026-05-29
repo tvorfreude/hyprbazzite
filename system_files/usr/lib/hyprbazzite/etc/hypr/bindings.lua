@@ -92,4 +92,4 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 -- LID SWITCH
 hl.bind("switch:on:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh off"), { locked = true })
 hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh on"), { locked = true })
-hl.bind("SUPER_SHIFT, D", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh toggle"), { locked = true })
+hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh toggle"), { locked = true })
