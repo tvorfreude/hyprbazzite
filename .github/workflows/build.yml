@@ -102,7 +102,7 @@ jobs:
           echo "Base image digest: ${BASE_DIGEST}"
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v3.8.1
+        uses: sigstore/cosign-installer@v4.1.2
 
       - name: Set short SHA
         id: vars
