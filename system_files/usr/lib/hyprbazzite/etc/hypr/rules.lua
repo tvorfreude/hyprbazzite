@@ -2,7 +2,7 @@
 hl.window_rule({
     match = { class = ".*" },
     suppress_event = "maximize",
-    opacity = "0.97 0.9"
+    opacity = "1.0 0.9"
 })
 
 -- Fix for ghost/XWayland focus issues
@@ -55,17 +55,6 @@ hl.window_rule({
     opacity = "1 1"
 })
 
--- ==========================================
--- GAMING & STEAM
--- ==========================================
-
--- Gaming & RetroArch
-hl.window_rule({
-    match = { class = "com.libretro.RetroArch" },
-    fullscreen = true,
-    opacity = "1 1"
-})
-
 -- Consolidated Steam Rules
 hl.window_rule({
     match = { class = "steam" },
@@ -93,10 +82,11 @@ hl.window_rule({
 
 -- Handheld / System Utilities
 hl.window_rule({
-    match = { class = "^(blueberry.py|Impala|Wiremix|org.gnome.NautilusPreviewer|About)$" },
+    match = { class = "^(pavucontrol|blueman-manager|nm-connection-editor|galculator)$" },
     float = true,
     center = true
 })
+
 hl.window_rule({
     match = { class = "^(blueberry.py|Impala|Wiremix|org.gnome.NautilusPreviewer|com.gabm.satty)$" },
     size = { 800, 600 }

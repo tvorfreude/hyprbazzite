@@ -43,7 +43,7 @@
 	},
 	"custom/headset-battery": {
 		"format": "󰠇 {}%",
-		"exec": "/etc/hypr/scripts/TritonCtl.sh LogiBattery",
+		"exec": "/usr/lib/hyprbazzite/etc/hypr/scripts/logibattery.sh",
 		"interval": 5,
 		"on-click": "solaar",
 		"return-type": "integer"
