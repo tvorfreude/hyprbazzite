@@ -1,6 +1,13 @@
 #!/bin/bash
 LAPTOP_MONITOR=$(hyprctl monitors all | awk '/Monitor (eDP|LVDS)/ {print $2}' | head -n 1)
 
+# Handling for missing instance signature
+if [ -z "$HYPRLAND_INSTANCE_SIGNATURE" ]; then
+    # Point to the modern Hyprland socket directory
+    HYPR_DIR="/run/user/$(id -u)/hypr"
+    export HYPRLAND_INSTANCE_SIGNATURE=$(command ls -1t "$HYPR_DIR" | head -n 1)
+fi
+
 if [ -z "$LAPTOP_MONITOR" ]; then
     echo "Error: No laptop monitor found."
     exit 1
