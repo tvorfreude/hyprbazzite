@@ -44,10 +44,10 @@ fi
 
 # 7. Execute the power command using wlr-randr
 if [ "$ACTION" == "on" ]; then
-    wlr-randr --output "$LAPTOP_MONITOR" --on
+    hyprctl dispatch "hl.dsp.dpms({on, 'eDP-1'})"
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    wlr-randr --output "$LAPTOP_MONITOR" --off
+    hyprctl dispatch "hl.dsp.dpms({off, 'eDP-1'})"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
