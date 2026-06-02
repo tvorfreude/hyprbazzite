@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # --- Configuration ---
-RUNNER="rofi"
+RUNNER="wofi"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 ROFI_THEME="$CONFIG_DIR/rofi/config-tritonctl.rasi"
 SCRIPTS_DIR="/usr/lib/hyprbazzite/etc/hypr/scripts"

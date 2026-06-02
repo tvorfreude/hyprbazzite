@@ -7,7 +7,7 @@ WALL_DIR="$HOME/Pictures/wallpapers"
 WALLUST_DIR="$CONFIG_DIR/hypr/wallust"
 WALLUST_CURRENT_WALL="$WALLUST_DIR/current_wallpaper.jpg"
 ROFI_THEME="$CONFIG_DIR/rofi/config-wallpaper.rasi"
-RUNNER="rofi"
+RUNNER="wofi"
 
 if ! command -v jq &>/dev/null || ! command -v bc &>/dev/null; then
     notify-send "TritonCtl" "Missing dependency: jq or bc"
