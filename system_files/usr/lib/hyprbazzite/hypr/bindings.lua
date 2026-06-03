@@ -100,14 +100,7 @@ hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh 
 
 -- 3-finger swipe left/right to switch workspaces
 hl.gesture({
-    type = "swipe",
     fingers = 3,
-    direction = "left",
-    on_swipe = hl.dsp.focus({ workspace = "e+1" })
-})
-hl.gesture({
-    type = "swipe",
-    fingers = 3,
-    direction = "right",
-    on_swipe = hl.dsp.focus({ workspace = "e-1" })
+    direction = "horizontal",
+    action = "workspace"
 })

@@ -36,7 +36,7 @@ hl.config({
     },
 
     -- Eye Candy & HDR
-    render = { cm_enabled = true, cm_auto_hdr = 2, allow_tearing = true },
+    render = { cm_enabled = true, cm_auto_hdr = 2 },
     animations = { enabled = true },
     decoration = {
         rounding = 8,
@@ -48,26 +48,18 @@ hl.config({
     -- Dwindle Layout Tuning
     dwindle = {
         force_split = 0,
-        split_width_ratio = 0.50,
-        pseudotile = true,
         preserve_split = true,
     },
 
     -- Master Layout Tuning (for windows that use it)
     master = {
         new_status = "master",
-        special_scale = 1,
-        thirdy = false,
     },
 
     -- Behaviors
     misc = {
         disable_hyprland_logo = true,
         focus_on_activate = true,
-        new_window_when_empty = false,
-        cancel_drag_on_edge = true,
-        mouse_move_cars_focus = true,
-        vim_keybindings = false,
     },
 
     -- Legacy/Compatibility
