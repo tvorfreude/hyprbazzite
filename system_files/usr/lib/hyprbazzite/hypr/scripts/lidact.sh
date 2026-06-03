@@ -42,12 +42,12 @@ if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     fi
 fi
 
-# 7. Execute the power command using wlr-randr
+# 7. Execute the power command using hyprctl dpms dispatch
 if [ "$ACTION" == "on" ]; then
-    hyprctl dispatch "hl.dsp.dpms({on, 'eDP-1'})"
+    hyprctl dispatch "hl.dsp.dpms({monitor = '$LAPTOP_MONITOR'})"
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    hyprctl dispatch "hl.dsp.dpms({off, 'eDP-1'})"
+    hyprctl dispatch "hl.dsp.dpms({monitor = '$LAPTOP_MONITOR'})"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
