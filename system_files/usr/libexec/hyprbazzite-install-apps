@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# hyprbazzite-install-apps - Post-installation application setup
+# Installs Flatpaks, configures permissions, sets up Homebrew, and installs VSCode.
+# Intended to be run via: ujust install-apps
+set -euo pipefail
+
+log() { echo "[install-apps] $*"; }
+notify() {
+    local title="$1"
+    local msg="$2"
+    local urgency="${3:-normal}"
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -u "$urgency" "$title" "$msg"
+    fi
+}
+
+# --- Internet check ---
+check_internet() {
+    curl -s --head --request GET --connect-timeout 5 https://flathub.org >/dev/null 2>&1
+}
+
+if ! check_internet; then
+    log "No internet connection. Please connect and retry."
+    notify "Install Apps" "No internet connection. Please connect and retry." "critical"
+    exit 1
+fi
+
+# --- Flatpak apps ---
+log "Installing Flatpak applications..."
+FLATPAKS=(
+    "com.discordapp.Discord"
+    "org.prismlauncher.PrismLauncher"
+    "com.bitwarden.desktop"
+    "com.surfshark.Surfshark"
+    "app.zen_browser.zen"
+)
+
+for app in "${FLATPAKS[@]}"; do
+    if flatpak list --app --columns=application | grep -q "^${app}$"; then
+        log "  $app already installed, skipping..."
+    else
+        log "  Installing $app..."
+        flatpak install --system -y flathub "$app" || log "  Failed to install $app"
+    fi
+done
+
+# --- Flatpak overrides ---
+log "Applying system-wide Flatpak overrides..."
+
+# Font access
+flatpak override --system --filesystem=xdg-config/fontconfig:ro
+flatpak override --system --filesystem=/usr/share/fonts:ro
+
+# GTK theme access (dark/light mode support)
+flatpak override --system --filesystem=xdg-config/gtk-3.0:ro
+flatpak override --system --filesystem=xdg-config/gtk-4.0:ro
+flatpak override --system --filesystem=xdg-config/gtk-4.0/assets:ro
+flatpak override --system --filesystem=xdg-config/gtk-4.0/icons:ro
+flatpak override --system --filesystem=xdg-config/kdeglobals:ro
+flatpak override --system --filesystem=/usr/share/themes:ro
+flatpak override --system --filesystem=/usr/share/icons:ro
+
+# GTK/Qt theme env (gtk3 for consistent theme propagation)
+flatpak override --system --env=GTK_THEME=Dracula
+flatpak override --system --env=QT_QPA_PLATFORMTHEME=gtk3
+
+# Wayland support
+flatpak override --system --socket=wayland
+
+# Network access
+flatpak override --system --socket=pulseaudio
+flatpak override --system --socket=x11
+
+# App-specific overrides
+log "Applying Discord Wayland override..."
+flatpak override --system --socket=wayland com.discordapp.Discord 2>/dev/null || true
+
+log "Applying Zen browser download fix..."
+flatpak override --system --filesystem=xdg-download --filesystem=host app.zen_browser.zen 2>/dev/null || true
+
+# --- User-specific Flatpak overrides ---
+log "Applying user-specific overrides..."
+for user in $(users 2>/dev/null | tr ' ' '\n' | sort -u); do
+    uid=$(id -u "$user" 2>/dev/null || true)
+    [ -z "$uid" ] && continue
+    bus_address="unix:path=/run/user/$uid/bus"
+    if [ -e "/run/user/$uid/bus" ]; then
+        log "  Applying user overrides for $user..."
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/fontconfig:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=/usr/share/fonts:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/gtk-3.0:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/gtk-4.0:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=xdg-config/kdeglobals:ro"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --filesystem=/usr/share/themes:ro"
+        # Qt theme via gtk3 for consistency
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --env=QT_QPA_PLATFORMTHEME=gtk3"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --env=QT_STYLE_OVERRIDE=Fusion"
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS='$bus_address' flatpak override --user --env=XDG_CURRENT_DESKTOP=Hyprland"
+    fi
+done
+
+# --- Homebrew + ublue-os tap ---
+log "Setting up Homebrew..."
+if ! command -v brew >/dev/null 2>&1; then
+    log "  Homebrew not found. Installing..."
+    (noninteractive /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true)
+    # Add brew to PATH for current session
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+else
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+
+# Add ublue-os tap
+if brew tap ublue-os/brew >/dev/null 2>&1; then
+    log "  Added ublue-os/brew tap."
+else
+    log "  ublue-os/brew tap already exists or failed to add."
+fi
+
+# --- VSCode installation ---
+log "Installing VSCode..."
+if command -v code >/dev/null 2>&1; then
+    log "  VSCode already installed, skipping..."
+else
+    if brew list --casks | grep -q visual-studio-code; then
+        log "  VSCode already installed via Homebrew, skipping..."
+    else
+        log "  Installing VSCode via Homebrew..."
+        brew install --cask visual-studio-code
+    fi
+fi
+
+log "Installation complete!"
+notify "Install Apps" "All applications installed successfully!" "normal"

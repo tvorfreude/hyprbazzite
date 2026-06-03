@@ -99,7 +99,9 @@ RUN --mount=type=cache,dst=/var/cache \
     # Media and clipboard
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
     # Hardware and system tools
-    brightnessctl swappy gparted systemd-devel btop && \
+    brightnessctl swappy gparted systemd-devel btop \
+    # OpenRGB (system RPM, replaces Flatpak)
+    openrgb openrgb-udev-rules && \
     dnf5 -y autoremove && \
     dnf5 -y clean all
 
@@ -128,34 +130,24 @@ RUN mkdir -p /usr/share/hyprbazzite/config && \
     done
 
 # ---------------------------------------------------------------------------
-# Step 8: Configure Flatpak remotes
+# Step 8: Set permissions on scripts and executables
 # ---------------------------------------------------------------------------
-RUN mkdir -p /etc/flatpak/remotes.d && \
-    curl -fsSL -L https://flathub.org/repo/flathub.flatpakrepo \
-        -o /etc/flatpak/remotes.d/flathub.flatpakrepo && \
-    flatpak uninstall -y org.mozilla.firefox org.gnome.* 2>/dev/null || true
-
-# ---------------------------------------------------------------------------
-# Step 9: Set permissions on scripts and executables
-# ---------------------------------------------------------------------------
-RUN chmod +x /usr/libexec/bazzite-flatpak-hijack.sh && \
-    chmod +x /usr/libexec/bazzite-flatpak-manager && \
-    chmod +x /usr/bin/wallpaper-cycle && \
-    echo 'source /usr/libexec/bazzite-flatpak-hijack.sh' >> /usr/libexec/bazzite-flatpak-manager && \
+RUN chmod +x /usr/bin/wallpaper-cycle && \
     # Ensure all libexec scripts are executable
     find /usr/libexec/ -type f -exec chmod +x {} + && \
     # Ensure all Hyprland scripts are executable
     find /usr/lib/hyprbazzite/hypr/scripts/ -type f -exec chmod +x {} +
 
 # ---------------------------------------------------------------------------
-# Step 10: Configure user defaults, environment, and systemd presets
+# Step 9: Configure user defaults, environment, and systemd presets
 # ---------------------------------------------------------------------------
 RUN usermod -s /bin/zsh root && \
     mkdir -p /etc/default && \
     echo 'SHELL=/bin/zsh' >> /etc/default/useradd && \
-    # Set Qt platform theme
+    # Set Qt platform theme (gtk3 for consistent theme propagation via GTK settings)
     mkdir -p /usr/lib/environment.d/ && \
-    echo 'QT_QPA_PLATFORMTHEME=qt5ct' >> /usr/lib/environment.d/10-qtct.conf && \
+    echo 'QT_QPA_PLATFORMTHEME=gtk3' >> /usr/lib/environment.d/10-qtct.conf && \
+    echo 'QT_STYLE_OVERRIDE=Fusion' >> /usr/lib/environment.d/10-qtct.conf && \
     # Build font cache
     fc-cache -f && \
     # Set session file permissions
@@ -173,7 +165,7 @@ RUN usermod -s /bin/zsh root && \
     cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme /etc/dconf/db/distro.d/
 
 # ---------------------------------------------------------------------------
-# Step 11: Cleanup - remove build artifacts from /var
+# Step 10: Cleanup - remove build artifacts from /var
 # ---------------------------------------------------------------------------
 RUN rm -rf /var/lib/flatpak/* && \
     rm -rf /var/cache/libdnf5/* && \

@@ -27,3 +27,8 @@ hypr-tdp-perf:
 # Show current TDP status
 hypr-tdp-status:
     /usr/libexec/hyprbazzite-ctl tdp get
+
+# Install post-setup applications (Flatpaks, Homebrew tap, VSCode)
+# Run: ujust install-apps
+install-apps:
+    /usr/libexec/hyprbazzite-install-apps
