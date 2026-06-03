@@ -100,8 +100,7 @@ RUN --mount=type=cache,dst=/var/cache \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
     # Hardware and system tools
     brightnessctl swappy gparted systemd-devel btop \
-    # OpenRGB (system RPM, replaces Flatpak)
-    openrgb openrgb-udev-rules && \
+    openrgb openrgb-udev-rules sddm && \
     dnf5 -y autoremove && \
     dnf5 -y clean all
 
