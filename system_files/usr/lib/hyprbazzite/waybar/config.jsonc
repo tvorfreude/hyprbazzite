@@ -166,32 +166,25 @@
     "window-rewrite-default": "󰣆",
     "window-rewrite": {
       // ── Browsers ──
-      "class<firefox|org.mozilla.firefox|librewolf|floorp|mercury-browser|[Cc]achy-browser>": "󰈹",
-      "class<zen|io.github.zen_browser.zen>":  "󰇧",
-      "class<waterfox|waterfox-bin>":           "󰈹",
-      "class<microsoft-edge>":                  "󰞩",
-      "class<Chromium|Thorium|[Cc]hrome|com.google.Chrome>": "󰖟",
-      "class<brave-browser|com.brave.Browser>": "󰢏",
-      "class<tor browser>":                     "󰗬",
-      "title<.*amazon.*>":                      "󰃋",
+      "class<zen|io.github.zen_browser.zen|firefox|org.mozilla.firefox|librewolf|floorp|mercury-browser|[Cc]achy-browser|tor browser|waterfox|waterfox-bin>": "󰈹",
+      "class<microsoft-edge>":                  "",
+      "class<Chromium|Thorium|[Cc]hrome|com.google.Chrome|brave-browser|com.brave.Browser>": "",
+      "title<.*amazon.*>":                      "",
       "title<.*reddit.*>":                      "󰑍",
       "title<.*youtube.*>":                     "󰗃",
-      "title<.*github.*>":                      "󰊢",
+      "title<.*github.*>":                      "",
       // ── Terminals ──
-      "class<kitty|konsole>":                   "󰆍",
-      "class<kitty-dropterm>":                  "󰆍",
-      "class<com.mitchellh.ghostty>":           "󰆍",
-      "class<org.wezfurlong.wezterm>":          "󰆍",
+      "class<kitty|konsole|kitty-dropterm|com.mitchellh.ghostty|org.wezfurlong.wezterm>":                   "",
       // ── Communication ──
       "class<[Tt]hunderbird|[Tt]hunderbird-esr>":  "󰊫",
       "class<eu.betterbird.Betterbird>":            "󰊫",
       "title<.*gmail.*>":                           "󰊫",
-      "class<[Tt]elegram-desktop|org.telegram.desktop|io.github.tdesktop_x64.TDesktop>": "󰙯",
+      "class<[Tt]elegram-desktop|org.telegram.desktop|io.github.tdesktop_x64.TDesktop>": "",
       "class<discord|[Ww]ebcord|Vesktop|com.discordapp.Discord>": "󰙯",
       "title<.*whatsapp.*>":  "󰖣",
       "title<.*zapzap.*>":    "󰖣",
       "title<.*messenger.*>": "󰟀",
-      "class<slack|com.slack.Slack>": "󰛪",
+      "class<slack|com.slack.Slack>": "",
       // ── AI ──
       "title<.*ChatGPT.*>":  "󰚩",
       "title<.*deepseek.*>": "󰚩",
@@ -202,7 +195,7 @@
       "class<Cider>":          "󰎆",
       "class<vlc>":            "󰕼",
       "class<[Ss]potify|com.spotify.Client>": "󰓇",
-      "title<.*Picture-in-Picture.*>": "󰍯",
+      "title<.*Picture-in-Picture.*>": "󰹗",
       "title<.*cmus.*>":       "󰕿",
       // ── Dev / Code ──
       "class<VSCode|code-url-handler|code|code-oss|codium|codium-url-handler|VSCodium|com.visualstudio.code>": "󰨞",
@@ -248,8 +241,8 @@
 
   "clock": {
     "interval": 1,
-    "format": " {:%I:%M %p}",
-    "format-alt": " {:%H:%M   %Y, %d %B, %A}",
+    "format": "󰥔 {:%I:%M %p}",
+    "format-alt": "󰃭 {:%H:%M  %d/%B/%Y, %A}",
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "calendar": {
       "mode": "year",
@@ -303,7 +296,7 @@
   "backlight": {
     "interval": 2,
     "format": "{icon}",
-    "format-icons": [" "," "," ","󰃝 ","󰃞 ","󰃟 ","󰃠 "],
+    "format-icons": ["󰃚","󰃛","󰃜","󰃝 ","󰃞","󰃟 ","󰃠 "],
     "tooltip-format": "Brightness {percent}%",
     "on-scroll-up":   "brightnessctl set +5%",
     "on-scroll-down": "brightnessctl set 5%-",
@@ -360,12 +353,12 @@
     "format-muted": "󰖁",
     "format-icons": {
       "headphone": "󰋋",
-      "hands-free": "󰝞",
-      "headset": "󰟣",
-      "phone": "󰐗",
-      "portable": "󰣙",
-      "car": "󰣟",
-      "default": ["󰕾","󰖀","󰕾","󰺠"],
+      "hands-free": "󰋍",
+      "headset": "󰋎",
+      "phone": "",
+      "portable": "󰦢",
+      "car": "󰄍",
+      "default": ["󰖁","󰕿","󰖀","󰕾"],
       "ignored-sinks": ["Easy Effects Sink"]
     },
     "scroll-step": 5.0,
@@ -406,7 +399,7 @@
       "chromium":   "󰖟",
       "default":    "󰟈",
       "firefox":    "󰈹",
-      "kdeconnect": "",
+      "kdeconnect": "󰌘",
       "mopidy":     "󰕿",
       "mpv":        "󰐹",
       "spotify":    "󰓇",
@@ -426,8 +419,8 @@
     "tooltip-format-deactivated": "Idle inhibitor inactive",
     "format": "{icon}",
     "format-icons": {
-      "activated":   " ",
-      "deactivated": " "
+      "activated":   "󰈈 ",
+      "deactivated": " "
     }
   },
 
@@ -461,19 +454,13 @@
       "(.*) - Google Chrome":      " $1",
       "(.*) — Zen Browser":        "󰖟 $1",
       "(.*) - Zen Browser":        "󰖟 $1",
-      "(.*) — Brave":              " $1",
-      "(.*) - Brave":              " $1",
       "(.*) — Visual Studio Code": "󰨞 $1",
       "(.*) - Visual Studio Code": "󰨞 $1",
-      "(.*) — Cursor":             "󱞜 $1",
-      "(.*) - Cursor":             "󱞜 $1",
       "Discord":                   "󰙯 Discord",
-      "Spotify":                   " Spotify",
-      "Slack":                     "󰗹 Slack",
+      "Slack":                     " Slack",
       "Telegram":                  "󰔥 Telegram",
       "Thunar":                    "󰉋 Thunar",
-      "Neovide":                   " Neovide",
-      "Steam":                     " Steam",
+      "Steam":                     " Steam",
       "Lutris":                    "󰮣 Lutris",
       "Bitwarden":                 "󰒄 Bitwarden",
       "(.*) - fish":               "> [$1]",
@@ -538,14 +525,14 @@
     "tooltip": false,
     "format": "{icon}",
     "format-icons": {
-      "notification":               "<span foreground='#ff5555'><sup></sup></span>",
-      "none":                       "",
-      "dnd-notification":           "<span foreground='#ff5555'><sup></sup></span>",
-      "dnd-none":                   "",
-      "inhibited-notification":     "<span foreground='#ff5555'><sup></sup></span>",
-      "inhibited-none":             "",
-      "dnd-inhibited-notification": "<span foreground='#ff5555'><sup></sup></span>",
-      "dnd-inhibited-none":         ""
+      "notification":               "<span foreground='#ff5555'><sup>󰂚</sup></span>",
+      "none":                       "󰂚",
+      "dnd-notification":           "<span foreground='#ff5555'><sup>󰂛</sup></span>",
+      "dnd-none":                   "󰂛",
+      "inhibited-notification":     "<span foreground='#ff5555'><sup>󰂚</sup></span>",
+      "inhibited-none":             "󰂚",
+      "dnd-inhibited-notification": "<span foreground='#ff5555'><sup>󰂛</sup></span>",
+      "dnd-inhibited-none":         "󰂛"
     },
     "return-type": "json",
     "exec-if": "which swaync-client",
@@ -562,59 +549,59 @@
     "tooltip-format": "App Launcher"
   },
   "custom/browser": {
-    "format": "󰖟 ",
+    "format": "󰖟",
     "on-click": "flatpak run io.github.zen_browser.zen",
     "tooltip": true,
     "tooltip-format": "Launch Browser"
   },
   "custom/tty": {
-    "format": "󰆍 ",
+    "format": "󰆍",
     "on-click": "kitty",
     "tooltip": true,
     "tooltip-format": "Launch Terminal"
   },
   "custom/file_manager": {
-    "format": "󰉋 ",
+    "format": "󰉋",
     "on-click": "thunar",
     "tooltip": true,
     "tooltip-format": "File Manager"
   },
   "custom/keyboard": {
-    "format": "󰌌 ",
+    "format": "󰌌",
     "on-click": "/usr/libexec/hyprbazzite-ctl osk toggle",
     "tooltip": true,
     "tooltip-format": "On-screen keyboard\nClick: Toggle open / close"
   },
   "custom/lock": {
-    "format": "󰌾 ",
+    "format": "󰌾",
     "on-click": "hyprlock",
     "tooltip": true,
     "tooltip-format": "Lock Screen"
   },
   "custom/power": {
-    "format": "⏻ ",
+    "format": "⏻",
     "on-click": "/usr/libexec/hyprbazzite-ctl power menu",
     "tooltip": true,
     "tooltip-format": "Power Menu"
   },
   "custom/quit": {
-    "format": "󰗼 ",
+    "format": "󰗼",
     "on-click": "hyprctl dispatch exit",
     "tooltip": true,
     "tooltip-format": "Exit Hyprland"
   },
   "custom/light_dark": {
-    "format": "󰔎 ",
+    "format": "󰔎",
     "tooltip": true,
     "tooltip-format": "Toggle Light / Dark"
   },
   "custom/settings": {
-    "format": "󰒓 ",
+    "format": "󰒓",
     "tooltip": true,
     "tooltip-format": "Settings"
   },
   "custom/dot_update": {
-    "format": "󰚰 ",
+    "format": "󰚰",
     "tooltip": true,
     "tooltip-format": "Updates"
   },
