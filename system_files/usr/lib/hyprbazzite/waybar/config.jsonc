@@ -166,7 +166,7 @@
     "window-rewrite-default": "󰣆",
     "window-rewrite": {
       // ── Browsers ──
-      "class<zen|io.github.zen_browser.zen|firefox|org.mozilla.firefox|librewolf|floorp|mercury-browser|[Cc]achy-browser|tor browser|waterfox|waterfox-bin>": "󰈹",
+      "class<app.zen_browser.zen|zen|io.github.zen_browser.zen|firefox|org.mozilla.firefox|librewolf|floorp|mercury-browser|[Cc]achy-browser|tor browser|waterfox|waterfox-bin>": "󰈹",
       "class<microsoft-edge>":                  "",
       "class<Chromium|Thorium|[Cc]hrome|com.google.Chrome|brave-browser|com.brave.Browser>": "",
       "title<.*amazon.*>":                      "",
@@ -176,8 +176,7 @@
       // ── Terminals ──
       "class<kitty|konsole|kitty-dropterm|com.mitchellh.ghostty|org.wezfurlong.wezterm>":                   "",
       // ── Communication ──
-      "class<[Tt]hunderbird|[Tt]hunderbird-esr>":  "󰊫",
-      "class<eu.betterbird.Betterbird>":            "󰊫",
+      "class<[Tt]hunderbird|[Tt]hunderbird-esr|eu.betterbird.Betterbird>":  "󰊫",
       "title<.*gmail.*>":                           "󰊫",
       "class<[Tt]elegram-desktop|org.telegram.desktop|io.github.tdesktop_x64.TDesktop>": "",
       "class<discord|[Ww]ebcord|Vesktop|com.discordapp.Discord>": "󰙯",
