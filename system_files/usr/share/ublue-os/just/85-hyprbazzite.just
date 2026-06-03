@@ -5,7 +5,7 @@ hypr-reset:
     echo "Resetting Hyprland configuration to defaults..."
     rm -rf ~/.config/hypr
     mkdir -p ~/.config/hypr
-    cp -r /usr/lib/hyprbazzite/etc/hypr/* ~/.config/hypr/
+    cp -r /usr/lib/hyprbazzite/hypr/* ~/.config/hypr/
     echo "Configuration reset complete. Please restart Hyprland."
 
 # Refresh system configuration links

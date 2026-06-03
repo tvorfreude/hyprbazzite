@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
+# tblue-secureboot-firstboot - First-boot Secure Boot EFI key repair
+#
+# Copies shim/fbx64 EFI binaries to the ESP, enrolls MOK keys if needed,
+# and runs bootupctl to validate the boot chain. Runs once and marks done.
+
 set -euo pipefail
+
+# -- Helpers ------------------------------------------------------------------
 
 log() {
     echo "[tblue-secureboot-firstboot] $*"
@@ -37,84 +44,103 @@ mark_done() {
     touch /var/lib/tblue/secureboot-firstboot.done
 }
 
-if [[ ! -d /sys/firmware/efi ]]; then
-    log "Not booted in UEFI mode; skipping."
-    mark_done
-    exit 0
-fi
+# -- Main ---------------------------------------------------------------------
 
-esp_root="$(resolve_esp_root || true)"
-
-if [[ -z "$esp_root" ]]; then
-    log "No EFI partition found under /boot/efi, /efi, or /boot; skipping."
-    mark_done
-    exit 0
-fi
-
-mkdir -p "$esp_root/EFI"
-
-shim_src="$(rpm -ql shim-x64 2>/dev/null | grep -E '/shimx64\.efi$' | head -n1 || true)"
-shim_vendor_src="$(rpm -ql shim-x64 2>/dev/null | grep -E '/shim\.efi$' | head -n1 || true)"
-fbx_src="$(rpm -ql shim-x64 2>/dev/null | grep -E '/fbx64\.efi$' | head -n1 || true)"
-
-if [[ -n "$shim_src" && -n "$fbx_src" && -f "$shim_src" && -f "$fbx_src" ]]; then
-    mkdir -p "$esp_root/EFI/BOOT"
-    mkdir -p "$esp_root/EFI/fedora"
-    copy_if_needed "$shim_src" "$esp_root/EFI/BOOT/BOOTX64.EFI"
-    copy_if_needed "$fbx_src" "$esp_root/EFI/BOOT/fbx64.efi"
-    copy_if_needed "$shim_src" "$esp_root/EFI/fedora/shimx64.efi"
-    if [[ -n "$shim_vendor_src" && -f "$shim_vendor_src" ]]; then
-        copy_if_needed "$shim_vendor_src" "$esp_root/EFI/fedora/shim.efi"
+main() {
+    # Only run on UEFI systems
+    if [[ ! -d /sys/firmware/efi ]]; then
+        log "Not booted in UEFI mode; skipping."
+        mark_done
+        exit 0
     fi
-    log "Updated EFI shim binaries for BOOT and fedora paths."
-else
-    log "Could not find shim sources from shim-x64 package."
-fi
 
-if command -v bootupctl >/dev/null 2>&1; then
-    bootupctl update || true
-    bootupctl adopt-and-update || true
-    bootupctl validate || true
-fi
+    # Locate the ESP mount point
+    local esp_root
+    esp_root="$(resolve_esp_root || true)"
 
-key_paths=()
+    if [[ -z "$esp_root" ]]; then
+        log "No EFI partition found under /boot/efi, /efi, or /boot; skipping."
+        mark_done
+        exit 0
+    fi
 
-tblue_key_path=""
-if [[ -f /usr/share/tblue-secureboot/secureboot.der ]]; then
-    tblue_key_path="/usr/share/tblue-secureboot/secureboot.der"
-elif command -v openssl >/dev/null 2>&1; then
-    for pem_source in /usr/share/tblue-secureboot/secureboot.pem /usr/share/tblue-secureboot/secureboot.crt; do
-        if [[ -f "$pem_source" ]]; then
-            mkdir -p /var/lib/tblue
-            generated_key="/var/lib/tblue/secureboot.der"
-            if openssl x509 -in "$pem_source" -outform DER -out "$generated_key" >/dev/null 2>&1; then
-                tblue_key_path="$generated_key"
-                break
+    mkdir -p "$esp_root/EFI"
+
+    # Resolve shim package file paths
+    local shim_src shim_vendor_src fbx_src
+    shim_src="$(rpm -ql shim-x64 2>/dev/null | grep -E '/shimx64\.efi$' | head -n1 || true)"
+    shim_vendor_src="$(rpm -ql shim-x64 2>/dev/null | grep -E '/shim\.efi$' | head -n1 || true)"
+    fbx_src="$(rpm -ql shim-x64 2>/dev/null | grep -E '/fbx64\.efi$' | head -n1 || true)"
+
+    # Copy shim binaries to ESP
+    if [[ -n "$shim_src" && -n "$fbx_src" && -f "$shim_src" && -f "$fbx_src" ]]; then
+        mkdir -p "$esp_root/EFI/BOOT"
+        mkdir -p "$esp_root/EFI/fedora"
+        copy_if_needed "$shim_src" "$esp_root/EFI/BOOT/BOOTX64.EFI"
+        copy_if_needed "$fbx_src" "$esp_root/EFI/BOOT/fbx64.efi"
+        copy_if_needed "$shim_src" "$esp_root/EFI/fedora/shimx64.efi"
+        if [[ -n "$shim_vendor_src" && -f "$shim_vendor_src" ]]; then
+            copy_if_needed "$shim_vendor_src" "$esp_root/EFI/fedora/shim.efi"
+        fi
+        log "Updated EFI shim binaries for BOOT and fedora paths."
+    else
+        log "Could not find shim sources from shim-x64 package."
+    fi
+
+    # Run bootupctl to validate/adopt boot entries
+    if command -v bootupctl >/dev/null 2>&1; then
+        bootupctl update || true
+        bootupctl adopt-and-update || true
+        bootupctl validate || true
+    fi
+
+    # Collect MOK key paths to check/enroll
+    local key_paths=()
+
+    # Try to find or generate the TBlue key in DER format
+    local tblue_key_path=""
+    if [[ -f /usr/share/tblue-secureboot/secureboot.der ]]; then
+        tblue_key_path="/usr/share/tblue-secureboot/secureboot.der"
+    elif command -v openssl >/dev/null 2>&1; then
+        local pem_source
+        for pem_source in /usr/share/tblue-secureboot/secureboot.pem /usr/share/tblue-secureboot/secureboot.crt; do
+            if [[ -f "$pem_source" ]]; then
+                mkdir -p /var/lib/tblue
+                local generated_key="/var/lib/tblue/secureboot.der"
+                if openssl x509 -in "$pem_source" -outform DER -out "$generated_key" >/dev/null 2>&1; then
+                    tblue_key_path="$generated_key"
+                    break
+                fi
             fi
-        fi
-    done
-fi
+        done
+    fi
 
-if [[ -n "$tblue_key_path" && -f "$tblue_key_path" ]]; then
-    key_paths+=("$tblue_key_path")
-fi
+    if [[ -n "$tblue_key_path" && -f "$tblue_key_path" ]]; then
+        key_paths+=("$tblue_key_path")
+    fi
 
-if [[ -f /usr/share/ublue-os/sb_pubkey.der ]]; then
-    key_paths+=("/usr/share/ublue-os/sb_pubkey.der")
-fi
+    # Also check for ublue-os key
+    if [[ -f /usr/share/ublue-os/sb_pubkey.der ]]; then
+        key_paths+=("/usr/share/ublue-os/sb_pubkey.der")
+    fi
 
-if command -v mokutil >/dev/null 2>&1 && [[ ${#key_paths[@]} -gt 0 ]]; then
-    for key_path in "${key_paths[@]}"; do
-        if mokutil --test-key "$key_path" >/dev/null 2>&1; then
-            log "Secure Boot MOK key already enrolled: $key_path"
-        else
-            log "MOK key is not enrolled. Import requires an interactive password, skipping automatic import."
-            log "Run manually: sudo mokutil --import $key_path"
-        fi
-    done
-elif command -v mokutil >/dev/null 2>&1; then
-    log "No usable Secure Boot certificates found at /usr/share/tblue-secureboot or /usr/share/ublue-os; skipping MOK key check."
-fi
+    # Check/enroll keys with mokutil
+    if command -v mokutil >/dev/null 2>&1 && [[ ${#key_paths[@]} -gt 0 ]]; then
+        local key_path
+        for key_path in "${key_paths[@]}"; do
+            if mokutil --test-key "$key_path" >/dev/null 2>&1; then
+                log "Secure Boot MOK key already enrolled: $key_path"
+            else
+                log "MOK key is not enrolled. Import requires an interactive password, skipping automatic import."
+                log "Run manually: sudo mokutil --import $key_path"
+            fi
+        done
+    elif command -v mokutil >/dev/null 2>&1; then
+        log "No usable Secure Boot certificates found at /usr/share/tblue-secureboot or /usr/share/ublue-os; skipping MOK key check."
+    fi
 
-mark_done
-log "Completed."
+    mark_done
+    log "Completed."
+}
+
+main "$@"

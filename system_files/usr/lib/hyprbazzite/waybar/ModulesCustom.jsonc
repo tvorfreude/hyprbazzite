@@ -43,7 +43,7 @@
 	},
 	"custom/headset-battery": {
 		"format": "󰠇 {}%",
-		"exec": "/usr/lib/hyprbazzite/etc/hypr/scripts/logibattery.sh",
+		"exec": "/usr/lib/hyprbazzite/hypr/scripts/logibattery.sh",
 		"interval": 5,
 		"on-click": "solaar",
 		"return-type": "integer"

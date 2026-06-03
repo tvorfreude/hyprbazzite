@@ -1,16 +1,14 @@
-
 [Unit]
 Description=TBlue Hibernate first-boot provisioning
 After=local-fs.target
 DefaultDependencies=no
 
 [Service]
-Type=simple
+Type=oneshot
 ExecStart=/usr/libexec/tblue-hibernate-setup
 RemainAfterExit=yes
 Nice=19
-CPUSchedulingPolicy=idle
-TimeoutSec=0
+IOSchedulingClass=idle
 StandardOutput=journal
 StandardError=journal
 

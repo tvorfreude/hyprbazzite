@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# bazzite-flatpak-hijack.sh - Custom Flatpak provisioning script
+#
+# Removes existing Flatpaks (optional with -d flag), installs a curated list
+# of applications, and applies system-wide Flatpak overrides for fonts, themes,
+# Wayland, and device access.
+set -euo pipefail
 
 # --- HIJACKED INSTALLER LOGIC START ---
 echo "[HIJACK] Running custom Flatpak installer logic (Injected)..."

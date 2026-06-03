@@ -2,15 +2,14 @@
 set -euo pipefail
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
-THEME="$CONFIG_DIR/rofi/config.rasi"
-MSG='Configuration'
+WOFI_CONFIG="$CONFIG_DIR/wofi/config"
 
 gtk_mode=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)
 mode_label="(light mode)"
 [[ "$gtk_mode" == "'prefer-dark'" ]] && mode_label="(dark mode)"
 
 options="Choose Kitty Terminal Theme\nGTK Settings (nwg-look)\nQT Apps Settings (qt6ct)\nQT Apps Settings (qt5ct)\nSwitch Dark-Light Theme $mode_label"
-choice=$(echo -e "$options" | rofi -i -dmenu -config "$THEME" -mesg "$MSG")
+choice=$(echo -e "$options" | wofi -i -dmenu -config "$WOFI_CONFIG" -p "Configuration")
 
 case "${choice%% *}" in
     "Choose Kitty Terminal Theme")
@@ -20,7 +19,7 @@ case "${choice%% *}" in
             exit 1
         fi
         themes=$(ls "$kitty_theme_dir" | grep '\.conf$' | sed 's/\.conf$//')
-        selected_theme=$(echo "$themes" | rofi -dmenu -p "Kitty Theme" -i -config "$THEME")
+        selected_theme=$(echo "$themes" | wofi -dmenu -p "Kitty Theme" -i -config "$WOFI_CONFIG")
         if [ -n "$selected_theme" ]; then
             sed -i "/^include themes\//d" "$CONFIG_DIR/kitty/kitty.conf"
             echo "include themes/$selected_theme.conf" >> "$CONFIG_DIR/kitty/kitty.conf"

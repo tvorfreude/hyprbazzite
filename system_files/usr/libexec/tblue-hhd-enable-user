@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
+# tblue-hhd-enable-user - Enable hybrid hibernate/swap service for the first regular user
+#
+# This one-shot script finds the first non-root user and enables the hhd@.service
+# for them. It runs once on first boot and marks itself as done.
+
 set -euo pipefail
+
+# -- Helpers ------------------------------------------------------------------
 
 log() {
     echo "[tblue-hhd-enable-user] $*"
@@ -10,23 +17,35 @@ mark_done() {
     touch /var/lib/tblue/hhd-enable-user.done
 }
 
-if ! systemctl list-unit-files 'hhd@.service' >/dev/null 2>&1; then
-    log "hhd@.service not installed; skipping."
-    mark_done
-    exit 0
-fi
+# -- Main ---------------------------------------------------------------------
 
-target_user=$(getent passwd | awk -F: '$3 >= 1000 && $1 != "nobody" && $7 !~ /(nologin|false)$/ {print $1; exit}')
-if [[ -z "${target_user:-}" ]]; then
-    log "No regular user found yet; will retry on next boot."
-    exit 0
-fi
+main() {
+    # Check if hhd@.service template is installed
+    if ! systemctl list-unit-files 'hhd@.service' >/dev/null 2>&1; then
+        log "hhd@.service not installed; skipping."
+        mark_done
+        exit 0
+    fi
 
-if systemctl enable --now "hhd@${target_user}.service"; then
-    log "Enabled hhd@${target_user}.service"
-    mark_done
-    exit 0
-fi
+    # Find the first regular (non-root) user
+    local target_user
+    target_user=$(getent passwd \
+        | awk -F: '\$3 >= 1000 && \$1 != "nobody" && \$7 !~ /(nologin|false)$/ {print \$1; exit}')
 
-log "Failed enabling hhd@${target_user}.service"
-exit 1
+    if [[ -z "${target_user:-}" ]]; then
+        log "No regular user found yet; will retry on next boot."
+        exit 0
+    fi
+
+    # Enable and start the hhd service for the user
+    if systemctl enable --now "hhd@${target_user}.service"; then
+        log "Enabled hhd@${target_user}.service"
+        mark_done
+        exit 0
+    fi
+
+    log "Failed enabling hhd@${target_user}.service"
+    exit 1
+}
+
+main "$@"

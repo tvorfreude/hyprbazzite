@@ -5,7 +5,7 @@ set -euo pipefail
 RUNNER="wofi"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}"
 ROFI_THEME="$CONFIG_DIR/rofi/config-tritonctl.rasi"
-SCRIPTS_DIR="/usr/lib/hyprbazzite/etc/hypr/scripts"
+SCRIPTS_DIR="/usr/lib/hyprbazzite/hypr/scripts"
 
 # --- Help Function ---
 show_help() {

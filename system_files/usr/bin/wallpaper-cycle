@@ -1,53 +1,82 @@
-#!/bin/bash
-# Directory containing wallpapers
-DIR="/usr/share/backgrounds/gif_wallpapers"
+#!/usr/bin/env bash
+# wallpaper-cycle - Cycle through GIF wallpapers using swww
+#
+# This script sets a random GIF wallpaper from the configured directory,
+# cycles it at regular intervals, and responds to monitor hotplug events.
 
-# Transition config
-TRANSITION="--transition-type grow --transition-pos 0.5,0.5 --transition-fps 30 --transition-step 90 --transition-duration 2"
+set -euo pipefail
 
-# Function to cycle wallpaper
+# -- Configuration -----------------------------------------------------------
+readonly DIR="/usr/share/backgrounds/gif_wallpapers"
+readonly TRANSITION_TYPE="grow"
+readonly TRANSITION_POS="0.5,0.5"
+readonly TRANSITION_FPS=30
+readonly TRANSITION_STEP=90
+readonly TRANSITION_DURATION=2
+readonly CYCLE_INTERVAL=900  # seconds (15 minutes)
+
+# -- Helpers ------------------------------------------------------------------
+
 cycle_now() {
     # Re-scan directory (in case files change)
-    if [ -d "$DIR" ]; then
-        FILES=("$DIR"/*.gif)
-        # Check if dir is not empty
-        if [ ${#FILES[@]} -gt 0 ] && [ -e "${FILES[0]}" ]; then
-            WALLPAPER="${FILES[RANDOM % ${#FILES[@]}]}"
-            if [ -f "$WALLPAPER" ]; then
-                swww img "$WALLPAPER" $TRANSITION --resize crop --filter Nearest
-            fi
-        fi
+    if [[ ! -d "$DIR" ]]; then
+        return 1
+    fi
+
+    local files=("$DIR"/*.gif)
+    # Check if directory is not empty
+    if [[ ${#files[@]} -eq 0 || ! -e "${files[0]}" ]]; then
+        return 1
+    fi
+
+    local wallpaper="${files[RANDOM % ${#files[@]}]}"
+    if [[ -f "$wallpaper" ]]; then
+        swww img \
+            --transition-type "$TRANSITION_TYPE" \
+            --transition-pos "$TRANSITION_POS" \
+            --transition-fps "$TRANSITION_FPS" \
+            --transition-step "$TRANSITION_STEP" \
+            --transition-duration "$TRANSITION_DURATION" \
+            --resize crop \
+            --filter Nearest \
+            "$wallpaper"
     fi
 }
 
-# Trap USR1 signal for manual cycle
-trap 'cycle_now' USR1
+# -- Monitor hotplug listener ------------------------------------------------
 
-# Function to listen for monitor hotplug events and trigger cycle_now
 monitor_hotplug() {
-        udevadm monitor --udev --subsystem-match=drm | \
-        while read -r line; do
-                if echo "$line" | grep -q 'change'; then
-                        cycle_now
-                fi
-        done
+    udevadm monitor --udev --subsystem-match=drm | \
+    while read -r line; do
+        if echo "$line" | grep -q 'change'; then
+            cycle_now || true
+        fi
+    done
 }
 
-# Initial delay to ensure daemon is ready config
-sleep 2
-cycle_now
+# -- Main ---------------------------------------------------------------------
 
-# Start monitor hotplug listener in background
-monitor_hotplug &
-HOTPLUG_PID=$!
+main() {
+    # Trap USR1 signal for manual cycle
+    trap cycle_now USR1
 
-# Infinite loop with interruptible sleep
-while true; do
-    # Sleep in background so 'wait' can be interrupted by trap
-    sleep 900 &
-    wait $!
-    cycle_now
-done
+    # Initial delay to ensure swww daemon is ready
+    sleep 2
+    cycle_now || true
 
-# Cleanup hotplug listener on exit
-trap "kill $HOTPLUG_PID 2>/dev/null" EXIT
+    # Start monitor hotplug listener in background
+    monitor_hotplug &
+    readonly hotplug_pid=$!
+
+    # Cleanup hotplug listener on exit
+    trap "kill $hotplug_pid 2>/dev/null" EXIT
+
+    # Infinite loop with interruptible sleep
+    while true; do
+        sleep "$CYCLE_INTERVAL" &
+        wait $!
+        cycle_now || true
+    done
+}
+
+main "$@"

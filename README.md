@@ -30,7 +30,7 @@ sudo bootc switch ghcr.io/tvorfreude/hyprbazzite:latest
 ## 🛠 Customization
 
 ### Configuration
-System-wide configurations are located in `/usr/lib/hyprbazzite/etc/`. User-specific skeletons are provided in `/etc/skel/`.
+System-wide configurations are located in `/usr/lib/hyprbazzite/`. User-specific skeletons are provided in `/etc/skel/`.
 
 ### Build System
 This image is built using GitHub Actions. The versioning scheme follows a `(tag.YYYYMMDD-SHA)` format, visible in your `PRETTY_NAME` within `/usr/lib/os-release`.

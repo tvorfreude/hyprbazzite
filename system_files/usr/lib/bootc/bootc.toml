@@ -9,5 +9,6 @@ minsize = "20 GiB"
 type = "xfs"
 
 [[customizations.filesystem]]
+mountpoint = "none"
 minsize = "8 GiB"
 type = "swap"

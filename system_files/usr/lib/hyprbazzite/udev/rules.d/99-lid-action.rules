@@ -1,0 +1,3 @@
+# Rule to trigger lid action script on lid change
+# This rule triggers whenever the lid switch state changes
+ACTION=="change", SUBSYSTEM=="button", KERNEL=="lid*", RUN+="/usr/lib/hyprbazzite/hypr/scripts/lidact.sh %s"

@@ -1,74 +1,95 @@
-
-
 #!/usr/bin/env bash
+# tblue-hibernate-setup - Configure hybrid sleep/hibernation for btrfs swapfiles
+#
+# Sets up resume kernel parameters, configures systemd sleep settings,
+# and disables unnecessary wakeup sources.
+
 set -euo pipefail
 
-SWAPFILE_PATH="/var/swap/swapfile"
-log() { echo "[tblue-hybrid-sleep] $*" >&2; }
+# -- Configuration -----------------------------------------------------------
+readonly SWAPFILE_PATH="/var/swap/swapfile"
 
-# 1. Ensure swapfile exists and is in fstab
-if [[ ! -f "$SWAPFILE_PATH" ]]; then
-    log "Error: swapfile $SWAPFILE_PATH does not exist. Please create it first."
-    exit 1
-fi
-if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
-    echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
-fi
+# -- Helpers ------------------------------------------------------------------
 
-# 2. Get the decrypted device path and physical offset
-dec_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
-if [[ -z "$dec_uuid" ]]; then
-    log "Error: Could not determine Decrypted UUID"
-    exit 1
-fi
-offset=$(btrfs inspect-internal map-swapfile -r "$SWAPFILE_PATH" | head -n1)
-if [[ -z "$offset" ]]; then
-    log "Error: Could not determine swapfile offset"
-    exit 1
-fi
+log() {
+    echo "[tblue-hibernate-setup] $*" >&2
+}
 
-log "Setting resume=UUID=$dec_uuid and resume_offset=$offset for hybrid sleep."
+configure_sleep_setting() {
+    local key="$1"
+    local value="$2"
+    local config="/etc/systemd/sleep.conf"
 
-# 3. Set kernel arguments for hybrid sleep
-rpm-ostree kargs \
-    --replace="resume=UUID=$dec_uuid" \
-    --replace="resume_offset=$offset" \
-    --append-if-missing="rootwait" \
-    --append-if-missing="resume_delay=5"
+    if grep -q "^${key}" "$config" 2>/dev/null; then
+        sed -i "s/^${key}.*/${key}=${value}/" "$config"
+    else
+        echo "${key}=${value}" >> "$config"
+    fi
+}
 
-# 4. Enable hybrid sleep, disable hibernation
-if grep -q "^AllowSuspend" /etc/systemd/sleep.conf; then
-    sed -i 's/^AllowSuspend.*/AllowSuspend=yes/' /etc/systemd/sleep.conf
-else
-    echo "AllowSuspend=yes" >> /etc/systemd/sleep.conf
-fi
-if grep -q "^AllowHibernation" /etc/systemd/sleep.conf; then
-    sed -i 's/^AllowHibernation.*/AllowHibernation=no/' /etc/systemd/sleep.conf
-else
-    echo "AllowHibernation=no" >> /etc/systemd/sleep.conf
-fi
-if grep -q "^AllowSuspendThenHibernate" /etc/systemd/sleep.conf; then
-    sed -i 's/^AllowSuspendThenHibernate.*/AllowSuspendThenHibernate=yes/' /etc/systemd/sleep.conf
-else
-    echo "AllowSuspendThenHibernate=yes" >> /etc/systemd/sleep.conf
-fi
+# -- Main ---------------------------------------------------------------------
 
-log "Hybrid sleep setup complete."
+main() {
+    # 1. Ensure swapfile exists and is in fstab
+    if [[ ! -f "$SWAPFILE_PATH" ]]; then
+        log "Error: swapfile $SWAPFILE_PATH does not exist. Please create it first."
+        exit 1
+    fi
 
-# 5. Disable all wakeup sources except the power button
-log "Disabling all wakeup sources except the power button."
-if [[ -f /proc/acpi/wakeup ]]; then
-    # Get the power button device (usually PBTN or PWRB)
-    power_btns=$(awk '/PBTN|PWRB/ {print $1}' /proc/acpi/wakeup)
-    # Disable all other wakeup devices
-    grep enabled /proc/acpi/wakeup | awk '{print $1}' | while read dev; do
-        if ! echo "$power_btns" | grep -q "$dev"; then
-            echo "$dev" > /proc/acpi/wakeup
-            log "Disabled wakeup for $dev"
-        fi
-    done
-    log "Wakeup sources after filtering:"
-    cat /proc/acpi/wakeup >&2
-else
-    log "/proc/acpi/wakeup not found; skipping wakeup source filtering."
-fi
+    if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
+        echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
+        log "Added swapfile to /etc/fstab"
+    fi
+
+    # 2. Get the decrypted device UUID and swapfile offset
+    local dec_uuid
+    dec_uuid=$(findmnt -no UUID -T "$SWAPFILE_PATH")
+    if [[ -z "$dec_uuid" ]]; then
+        log "Error: Could not determine Decrypted UUID"
+        exit 1
+    fi
+
+    local offset
+    offset=$(btrfs inspect-internal map-swapfile -r "$SWAPFILE_PATH" | head -n1)
+    if [[ -z "$offset" ]]; then
+        log "Error: Could not determine swapfile offset"
+        exit 1
+    fi
+
+    log "Setting resume=UUID=$dec_uuid and resume_offset=$offset for hybrid sleep."
+
+    # 3. Set kernel arguments for resume
+    rpm-ostree kargs \
+        --replace="resume=UUID=$dec_uuid" \
+        --replace="resume_offset=$offset" \
+        --append-if-missing="rootwait" \
+        --append-if-missing="resume_delay=5"
+
+    # 4. Configure systemd sleep settings
+    configure_sleep_setting "AllowSuspend" "yes"
+    configure_sleep_setting "AllowHibernation" "no"
+    configure_sleep_setting "AllowSuspendThenHibernate" "yes"
+
+    log "Hybrid sleep setup complete."
+
+    # 5. Disable all wakeup sources except the power button
+    log "Disabling all wakeup sources except the power button."
+    if [[ -f /proc/acpi/wakeup ]]; then
+        # Get the power button device (usually PBTN or PWRB)
+        local power_btns
+        power_btns=$(awk '/PBTN|PWRB/ {print $1}' /proc/acpi/wakeup)
+        # Disable all other wakeup devices
+        grep enabled /proc/acpi/wakeup | awk '{print $1}' | while read -r dev; do
+            if ! echo "$power_btns" | grep -q "$dev"; then
+                echo "$dev" > /proc/acpi/wakeup
+                log "Disabled wakeup for $dev"
+            fi
+        done
+        log "Wakeup sources after filtering:"
+        cat /proc/acpi/wakeup >&2
+    else
+        log "/proc/acpi/wakeup not found; skipping wakeup source filtering."
+    fi
+}
+
+main "$@"
