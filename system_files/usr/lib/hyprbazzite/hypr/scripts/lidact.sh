@@ -44,10 +44,10 @@ fi
 
 # 7. Execute the power command using hyprctl dpms dispatch
 if [ "$ACTION" == "on" ]; then
-    hyprctl dispatch "hl.dsp.dpms({monitor = '$LAPTOP_MONITOR'})"
+    hyprctl dispatch "hl.dsp.dpms({action = 'on', monitor = '$LAPTOP_MONITOR'})"
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    hyprctl dispatch "hl.dsp.dpms({monitor = '$LAPTOP_MONITOR'})"
+    hyprctl dispatch "hl.dsp.dpms({action = 'off', monitor = '$LAPTOP_MONITOR'})"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"

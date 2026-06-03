@@ -48,3 +48,5 @@ This project is licensed under the **Apache License 2.0**. See the [LICENSE](LIC
 
 ---
 *Built with ❤️ using the Universal Blue image template.*
+
+Thanks (JaKooLit)[https://github.com/JaKooLit]
