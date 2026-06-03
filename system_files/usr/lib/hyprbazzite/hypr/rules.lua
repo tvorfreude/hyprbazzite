@@ -1,4 +1,8 @@
--- Global Rules
+-- ==========================================
+-- GLOBAL RULES
+-- ==========================================
+
+-- Default window behavior: suppress maximize event, set opacity
 hl.window_rule({
     match = { class = ".*" },
     suppress_event = "maximize",
@@ -7,7 +11,7 @@ hl.window_rule({
 
 -- Fix for ghost/XWayland focus issues
 hl.window_rule({
-    match = { 
+    match = {
         class = "^$",
         title = "^$",
         xwayland = true,
@@ -18,23 +22,32 @@ hl.window_rule({
     no_focus = true
 })
 
--- Browsers & Chromium
+-- ==========================================
+-- BROWSERS & CHROMIUM
+-- ==========================================
+
 hl.window_rule({ match = { class = "Chromium" }, tile = true })
 hl.window_rule({
-    match = { class = "^(Chromium|chromium|google-chrome|google-chrome-unstable|zen-browser)$" },
+    match = { class = "^(Chromium|chromium|google-chrome|google-chrome-unstable|zen-browser|Brave|firefox)$" },
     opacity = "1 0.97"
 })
 hl.window_rule({ match = { initial_title = "youtube.com_/" }, opacity = "1 1" })
 
+-- ==========================================
+-- DEVELOPMENT & COMMUNICATION
+-- ==========================================
+
 hl.window_rule({
-    match = { class = "^(code-url-handler|vscode|cursor|Slack|discord|WebCord|spotify)$" },
+    match = { class = "^(code-url-handler|vscode|code|cursor|Slack|discord|webcord|spotify|neovide)$" },
     opacity = "1 1",
     tile = true
 })
 
+-- ==========================================
+-- PICTURE-IN-PICTURE (PiP)
+-- ==========================================
 
--- Picture-in-Picture (PiP) Logic
-hl.window_rule({ 
+hl.window_rule({
     match = { title = "^Picture[- ]in[- ][Pp]icture$" },
     tag = "+pip"
 })
@@ -48,7 +61,10 @@ hl.window_rule({
     move = { "100%-w-40", "4%" }
 })
 
--- Gaming & RetroArch
+-- ==========================================
+-- GAMING
+-- ==========================================
+
 hl.window_rule({
     match = { class = "com.libretro.RetroArch" },
     fullscreen = true,
@@ -75,14 +91,24 @@ hl.window_rule({
     center = true
 })
 
+-- Lutris (gaming platform)
+hl.window_rule({
+    match = { class = "lutris" },
+    opacity = "1 1"
+})
+hl.window_rule({
+    match = { class = "lutris", title = "^(Lutris)$" },
+    float = false,
+    tile = true
+})
 
 -- ==========================================
 -- UTILITIES, DIALOGS & PORTALS
 -- ==========================================
 
--- Handheld / System Utilities
+-- System Utilities
 hl.window_rule({
-    match = { class = "^(pavucontrol|blueman-manager|nm-connection-editor|galculator)$" },
+    match = { class = "^(pavucontrol|blueman-manager|nm-connection-editor|galculator|btop|GParted)$" },
     float = true,
     center = true
 })
@@ -103,9 +129,9 @@ hl.window_rule({
 
 -- Polkit Authentication Agents
 hl.window_rule({
-    match = { 
+    match = {
         class = "^(polkit-gnome-authentication-agent-1|lxqt-policykit-agent|lxpolkit|org.kde.polkit-kde-authentication-agent-1)$",
-        title = "^(Authentication Required)$" 
+        title = "^(Authentication Required)$"
     },
     float = true,
     center = true,
@@ -113,7 +139,18 @@ hl.window_rule({
     stay_focused = true
 })
 
--- Media & Fullscreen Overrides
+-- Bitwarden (password manager)
+hl.window_rule({
+    match = { class = "com.bitwarden.desktop" },
+    float = true,
+    center = true,
+    size = { 600, 500 }
+})
+
+-- ==========================================
+-- MEDIA & FULLSCREEN OVERRIDES
+-- ==========================================
+
 hl.window_rule({ match = { class = "Screensaver" }, fullscreen = true })
 hl.window_rule({
     match = { class = "^(zoom|vlc|mpv|org.kde.kdenlive|com.obsproject.Studio|com.github.PintaProject.Pinta|imv|org.gnome.NautilusPreviewer)$" },
@@ -124,7 +161,10 @@ hl.window_rule({
     opacity = "1.0 override 1.0 override"
 })
 
--- Special Workspaces (Scratchpads)
+-- ==========================================
+-- SPECIAL WORKSPACES (SCRATCHPADS)
+-- ==========================================
+
 hl.window_rule({
     match = { class = "scratchpad" },
     workspace = "special:scratchpad",
@@ -133,7 +173,10 @@ hl.window_rule({
     center = true
 })
 
--- Layer Rules
+-- ==========================================
+-- LAYER RULES
+-- ==========================================
+
 hl.layer_rule({ match = { namespace = "selection" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "swaync-control-center" }, blur = true })
 hl.layer_rule({ match = { namespace = "swaync-notification-window" }, blur = false })

@@ -93,3 +93,21 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 hl.bind("switch:on:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh off"), { locked = true })
 hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh on"), { locked = true })
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh toggle"), { locked = true })
+
+-- ==========================================
+-- SWIPE GESTURES (workspace navigation)
+-- ==========================================
+
+-- 3-finger swipe left/right to switch workspaces
+hl.gesture({
+    type = "swipe",
+    fingers = 3,
+    direction = "left",
+    on_swipe = hl.dsp.focus({ workspace = "e+1" })
+})
+hl.gesture({
+    type = "swipe",
+    fingers = 3,
+    direction = "right",
+    on_swipe = hl.dsp.focus({ workspace = "e-1" })
+})

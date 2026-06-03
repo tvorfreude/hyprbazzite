@@ -22,13 +22,15 @@
 		"idle_inhibitor",
 		"tray",
 		"clock",
-		"hyprland/window"
+		"hyprland/window",
+		"custom/separator#dot-line",
+		"hyprland/taskbar"
 	],
 	"modules-center": [
 		"group/app_drawer",
 		"custom/keyboard",
 		"custom/separator#dot-line",
-		"hyprland/workspaces#rw"
+		"hyprland/workspaces"
 	],
 	"modules-right": [
 		"group/laptop",

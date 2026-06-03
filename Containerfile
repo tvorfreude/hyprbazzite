@@ -79,7 +79,7 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install --skip-unavailable \
     # Hyprland core
-    hyprland hyprland-guiutils hyprlock hypridle hyprpaper uwsm hyprland-uwsm \
+    hyprland hyprland-guiutils hyprlock swayidle hyprpaper uwsm hyprland-uwsm \
     # Desktop utilities
     swww waybar SwayNotificationCenter wofi wvkbd hhd adjustor hhd-ui lact \
     # Shell and CLI tools
