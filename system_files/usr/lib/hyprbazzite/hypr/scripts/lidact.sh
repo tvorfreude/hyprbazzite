@@ -47,7 +47,7 @@ if [ "$ACTION" == "on" ]; then
     hyprctl reload
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    hyprctl eval "hl.monitor({ output = 'HDMI-A-1', disabled = true })"
+    hyprctl eval "hl.monitor({ output = '$LAPTOP_MONITOR', disabled = true })"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
