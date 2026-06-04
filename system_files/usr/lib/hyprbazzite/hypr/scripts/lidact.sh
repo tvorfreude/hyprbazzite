@@ -25,7 +25,7 @@ if [ -z "$LAPTOP_MONITOR" ]; then
 fi
 
 # 5. Check the current monitor state using the hyprctl active list
-if hyprctl monitors | grep -q "Monitor $LAPTOP_MONITOR"; then
+if hyprctl -j monitors | jq -e ".[] | select(.name == \"$LAPTOP_MONITOR\")" > /dev/null; then
     CURRENT_STATE="on"
 else
     CURRENT_STATE="off"
@@ -42,12 +42,12 @@ if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     fi
 fi
 
-# 7. Execute the power command using hyprctl dpms dispatch
+# use the disable and reload functionality
 if [ "$ACTION" == "on" ]; then
-    hyprctl dispatch "hl.dsp.dpms({action = 'on', monitor = '$LAPTOP_MONITOR'})"
+    hyprctl reload
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    hyprctl dispatch "hl.dsp.dpms({action = 'off', monitor = '$LAPTOP_MONITOR'})"
+    hyprctl eval "hl.monitor({ output = 'HDMI-A-1', disabled = true })"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
