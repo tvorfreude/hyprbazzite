@@ -63,7 +63,7 @@ jobs:
 
       # These stage versions are pinned by https://github.com/renovatebot/renovate
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           # Check out the PR branch when triggered via comment; default ref otherwise
           ref: ${{ github.event_name == 'issue_comment' && steps.pr_ref.outputs.ref || github.ref }}
