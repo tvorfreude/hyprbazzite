@@ -7,33 +7,27 @@
 # ---------------------------------------------------------------------------
 FROM fedora:latest AS assets
 
+ARG NERD_FONTS_VERSION=v3.4.0
+
 # Install download utilities
 RUN dnf5 -y install curl unzip && \
     dnf5 -y clean all
 
-# JetBrains Mono Nerd Font
-RUN curl -fsSL -o /tmp/jb-mono.zip \
-    https://github.com/ryanoasis/nerd-fonts/releases/download/v3.0.2/JetBrainsMono.zip && \
+# Download all external assets in one layer
+RUN mkdir -p /fonts /themes/Dracula /qt5ct/colors && \
+    # JetBrains Mono Nerd Font
+    curl -fsSL -o /tmp/jb-mono.zip \
+      "https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONTS_VERSION}/JetBrainsMono.zip" && \
     unzip -o /tmp/jb-mono.zip -d /fonts/ && \
-    rm -f /tmp/jb-mono.zip
-
-# Dracula GTK Theme
-RUN mkdir -p /themes/Dracula && \
+    # Dracula GTK Theme
     curl -fsSL -L https://github.com/dracula/gtk/archive/master.zip -o /tmp/dracula-gtk.zip && \
     unzip -q /tmp/dracula-gtk.zip -d /tmp && \
     mv /tmp/gtk-master/* /themes/Dracula/ && \
-    rm -rf /tmp/dracula-gtk.zip /tmp/gtk-master
-
-# Dracula Qt5 Color Scheme
-RUN mkdir -p /qt5ct/colors && \
+    # Dracula Qt5 Color Scheme
     curl -fsSL -o /qt5ct/colors/Dracula.conf \
-    https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf
-
-# ---------------------------------------------------------------------------
-# Stage 2: Build context (for reference, not copied into final image)
-# ---------------------------------------------------------------------------
-FROM scratch AS ctx
-COPY build_files /
+      https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf && \
+    # Cleanup
+    rm -rf /tmp/*
 
 # ===========================================================================
 # Stage 3: Final Image
@@ -56,11 +50,9 @@ RUN build_id="${BUILD_STAMP:-stable.$(date -u +%Y%m%d)-${SHA_HEAD_SHORT:-unknown
 # Step 2: Enable COPR repositories
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,dst=/var/cache \
-    dnf5 -y copr enable sdegler/hyprland && \
-    dnf5 -y copr enable erikreider/SwayNotificationCenter && \
-    dnf5 -y copr enable fed500/wvkbd && \
-    dnf5 -y copr enable hhd-dev/hhd && \
-    dnf5 -y copr enable atim/starship && \
+    for repo in sdegler/hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship; do \
+      dnf5 -y copr enable "$repo"; \
+    done && \
     dnf5 -y clean all
 
 # ---------------------------------------------------------------------------
@@ -124,8 +116,9 @@ RUN sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/n
 RUN mkdir -p /usr/share/hyprbazzite/config && \
     cp -af /usr/lib/hyprbazzite/skel/.config/. /usr/share/hyprbazzite/config/ && \
     mkdir -p /etc/skel/.config && \
-    for dir in $(ls /usr/share/hyprbazzite/config/); do \
-        ln -sf /usr/share/hyprbazzite/config/$dir /etc/skel/.config/$dir; \
+    for dir in /usr/share/hyprbazzite/config/*/; do \
+        dirname=$(basename "$dir"); \
+        ln -sf "/usr/share/hyprbazzite/config/$dirname" "/etc/skel/.config/$dirname"; \
     done
 
 # ---------------------------------------------------------------------------
@@ -133,7 +126,7 @@ RUN mkdir -p /usr/share/hyprbazzite/config && \
 # ---------------------------------------------------------------------------
 RUN chmod +x /usr/bin/wallpaper-cycle && \
     # Ensure all libexec scripts are executable
-    find /usr/libexec/ -type f -exec chmod +x {} + && \
+    find /usr/libexec/hyprbazzite/ -type f -exec chmod +x {} + && \
     # Ensure all Hyprland scripts are executable
     find /usr/lib/hyprbazzite/hypr/scripts/ -type f -exec chmod +x {} +
 
