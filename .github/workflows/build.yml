@@ -184,5 +184,8 @@ jobs:
       
       - name: Sign Images
         if: github.event_name != 'pull_request'
+        env:
+          COSIGN_REGISTRY_USERNAME: ${{ github.actor }}
+          COSIGN_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cosign sign --yes "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
