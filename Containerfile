@@ -13,21 +13,20 @@ ARG NERD_FONTS_VERSION=v3.4.0
 RUN dnf5 -y install curl unzip && \
     dnf5 -y clean all
 
-# Download all external assets in one layer
-RUN mkdir -p /fonts /themes/Dracula /qt5ct/colors && \
-    # JetBrains Mono Nerd Font
-    curl -fsSL -o /tmp/jb-mono.zip \
-      "https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONTS_VERSION}/JetBrainsMono.zip" && \
+RUN curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o /tmp/jb-mono.zip \
+    "https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONTS_VERSION}/JetBrainsMono.zip" && \
     unzip -o /tmp/jb-mono.zip -d /fonts/ && \
-    # Dracula GTK Theme
-    curl -fsSL -L https://github.com/dracula/gtk/archive/master.zip -o /tmp/dracula-gtk.zip && \
+    rm -f /tmp/jb-mono.zip
+
+RUN curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -L \
+    https://github.com/dracula/gtk/archive/master.zip -o /tmp/dracula-gtk.zip && \
     unzip -q /tmp/dracula-gtk.zip -d /tmp && \
-    mv /tmp/gtk-master/* /themes/Dracula/ && \
-    # Dracula Qt5 Color Scheme
-    curl -fsSL -o /qt5ct/colors/Dracula.conf \
-      https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf && \
-    # Cleanup
-    rm -rf /tmp/*
+    mkdir -p /themes/Dracula && mv /tmp/gtk-master/* /themes/Dracula/ && \
+    rm -rf /tmp/dracula-gtk.zip /tmp/gtk-master
+
+RUN mkdir -p /qt5ct/colors && \
+    curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o /qt5ct/colors/Dracula.conf \
+    https://raw.githubusercontent.com/dracula/qt5/master/Dracula.conf
 
 # ===========================================================================
 # Stage 3: Final Image
