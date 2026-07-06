@@ -125,7 +125,7 @@ RUN mkdir -p /usr/share/hyprbazzite/config && \
 # ---------------------------------------------------------------------------
 RUN chmod +x /usr/bin/wallpaper-cycle && \
     # Ensure all libexec scripts are executable
-    find /usr/libexec/hyprbazzite/ -type f -exec chmod +x {} + && \
+    find /usr/libexec/ -type f -exec chmod +x {} + && \
     # Ensure all Hyprland scripts are executable
     find /usr/lib/hyprbazzite/hypr/scripts/ -type f -exec chmod +x {} +
 
