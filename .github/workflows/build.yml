@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - testing
     paths:
       - 'Containerfile'
       - 'system_files/**'
@@ -13,6 +14,7 @@ on:
   pull_request:
     branches:
       - main
+      - testing
     paths:
       - 'Containerfile'
       - 'system_files/**'
@@ -29,7 +31,7 @@ env:
   DEFAULT_TAG: "latest"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}-${{ inputs.brand_name }}-${{ inputs.stream_name }}
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -40,10 +42,20 @@ jobs:
     outputs:
       base-updated: ${{ steps.check.outputs.updated }}
     steps:
+      - name: Install skopeo
+        run: |
+          if ! command -v skopeo &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y skopeo
+          fi
       - name: Check bazzite:stable for updates
         id: check
         run: |
           BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
+          if [ -z "$BASE_DIGEST" ] || [ "$BASE_DIGEST" = "null" ]; then
+            echo "Failed to fetch base image digest, skipping"
+            echo "updated=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
           echo "Base image digest: $BASE_DIGEST"
           
           if skopeo inspect docker://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest 2>/dev/null | jq -e '.Labels."org.opencontainers.image.base.digest"' > /dev/null; then
@@ -61,6 +73,7 @@ jobs:
             echo "Image doesn't exist yet or no base digest label"
             echo "updated=true" >> $GITHUB_OUTPUT
           fi
+          echo "### Base image check: $(cat $GITHUB_OUTPUT | grep updated | cut -d= -f2)" >> $GITHUB_STEP_SUMMARY
 
   build_push:
     name: Build and push image
@@ -109,23 +122,16 @@ jobs:
         id: vars
         run: echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
-      - name: Generate Signing Keys
-        run: |
-          cosign generate-key-pair
-          # Store private key safely in workspace for the signing step
-          mv cosign.key /tmp/cosign.key
-        env:
-          COSIGN_PASSWORD: ""
-
       - name: Image Metadata
         uses: docker/metadata-action@v6
         id: metadata
         with:
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=stable.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=testing.pr${{ github.event.pull_request.number }}.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name == 'pull_request' }}
-            type=raw,value=testing,enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+            type=raw,value=stable.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+            type=raw,value=testing,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/testing' }}
+            type=raw,value=testing.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/testing' }}
+            type=raw,value=pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
@@ -164,6 +170,7 @@ jobs:
             BUILD_STAMP=${{ steps.metadata.outputs.version }}
             
       - name: Push Image to GHCR
+        if: github.event_name != 'pull_request'
         uses: redhat-actions/push-to-registry@v2
         id: push
         with:
@@ -174,20 +181,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
           extra-args: |
             --disable-content-trust
-
-      - name: Log in to GHCR for Cosign
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u ${{ github.actor }} --password-stdin
       
       - name: Sign Images
         if: github.event_name != 'pull_request'
         run: |
-          cosign sign --yes "ghcr.io/${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-
-      - name: Upload Public Key Artifact
-        if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
-        with:
-          name: cosign.pub
-          path: cosign.pub
-          if-no-files-found: error
-          retention-days: 10
+          cosign sign --yes "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
