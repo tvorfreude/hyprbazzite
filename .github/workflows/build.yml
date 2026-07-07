@@ -228,7 +228,7 @@ jobs:
   cleanup:
     name: Cleanup old package versions
     needs: build_push
-    if: github.event_name != 'pull_request'
+    if: always() && needs.build_push.result == 'success' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     permissions:
       packages: write
