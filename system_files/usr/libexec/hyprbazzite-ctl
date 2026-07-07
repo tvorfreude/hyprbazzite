@@ -283,6 +283,67 @@ lid_handle() {
     esac
 }
 
+# --- Keybinds Module ---
+keybinds_switch() {
+    local action="${1:-}"
+    local profile_file="/etc/hypr/keybind-profile"
+    local keyd_src="/usr/lib/hyprbazzite/keyd/macos.conf"
+    local keyd_dst="/etc/keyd/default.conf"
+    local current="linux"
+
+    if [[ -f "$profile_file" ]]; then
+        current=$(cat "$profile_file" 2>/dev/null | tr -d '[:space:]')
+    fi
+
+    _apply_keyd() {
+        local target_profile="$1"
+        if [[ "$target_profile" == "macos" ]]; then
+            # Enable keyd Super→Ctrl remap
+            if [[ -f "$keyd_src" ]]; then
+                sudo cp "$keyd_src" "$keyd_dst"
+                sudo systemctl restart keyd 2>/dev/null || sudo keyd reload 2>/dev/null || true
+            fi
+        else
+            # Disable keyd remap (empty/default config)
+            sudo rm -f "$keyd_dst"
+            sudo systemctl restart keyd 2>/dev/null || sudo keyd reload 2>/dev/null || true
+        fi
+    }
+
+    case "$action" in
+        macos|linux)
+            echo "$action" > "$profile_file"
+            _apply_keyd "$action"
+            notify "Keybinds" "Switched to ${action} profile. Reloading..."
+            hyprctl reload
+            ;;
+        toggle)
+            if [[ "$current" == "macos" ]]; then
+                echo "linux" > "$profile_file"
+                _apply_keyd "linux"
+                notify "Keybinds" "Switched to linux profile. Reloading..."
+            else
+                echo "macos" > "$profile_file"
+                _apply_keyd "macos"
+                notify "Keybinds" "Switched to macos profile. Reloading..."
+            fi
+            hyprctl reload
+            ;;
+        status|"")
+            echo "Current keybind profile: $current"
+            if [[ -f "$keyd_dst" ]]; then
+                echo "keyd remap: active (Super→Ctrl)"
+            else
+                echo "keyd remap: inactive"
+            fi
+            ;;
+        *)
+            echo "Usage: hyprbazzite-ctl keybinds [macos|linux|toggle|status]"
+            exit 1
+            ;;
+    esac
+}
+
 # --- Main Entry Point ---
 main() {
     if [[ $# -eq 0 ]]; then
@@ -293,6 +354,7 @@ main() {
         echo "  osk toggle"
         echo "  power [profile|menu|shutdown|reboot|suspend|hybrid-sleep|lock|logout]"
         echo "  screenshot [full|area]"
+        echo "  keybinds [macos|linux|toggle|status]"
         echo "  lid [close|open]"
         exit 0
     fi
@@ -332,6 +394,9 @@ main() {
             ;;
         screenshot)
             screenshot_take "${1:-full}"
+            ;;
+        keybinds)
+            keybinds_switch "${1:-}"
             ;;
         lid)
             lid_handle "${1:-}"
