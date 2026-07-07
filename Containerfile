@@ -49,7 +49,7 @@ RUN build_id="${BUILD_STAMP:-stable.$(date -u +%Y%m%d)-${SHA_HEAD_SHORT:-unknown
 # Step 2: Enable COPR repositories
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,dst=/var/cache \
-    for repo in sdegler/hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship; do \
+    for repo in sdegler/hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship alternateved/keyd; do \
       dnf5 -y copr enable "$repo"; \
     done && \
     dnf5 -y clean all
@@ -79,6 +79,8 @@ RUN --mount=type=cache,dst=/var/cache \
     thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 \
     # System utilities
     network-manager-applet pavucontrol xdg-desktop-portal-hyprland lxqt-policykit \
+    # Input remapping (for macOS keybind profile)
+    keyd \
     # Security and encryption
     gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
     # Theming
