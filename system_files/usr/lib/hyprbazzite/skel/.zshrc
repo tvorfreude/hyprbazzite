@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # ===== BASE ENV =====
 export QT_QPA_PLATFORMTHEME=gtk3
 export PATH="$HOME/bin:$HOME/.local/bin:$PATH"
