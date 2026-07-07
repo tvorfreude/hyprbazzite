@@ -56,9 +56,13 @@ jobs:
         with:
           dockerfile: Containerfile
           failure-threshold: warning
-          # Ignore DL3015 (apt-get install missing --no-install-recommends) - not applicable to dnf
-          # Ignore DL3059 (multiple consecutive RUN) - intentional for readability and caching
-          ignore: DL3015,DL3059,DL3033,DL3041
+          # DL3007 - FROM fedora:latest in assets stage is acceptable (not runtime)
+          # DL3015 - --no-install-recommends not applicable to dnf
+          # DL3033 - dnf clean all is handled per-layer
+          # DL3041 - dnf version pinning not practical for COPR packages
+          # DL3059 - multiple consecutive RUN intentional for readability
+          # SC2015 - A && B || C pattern is used safely in cleanup steps
+          ignore: DL3007,DL3015,DL3033,DL3041,DL3059,SC2015
 
   check_base_image:
     name: Check for base image updates
