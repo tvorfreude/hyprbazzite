@@ -47,7 +47,9 @@ jobs:
         with:
           scandir: './system_files/usr'
           additional_files: 'scripts/verify-image.sh system_files/usr/bin/wallpaper-cycle'
-          severity: warning
+          severity: error
+          ignore_paths: >-
+            system_files/usr/lib/hyprbazzite/skel
 
       - name: Run Hadolint
         uses: hadolint/hadolint-action@v3.1.0
