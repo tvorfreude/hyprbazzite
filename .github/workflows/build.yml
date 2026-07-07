@@ -224,3 +224,37 @@ jobs:
           COSIGN_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cosign sign --yes "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+
+  cleanup:
+    name: Cleanup old package versions
+    needs: build_push
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      packages: write
+    steps:
+      - name: Delete old untagged images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 5
+          delete-only-untagged-versions: true
+
+      - name: Delete old cosign signature tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PACKAGE="${{ github.event.repository.name }}"
+          OWNER="${{ github.repository_owner }}"
+
+          # Get all versions, filter to sha256-* signature tags, keep only the latest 3
+          gh api --paginate \
+            "/user/packages/container/${PACKAGE}/versions" \
+            --jq '.[] | select(.metadata.container.tags | any(startswith("sha256-"))) | .id' \
+          | tail -n +4 \
+          | while read -r version_id; do
+              echo "Deleting old signature version: $version_id"
+              gh api --method DELETE \
+                "/user/packages/container/${PACKAGE}/versions/${version_id}" || true
+            done
