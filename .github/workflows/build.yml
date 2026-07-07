@@ -35,6 +35,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  lint:
+    name: Lint scripts and Containerfile
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: './system_files/usr'
+          additional_files: 'scripts/verify-image.sh system_files/usr/bin/wallpaper-cycle'
+          severity: warning
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Containerfile
+          failure-threshold: warning
+          # Ignore DL3015 (apt-get install missing --no-install-recommends) - not applicable to dnf
+          # Ignore DL3059 (multiple consecutive RUN) - intentional for readability and caching
+          ignore: DL3015,DL3059,DL3033,DL3041
+
   check_base_image:
     name: Check for base image updates
     if: github.event_name == 'schedule'
@@ -80,7 +103,6 @@ jobs:
     needs: check_base_image
     if: |
       always() &&
-      github.actor != 'dependabot[bot]' &&
       (github.event_name == 'workflow_dispatch' ||
        github.event_name == 'push' ||
        github.event_name == 'pull_request' ||
@@ -168,6 +190,13 @@ jobs:
           build-args: |
             SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
             BUILD_STAMP=${{ steps.metadata.outputs.version }}
+
+      - name: Verify image integrity
+        run: |
+          podman run --rm \
+            -v "${{ github.workspace }}/scripts/verify-image.sh:/tmp/verify-image.sh:ro" \
+            "localhost/${{ env.IMAGE_NAME }}:latest" \
+            bash /tmp/verify-image.sh
             
       - name: Push Image to GHCR
         if: github.event_name != 'pull_request'
