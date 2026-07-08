@@ -80,6 +80,7 @@ if profile == "macos" then
     -- ─── Layout ──────────────────────────────────────────────────────────────
     hl.bind(m .. " + slash", hl.dsp.exec_cmd("hyprctl keyword dwindle:force_split 0"))
     hl.bind(m .. " + comma", hl.dsp.window.pseudo())
+    hl.bind(m .. " + SHIFT + A", hl.dsp.exec_cmd("hyprctl keyword general:layout $(hyprctl getoption general:layout | grep 'str:' | awk '{print $2}' | grep -q dwindle && echo master || echo dwindle)"))
 
     -- ─── Focus Monitor ───────────────────────────────────────────────────────
     hl.bind(m .. " + period",    hl.dsp.focus({ monitor = "+1" }))
