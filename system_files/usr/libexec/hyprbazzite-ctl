@@ -295,16 +295,11 @@ keybinds_switch() {
         current=$(cat "$profile_file" 2>/dev/null | tr -d '[:space:]')
     fi
 
+    # keyd has been retired. Both profiles now bind real physical keys directly
+    # (macos = ALT/Option modifier, exactly like AeroSpace). This helper only
+    # tears down any leftover keyd remap so an old install can't fight the binds.
     _apply_keyd() {
-        local target_profile="$1"
-        if [[ "$target_profile" == "macos" ]]; then
-            # Enable keyd Super→Ctrl remap
-            if [[ -f "$keyd_src" ]]; then
-                sudo cp "$keyd_src" "$keyd_dst"
-                sudo systemctl restart keyd 2>/dev/null || sudo keyd reload 2>/dev/null || true
-            fi
-        else
-            # Disable keyd remap (empty/default config)
+        if [[ -f "$keyd_dst" ]]; then
             sudo rm -f "$keyd_dst"
             sudo systemctl restart keyd 2>/dev/null || sudo keyd reload 2>/dev/null || true
         fi
@@ -331,10 +326,9 @@ keybinds_switch() {
             ;;
         status|"")
             echo "Current keybind profile: $current"
+            echo "keyd remap: retired (binds use real physical keys; macos = ALT/Option)"
             if [[ -f "$keyd_dst" ]]; then
-                echo "keyd remap: active (Super→Ctrl)"
-            else
-                echo "keyd remap: inactive"
+                echo "note: a leftover $keyd_dst still exists — it will be removed on next profile switch"
             fi
             ;;
         *)
