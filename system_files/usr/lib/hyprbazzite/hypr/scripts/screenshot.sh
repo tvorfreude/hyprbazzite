@@ -10,13 +10,21 @@ if [[ ! -d "$OUTPUT_DIR" ]]; then
     exit 1
 fi
 
-mode="${1:-region}"
+mode="${1:-region}" # region, window, output, clipboard
 
 if command -v hyprshot &>/dev/null; then
     pkill slurp || true
     if [[ "$mode" == "clipboard" ]]; then
         hyprshot -m region --raw | wl-copy
-        notify-send "Screenshot copied to clipboard"
+        notify-send "Screenshot" "Region copied to clipboard" -i camera-photo
+    elif [[ "$mode" == "window" ]]; then
+        hyprshot -m window --raw |
+            satty --filename - \
+                --output-filename "$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png" \
+                --early-exit \
+                --actions-on-enter save-to-clipboard \
+                --save-after-copy \
+                --copy-command 'wl-copy'
     else
         hyprshot -m region --raw |
             satty --filename - \

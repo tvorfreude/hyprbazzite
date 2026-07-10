@@ -34,8 +34,14 @@ handle_selection() {
 
     wallust run "$WALLUST_CURRENT_WALL" -s
     hyprctl reload
-    swaybg -i "$WALLUST_CURRENT_WALL" -m fill &
-    notify-send "Wallpaper and Theme Changed" "$(basename "$wall_path")"
+
+    if command -v swww &>/dev/null; then
+        swww img "$WALLUST_CURRENT_WALL" --transition-type wipe --transition-duration 2
+    else
+        pkill swaybg || true
+        swaybg -i "$WALLUST_CURRENT_WALL" -m fill &
+    fi
+    notify-send "Wallpaper and Theme Changed" "$(basename "$wall_path")" -i "image-x-generic"
 }
 
 mapfile -d '' wall_files < <(find "$WALL_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.bmp" -o -iname "*.webp" \) -print0)
@@ -55,7 +61,11 @@ generate_list() {
     done | sort
 }
 
-choice=$(generate_list | $RUNNER -dmenu -p "🖼️ Wallpaper" -i -config "$ROFI_THEME")
+if [ "$RUNNER" = "wofi" ]; then
+    choice=$(generate_list | $RUNNER -dmenu -p "🖼️ Wallpaper" -i)
+else
+    choice=$(generate_list | $RUNNER -dmenu -p "🖼️ Wallpaper" -i -theme "$ROFI_THEME")
+fi
 
 if [ -n "$choice" ]; then
     if [ "$choice" = "Random" ]; then
