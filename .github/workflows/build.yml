@@ -199,9 +199,13 @@ jobs:
 
       - name: Verify image integrity
         run: |
+          # Use the first tag from metadata for verification
+          TAGS=(${{ steps.metadata.outputs.tags }})
+          FIRST_TAG=${TAGS[0]}
+          echo "Verifying image with tag: $FIRST_TAG"
           podman run --rm --pull=never \
             -v "${{ github.workspace }}/scripts/verify-image.sh:/tmp/verify-image.sh:ro" \
-            "localhost/${{ env.IMAGE_NAME }}:latest" \
+            "localhost/${{ env.IMAGE_NAME }}:$FIRST_TAG" \
             bash /tmp/verify-image.sh
             
       - name: Push Image to GHCR
