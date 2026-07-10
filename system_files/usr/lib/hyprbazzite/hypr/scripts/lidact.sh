@@ -25,7 +25,8 @@ if [ -z "$LAPTOP_MONITOR" ]; then
 fi
 
 # 5. Check the current monitor state using the hyprctl active list
-if hyprctl -j monitors | jq -e ".[] | select(.name == \"$LAPTOP_MONITOR\")" > /dev/null; then
+# We check if the monitor is NOT disabled
+if hyprctl -j monitors all | jq -e ".[] | select(.name == \"$LAPTOP_MONITOR\" and .disabled == false)" > /dev/null; then
     CURRENT_STATE="on"
 else
     CURRENT_STATE="off"
@@ -42,12 +43,12 @@ if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     fi
 fi
 
-# use the disable and reload functionality
+# use keyword dispatch for better reliability
 if [ "$ACTION" == "on" ]; then
-    hyprctl reload
+    hyprctl keyword monitor "$LAPTOP_MONITOR,preferred,auto,1"
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    hyprctl eval "hl.monitor({ output = '$LAPTOP_MONITOR', disabled = true })"
+    hyprctl keyword monitor "$LAPTOP_MONITOR,disable"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
