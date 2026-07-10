@@ -11,37 +11,49 @@ if [[ ! -d "$OUTPUT_DIR" ]]; then
 fi
 
 mode="${1:-region}" # region, window, output, clipboard
+TIMESTAMP=$(date +'%Y-%m-%d_%H-%M-%S')
+FILENAME="screenshot-$TIMESTAMP.png"
+
+# Check for editor
+if command -v satty &>/dev/null; then
+    EDITOR="satty --filename - --output-filename $OUTPUT_DIR/$FILENAME --early-exit --actions-on-enter save-to-clipboard --save-after-copy --copy-command wl-copy"
+elif command -v swappy &>/dev/null; then
+    EDITOR="swappy -f - -o $OUTPUT_DIR/$FILENAME"
+else
+    EDITOR="cat > $OUTPUT_DIR/$FILENAME"
+fi
 
 if command -v hyprshot &>/dev/null; then
     pkill slurp || true
-    if [[ "$mode" == "clipboard" ]]; then
-        hyprshot -m region --raw | wl-copy
-        notify-send "Screenshot" "Region copied to clipboard" -i camera-photo
-    elif [[ "$mode" == "window" ]]; then
-        hyprshot -m window --raw |
-            satty --filename - \
-                --output-filename "$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png" \
-                --early-exit \
-                --actions-on-enter save-to-clipboard \
-                --save-after-copy \
-                --copy-command 'wl-copy'
-    else
-        hyprshot -m region --raw |
-            satty --filename - \
-                --output-filename "$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png" \
-                --early-exit \
-                --actions-on-enter save-to-clipboard \
-                --save-after-copy \
-                --copy-command 'wl-copy'
-    fi
-elif command -v slurp &>/dev/null && command -v grim &>/dev/null && command -v swappy &>/dev/null; then
-    region=$(slurp)
-    if [[ "$mode" == "clipboard" ]]; then
-        grim -g "$region" - | wl-copy
-        notify-send "Screenshot copied to clipboard"
-    else
-        grim -g "$region" /tmp/screenshot.png && swappy -f /tmp/screenshot.png && mv /tmp/screenshot.png "$OUTPUT_DIR/screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
-    fi
+    case "$mode" in
+        clipboard)
+            hyprshot -m region --raw | wl-copy
+            notify-send "Screenshot" "Region copied to clipboard" -i camera-photo
+            ;;
+        window)
+            hyprshot -m window --raw | $EDITOR
+            ;;
+        output)
+            hyprshot -m output --raw | $EDITOR
+            ;;
+        *)
+            hyprshot -m region --raw | $EDITOR
+            ;;
+    esac
+elif command -v grim &>/dev/null; then
+    pkill slurp || true
+    case "$mode" in
+        clipboard)
+            grim -g "$(slurp)" - | wl-copy
+            notify-send "Screenshot" "Region copied to clipboard" -i camera-photo
+            ;;
+        output)
+            grim - | $EDITOR
+            ;;
+        *)
+            grim -g "$(slurp)" - | $EDITOR
+            ;;
+    esac
 else
     notify-send "No screenshot tool (hyprshot or slurp/grim/swappy) found!" -u critical -t 3000
     exit 1
