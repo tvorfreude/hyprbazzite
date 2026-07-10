@@ -34,6 +34,7 @@ end
 local terminal = "kitty"
 local browser = "flatpak run io.github.zen_browser.zen"
 local filemanager = "thunar"
+local launcher = "wofi -wass"
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- MACOS PROFILE
@@ -51,10 +52,8 @@ if profile == "macos" then
     -- ─── Launch ──────────────────────────────────────────────────────────────
     -- AeroSpace: alt-enter -> new terminal window
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
-    -- Spotlight equivalent. AeroSpace leaves Cmd-Space to macOS; we offer both
-    -- ALT-Space (WM modifier) and SUPER-Space (physical Cmd) as launchers.
-    hl.bind(m .. " + SPACE",     hl.dsp.exec_cmd("wofi -wass"))
-    hl.bind("SUPER + SPACE",     hl.dsp.exec_cmd("wofi -wass"))
+    -- Spotlight equivalent (Alt+Space as the physical Option key on Mac hardware)
+    hl.bind("ALT + SPACE",       hl.dsp.exec_cmd(launcher))
 
     -- ─── Window Actions ──────────────────────────────────────────────────────
     hl.bind(m .. " + W", hl.dsp.window.close())            -- alt-w  = close
@@ -259,7 +258,7 @@ else
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
     hl.bind(m .. " + B",      hl.dsp.exec_cmd(browser))
     hl.bind(m .. " + F",      hl.dsp.exec_cmd(filemanager))
-    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd("wofi -wass"))
+    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd(launcher))
     hl.bind(m .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
 
     -- ─── Window Management ───────────────────────────────────────────────────
