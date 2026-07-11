@@ -47,16 +47,17 @@ local launcher = "wofi -wass"
 -- ═══════════════════════════════════════════════════════════════════════════════
 if profile == "macos" then
 
-    local m = "ALT"
+    local m = "SUPER"
+    local m2 = "ALT"
 
     -- ─── Launch ──────────────────────────────────────────────────────────────
     -- AeroSpace: alt-enter -> new terminal window
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
     -- Spotlight equivalent (Cmd+Space / Super+Space)
-    hl.bind("SUPER + SPACE",     hl.dsp.exec_cmd(launcher))
+    hl.bind(m2 .. " + SPACE",     hl.dsp.exec_cmd(launcher))
 
     -- ─── Window Actions ──────────────────────────────────────────────────────
-    hl.bind("SUPER + W", hl.dsp.window.close())            -- cmd-w  = close
+    hl.bind(m2 .. " + W", hl.dsp.window.close())            -- cmd-w  = close
     hl.bind(m .. " + F", hl.dsp.window.fullscreen(0))      -- alt-f  = fullscreen
     hl.bind(m .. " + V", hl.dsp.window.float({ action = "toggle" })) -- alt-v = layout floating tiling
     -- alt-e = balance-sizes. Hyprland/dwindle has no true balance; reset the
@@ -151,12 +152,12 @@ if profile == "macos" then
     -- ─── System (matching macOS conventions) ─────────────────────────────────
     -- Cmd+Shift+3/4/5 = screenshot. Bound to physical SUPER (the Cmd key), which
     -- is now free since we no longer remap it via keyd.
-    hl.bind("SUPER + SHIFT + 3", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
-    hl.bind("SUPER + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
-    hl.bind("SUPER + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+    hl.bind(m2 .. " + SHIFT + 3", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
+    hl.bind(m2 .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+    hl.bind(m2 .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
 
     -- Cmd+Ctrl+Q = lock screen (macOS)
-    hl.bind("SUPER + CTRL + Q", hl.dsp.exec_cmd("hyprlock"))
+    hl.bind(m2 .. " + CTRL + Q", hl.dsp.exec_cmd("hyprlock"))
 
     -- Notification center (macOS-style). AeroSpace leaves this to macOS; alt-n here.
     hl.bind(m .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"))
@@ -165,7 +166,7 @@ if profile == "macos" then
     hl.bind(m .. " + O", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
 
     -- Clipboard history (Cmd+Shift+V equivalent)
-    hl.bind(m .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
+    hl.bind(m2 .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
 
     -- ─── Mouse Bindings ──────────────────────────────────────────────────────
     -- AeroSpace: alt + left-drag = move, alt + right-drag = resize
@@ -258,8 +259,7 @@ else
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
     hl.bind(m .. " + B",      hl.dsp.exec_cmd(browser))
     hl.bind(m .. " + F",      hl.dsp.exec_cmd(filemanager))
-    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd(launcher))
-    hl.bind(m .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
+    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd(l    hl.bind(m .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
 
     -- ─── Window Management ───────────────────────────────────────────────────
     hl.bind(m .. " + W",         hl.dsp.window.close())
