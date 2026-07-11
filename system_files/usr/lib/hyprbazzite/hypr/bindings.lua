@@ -52,11 +52,11 @@ if profile == "macos" then
     -- ─── Launch ──────────────────────────────────────────────────────────────
     -- AeroSpace: alt-enter -> new terminal window
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
-    -- Spotlight equivalent (Alt+Space as the physical Option key on Mac hardware)
-    hl.bind("ALT + SPACE",       hl.dsp.exec_cmd(launcher))
+    -- Spotlight equivalent (Cmd+Space / Super+Space)
+    hl.bind("SUPER + SPACE",     hl.dsp.exec_cmd(launcher))
 
     -- ─── Window Actions ──────────────────────────────────────────────────────
-    hl.bind(m .. " + W", hl.dsp.window.close())            -- alt-w  = close
+    hl.bind("SUPER + W", hl.dsp.window.close())            -- cmd-w  = close
     hl.bind(m .. " + F", hl.dsp.window.fullscreen(0))      -- alt-f  = fullscreen
     hl.bind(m .. " + V", hl.dsp.window.float({ action = "toggle" })) -- alt-v = layout floating tiling
     -- alt-e = balance-sizes. Hyprland/dwindle has no true balance; reset the
@@ -111,8 +111,8 @@ if profile == "macos" then
     -- ─── Workspaces ──────────────────────────────────────────────────────────
     for i = 1, 10 do
         local key = i % 10
-        hl.bind(m .. " + " .. key,         hl.dsp.focus({ workspace = i }))
-        hl.bind(m .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+        hl.bind("SUPER + " .. key,         hl.dsp.focus({ workspace = i }))
+        hl.bind("SUPER + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
     end
 
     -- ─── Workspace Navigation ────────────────────────────────────────────────
@@ -122,8 +122,8 @@ if profile == "macos" then
     hl.bind(m .. " + SHIFT + Tab", hl.dsp.exec_cmd("hyprctl dispatch moveworkspacetomonitor +1"))
 
     -- ─── Special Workspaces (Scratchpads) ────────────────────────────────────
-    hl.bind(m .. " + S", hl.dsp.workspace.toggle_special())
-    hl.bind(m .. " + SHIFT + S", function()
+    hl.bind("SUPER + S", hl.dsp.workspace.toggle_special())
+    hl.bind("SUPER + SHIFT + S", function()
         local window = hl.get_active_window()
         if window and window.workspace.name:find("^special") then
             hl.dispatch(hl.dsp.window.move({ workspace = "e+0" }))
@@ -132,8 +132,8 @@ if profile == "macos" then
         end
     end)
 
-    hl.bind(m .. " + Q", hl.dsp.workspace.toggle_special("scratchpad"))
-    hl.bind(m .. " + SHIFT + Q", function()
+    hl.bind("SUPER + Q", hl.dsp.workspace.toggle_special("scratchpad"))
+    hl.bind("SUPER + SHIFT + Q", function()
         local window = hl.get_active_window()
         if window and window.workspace.name:find("^special:scratchpad") then
             hl.dispatch(hl.dsp.window.move({ workspace = "e+0" }))
