@@ -54,7 +54,7 @@ if profile == "macos" then
     -- AeroSpace: alt-enter -> new terminal window
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
     -- Spotlight equivalent (Cmd+Space / Super+Space)
-    hl.bind(m2 .. " + SPACE",     hl.dsp.exec_cmd(launcher))
+    hl.bind(m2 .. " + SPACE", hl.dsp.exec_cmd(launcher))
 
     -- ─── Window Actions ──────────────────────────────────────────────────────
     hl.bind(m2 .. " + W", hl.dsp.window.close())            -- cmd-w  = close
@@ -259,7 +259,7 @@ else
     hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
     hl.bind(m .. " + B",      hl.dsp.exec_cmd(browser))
     hl.bind(m .. " + F",      hl.dsp.exec_cmd(filemanager))
-    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd(l    hl.bind(m .. " + E",      hl.dsp.exec_cmd(terminal .. " -e nvim"))
+    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd(launcher))
 
     -- ─── Window Management ───────────────────────────────────────────────────
     hl.bind(m .. " + W",         hl.dsp.window.close())
