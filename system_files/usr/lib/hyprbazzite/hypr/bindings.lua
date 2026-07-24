@@ -344,8 +344,8 @@ hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),                    
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),                         { locked = true })
 
 -- ─── Lid Switch ──────────────────────────────────────────────────────────────
-hl.bind("switch:on:Lid Switch",  hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh off"), { locked = true })
-hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh on"),  { locked = true })
+hl.bind("switch:on:Lid Switch",  hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh lid-close"), { locked = true })
+hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh lid-open"),  { locked = true })
 
 -- ─── Gestures ────────────────────────────────────────────────────────────────
 hl.gesture({
