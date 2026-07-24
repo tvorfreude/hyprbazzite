@@ -1,0 +1,18 @@
+[Unit]
+Description=Disable non-power-button wakeup sources (power button only wake)
+# The lid (and other ACPI devices) can wake the machine from suspend. This
+# leaves ONLY the power button as a wake source, so opening the lid does not
+# resume. /proc/acpi/wakeup settings persist for the boot session (across
+# suspend/resume) and reset on reboot, so running once at boot is sufficient.
+After=multi-user.target
+ConditionPathExists=/proc/acpi/wakeup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/hyprbazzite/hypr/scripts/disable-nonpower-wakeup.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
