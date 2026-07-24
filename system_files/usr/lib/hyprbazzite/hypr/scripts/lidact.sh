@@ -45,10 +45,10 @@ fi
 
 # use keyword dispatch for better reliability
 if [ "$ACTION" == "on" ]; then
-    hyprctl keyword monitor "$LAPTOP_MONITOR,preferred,auto,1"
+    hyprctl reload
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
-    hyprctl keyword monitor "$LAPTOP_MONITOR,disable"
+    hyprctl eval "hl.monitor({ output = \"$LAPTOP_MONITOR\", disabled = true })"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
     echo "Usage: $0 [on|off|toggle]"
