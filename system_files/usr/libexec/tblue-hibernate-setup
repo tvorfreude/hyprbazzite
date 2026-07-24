@@ -27,18 +27,59 @@ configure_sleep_setting() {
     fi
 }
 
+# Size the swapfile a little larger than RAM so systemd can always fit the
+# hibernation image (it refuses if usable swap < in-use memory).
+swapfile_size_mib() {
+    local mem_kib ram_mib
+    mem_kib=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+    ram_mib=$(( (mem_kib + 1023) / 1024 ))   # RAM in MiB, rounded up
+    echo $(( ram_mib + 2048 ))               # + 2 GiB headroom
+}
+
+# Create a hibernation-capable swapfile on btrfs if one isn't already present.
+# btrfs requires the swapfile to be NOCOW and fully preallocated; the
+# `btrfs filesystem mkswapfile` helper does all of that (and runs mkswap).
+ensure_swapfile() {
+    # Treat only a non-empty file as "already provisioned".
+    if [[ -s "$SWAPFILE_PATH" ]]; then
+        return 0
+    fi
+    rm -f "$SWAPFILE_PATH"
+    mkdir -p "$(dirname "$SWAPFILE_PATH")"
+
+    local size_mib
+    size_mib=$(swapfile_size_mib)
+    log "No swapfile found; creating a ${size_mib} MiB swapfile at $SWAPFILE_PATH"
+
+    if btrfs filesystem mkswapfile --size "${size_mib}m" --uuid clear "$SWAPFILE_PATH" 2>/dev/null; then
+        log "Created swapfile via 'btrfs filesystem mkswapfile'."
+    else
+        # Fallback for older btrfs-progs without the mkswapfile subcommand.
+        log "'btrfs filesystem mkswapfile' unavailable; creating manually (NOCOW + dd)."
+        rm -f "$SWAPFILE_PATH"
+        truncate -s 0 "$SWAPFILE_PATH"
+        chattr +C "$SWAPFILE_PATH"                 # NOCOW must be set while empty
+        dd if=/dev/zero of="$SWAPFILE_PATH" bs=1M count="$size_mib" status=none
+        chmod 600 "$SWAPFILE_PATH"
+        mkswap "$SWAPFILE_PATH"
+    fi
+}
+
 # -- Main ---------------------------------------------------------------------
 
 main() {
-    # 1. Ensure swapfile exists and is in fstab
-    if [[ ! -f "$SWAPFILE_PATH" ]]; then
-        log "Error: swapfile $SWAPFILE_PATH does not exist. Please create it first."
-        exit 1
-    fi
+    # 1. Ensure the swapfile exists (create it if missing), then fstab + activate.
+    ensure_swapfile
 
     if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
         echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
         log "Added swapfile to /etc/fstab"
+    fi
+
+    # Activate now so swap is usable this boot (the resume= karg set below still
+    # needs a reboot before hibernation actually works).
+    if ! swapon --show=NAME --noheadings 2>/dev/null | grep -qx "$SWAPFILE_PATH"; then
+        swapon "$SWAPFILE_PATH" || log "Warning: swapon failed; fstab will retry next boot."
     fi
 
     # 2. Get the decrypted device UUID and swapfile offset
@@ -58,12 +99,21 @@ main() {
 
     log "Setting resume=UUID=$dec_uuid and resume_offset=$offset for hybrid sleep."
 
-    # 3. Set kernel arguments for resume
-    rpm-ostree kargs \
-        --replace="resume=UUID=$dec_uuid" \
-        --replace="resume_offset=$offset" \
-        --append-if-missing="rootwait" \
-        --append-if-missing="resume_delay=5"
+    # 3. Set kernel arguments for resume.
+    # Use --append-if-missing (not --replace): on a fresh install the resume
+    # kargs don't exist yet, and --replace fails on a missing key. Only touch
+    # kargs when 'resume=' is absent so steady-state boots skip the (slow)
+    # rpm-ostree transaction. NOTE: applied kargs require a reboot to take effect.
+    if ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^resume='; then
+        log "Applying resume kernel arguments (first-time provisioning; reboot required)."
+        rpm-ostree kargs \
+            --append-if-missing="resume=UUID=$dec_uuid" \
+            --append-if-missing="resume_offset=$offset" \
+            --append-if-missing="rootwait" \
+            --append-if-missing="resume_delay=5"
+    else
+        log "resume kernel argument already present; leaving kargs unchanged."
+    fi
 
     # 4. Configure systemd sleep settings
     configure_sleep_setting "AllowSuspend" "yes"
