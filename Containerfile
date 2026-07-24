@@ -153,6 +153,7 @@ RUN usermod -s /bin/zsh root && \
     echo "enable hhd.service" > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable sddm.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable tblue-hibernate-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    echo "enable tblue-disable-nonpower-wakeup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     # Copy dconf theme settings
     mkdir -p /etc/dconf/db/distro.d/ && \
     cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme /etc/dconf/db/distro.d/
