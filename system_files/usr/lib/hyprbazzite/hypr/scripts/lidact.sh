@@ -45,11 +45,12 @@ if [ "$ACTION" == "lid-close" ]; then
         # Docked: clamshell -- just turn the internal panel off, keep working.
         ACTION="off"
     else
-        # Undocked: sleep. Plain S3 suspend is unreliable on this UEFI/TPM box,
-        # so use the configured suspend-then-hibernate path (/etc/systemd/sleep.conf).
+        # Undocked: sleep. Hibernation is blocked by Secure Boot on this image
+        # (Fedora's lockdown driver blocks hibernate under Secure Boot), so use
+        # plain suspend (S3/s2idle), which is available with Secure Boot enabled.
         # Lock first so the machine is locked on resume.
         loginctl lock-session 2>/dev/null || true
-        exec systemctl suspend-then-hibernate
+        exec systemctl suspend
     fi
 elif [ "$ACTION" == "lid-open" ]; then
     ACTION="on"
