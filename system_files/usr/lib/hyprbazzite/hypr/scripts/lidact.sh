@@ -32,8 +32,28 @@ else
     CURRENT_STATE="off"
 fi
 
-# 6. Parse arguments (on, off, or toggle)
+# 6. Parse arguments (on, off, toggle, lid-close, lid-open)
 ACTION=$1
+
+# Lid-event actions decide between clamshell mode and sleep based on whether
+# any EXTERNAL display is connected. Called from the Hyprland Lid Switch binds.
+if [ "$ACTION" == "lid-close" ]; then
+    # Count enabled monitors that are NOT the internal laptop panel.
+    EXT_COUNT=$(hyprctl -j monitors all \
+        | jq "[.[] | select(.name != \"$LAPTOP_MONITOR\" and .disabled == false)] | length")
+    if [ "${EXT_COUNT:-0}" -gt 0 ]; then
+        # Docked: clamshell -- just turn the internal panel off, keep working.
+        ACTION="off"
+    else
+        # Undocked: sleep. Plain S3 suspend is unreliable on this UEFI/TPM box,
+        # so use the configured suspend-then-hibernate path (/etc/systemd/sleep.conf).
+        # Lock first so the machine is locked on resume.
+        loginctl lock-session 2>/dev/null || true
+        exec systemctl suspend-then-hibernate
+    fi
+elif [ "$ACTION" == "lid-open" ]; then
+    ACTION="on"
+fi
 
 if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     if [ "$CURRENT_STATE" == "on" ]; then
@@ -43,14 +63,15 @@ if [ -z "$ACTION" ] || [ "$ACTION" == "toggle" ]; then
     fi
 fi
 
-# use keyword dispatch for better reliability
 if [ "$ACTION" == "on" ]; then
+    # Re-apply monitors.lua (the single source of truth for mode/scale/position)
+    # so the panel comes back exactly as configured rather than at "preferred".
     hyprctl reload
     echo "Successfully turned $LAPTOP_MONITOR ON"
 elif [ "$ACTION" == "off" ]; then
     hyprctl eval "hl.monitor({ output = \"$LAPTOP_MONITOR\", disabled = true })"
     echo "Successfully turned $LAPTOP_MONITOR OFF"
 else
-    echo "Usage: $0 [on|off|toggle]"
+    echo "Usage: $0 [on|off|toggle|lid-close|lid-open]"
     exit 1
 fi
