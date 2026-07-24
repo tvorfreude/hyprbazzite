@@ -101,18 +101,23 @@ main() {
 
     # 3. Set kernel arguments for resume.
     # Use --append-if-missing (not --replace): on a fresh install the resume
-    # kargs don't exist yet, and --replace fails on a missing key. Only touch
-    # kargs when 'resume=' is absent so steady-state boots skip the (slow)
-    # rpm-ostree transaction. NOTE: applied kargs require a reboot to take effect.
-    if ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^resume='; then
-        log "Applying resume kernel arguments (first-time provisioning; reboot required)."
+    # kargs don't exist yet, and --replace fails on a missing key.
+    # Also strip 'nohibernate', which Bazzite/uBlue ships by default -- while it
+    # is present the kernel reports /sys/power/disk as [disabled] and neither
+    # hibernate nor suspend-then-hibernate can run at all.
+    # Guarded so steady-state boots skip the (slow) rpm-ostree transaction.
+    # NOTE: applied kargs require a reboot to take effect.
+    if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'nohibernate' \
+       || ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^resume='; then
+        log "Provisioning hibernation kargs (remove nohibernate, add resume; reboot required)."
         rpm-ostree kargs \
+            --delete-if-present="nohibernate" \
             --append-if-missing="resume=UUID=$dec_uuid" \
             --append-if-missing="resume_offset=$offset" \
             --append-if-missing="rootwait" \
             --append-if-missing="resume_delay=5"
     else
-        log "resume kernel argument already present; leaving kargs unchanged."
+        log "Hibernation kargs already provisioned; leaving kargs unchanged."
     fi
 
     # 4. Configure systemd sleep settings
