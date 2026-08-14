@@ -6,7 +6,7 @@
 # Stage 1: Download external assets (fonts, themes)
 # ---------------------------------------------------------------------------
 # renovate: datasource=docker depName=fedora
-FROM fedora:42@sha256:99e203b80b1c3d8f7e161ec10a68fd02b081ef83a3963553e513c82846b97814 AS assets
+FROM fedora:45@sha256:0c1f63ed8fb818fad16cf6ae091598c410a21d2e1a9adf183beb93189299bfba AS assets
 
 ARG NERD_FONTS_VERSION=v3.5.0
 
