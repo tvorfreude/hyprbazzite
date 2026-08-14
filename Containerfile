@@ -8,7 +8,7 @@
 # renovate: datasource=docker depName=fedora
 FROM fedora:42@sha256:99e203b80b1c3d8f7e161ec10a68fd02b081ef83a3963553e513c82846b97814 AS assets
 
-ARG NERD_FONTS_VERSION=v3.4.0
+ARG NERD_FONTS_VERSION=v3.5.0
 
 # Install download utilities
 RUN dnf5 -y install curl unzip && \
