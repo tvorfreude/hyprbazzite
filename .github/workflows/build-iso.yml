@@ -57,7 +57,7 @@ jobs:
 
       # Free up disk space – ISOs can exceed 4 GB
       - name: Maximize build space
-        uses: ublue-os/remove-unwanted-software@v7
+        uses: ublue-os/remove-unwanted-software@517622d6452028f266b7ba4cc9a123b5f58a6b53 # v7
 
       # When triggered from a PR comment, resolve the PR's head branch name
       - name: Get PR head ref
@@ -72,7 +72,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Check out the PR branch when triggered via comment; default ref otherwise
           ref: ${{ github.event_name == 'issue_comment' && steps.pr_ref.outputs.ref || github.ref }}
@@ -86,7 +86,7 @@ jobs:
 
       - name: Build container image
         id: build_image
-        uses: redhat-actions/buildah-build@v2
+        uses: redhat-actions/buildah-build@9dc2ade9b5db229966b5025ae266311e12f349c4 # v2
         with:
           containerfiles: |
             ./Containerfile
@@ -138,7 +138,7 @@ jobs:
             localhost/${{ env.IMAGE_NAME }}:latest
 
       - name: Upload ISO artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.0
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ${{ env.IMAGE_NAME }}-iso
           path: /tmp/iso-output/
