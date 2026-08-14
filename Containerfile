@@ -66,39 +66,19 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y clean all
 
 # ---------------------------------------------------------------------------
-# Step 4: Install HyprBazzite packages (split by change frequency for caching)
+# Step 4: Install HyprBazzite packages
 # ---------------------------------------------------------------------------
-
-# Core Hyprland + desktop session (changes rarely)
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install --skip-unavailable \
     hyprland hyprland-guiutils hyprlock swayidle hyprpaper uwsm hyprland-uwsm \
     swww waybar SwayNotificationCenter wofi wvkbd \
     xdg-desktop-portal-hyprland lxqt-policykit sddm \
-    openrgb openrgb-udev-rules && \
-    dnf5 -y clean all
-
-# Shell, CLI tools, and terminal (changes occasionally)
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    dnf5 -y install --skip-unavailable \
-    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep && \
-    dnf5 -y clean all
-
-# Gaming and hardware support (changes with upstream)
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    dnf5 -y install --skip-unavailable \
+    openrgb openrgb-udev-rules \
+    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep \
     hhd adjustor hhd-ui lact keyd \
     rom-properties lutris steam-devices \
-    brightnessctl gparted systemd-devel btop && \
-    dnf5 -y clean all
-
-# Desktop apps, theming, and utilities (changes more frequently)
-RUN --mount=type=cache,dst=/var/cache \
-    --mount=type=cache,dst=/var/log \
-    dnf5 -y install --skip-unavailable \
+    brightnessctl gparted systemd-devel btop \
     thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 \
     network-manager-applet pavucontrol \
     gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
