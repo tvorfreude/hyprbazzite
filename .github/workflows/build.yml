@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # v2.0.0
+        uses: ludeeus/action-shellcheck@2.0.0
         with:
           scandir: './system_files/usr'
           additional_files: 'scripts/verify-image.sh system_files/usr/bin/wallpaper-cycle'
@@ -57,7 +57,7 @@ jobs:
             system_files/usr/lib/hyprbazzite/skel
 
       - name: Run Hadolint
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf # v3.1.0
+        uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Containerfile
           failure-threshold: warning
@@ -137,7 +137,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Maximize build space
-        uses: ublue-os/remove-unwanted-software@cc062e0df71c3efbfc3ad5ff0cae0982b0133090 # v7
+        uses: ublue-os/remove-unwanted-software@v7
 
       - name: Get current date
         id: date
@@ -151,14 +151,14 @@ jobs:
           echo "Base image digest: ${BASE_DIGEST}"
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@3454372f43399081ed03b604cb2d021dabca52bb # v3.8.0
+        uses: sigstore/cosign-installer@v3.8.0
 
       - name: Set short SHA
         id: vars
         run: echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
 
       - name: Image Metadata
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        uses: docker/metadata-action@v5.7.0
         id: metadata
         with:
           tags: |
@@ -190,7 +190,7 @@ jobs:
 
       - name: Build Image
         id: build_image
-        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2.13
+        uses: redhat-actions/buildah-build@v2
         with:
           containerfiles: |
             ./Containerfile
@@ -217,7 +217,7 @@ jobs:
             
       - name: Push Image to GHCR
         if: github.event_name != 'pull_request'
-        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2.8
+        uses: redhat-actions/push-to-registry@v2
         id: push
         with:
           image: ${{ env.IMAGE_NAME }}
@@ -228,7 +228,7 @@ jobs:
 
       - name: Generate SBOM
         if: github.event_name != 'pull_request'
-        uses: anchore/sbom-action@e11c554f704a0b820cbf8c51673f6945e0731532 # v0.18.0
+        uses: anchore/sbom-action@v0
         with:
           image: "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
           format: spdx-json
@@ -270,7 +270,7 @@ jobs:
       packages: write
     steps:
       - name: Delete old untagged images
-        uses: actions/delete-package-versions@4dbb860e4e4f945abf06e0d0f4c21c21fb44c529 # v5.0.0
+        uses: actions/delete-package-versions@v5
         with:
           package-name: ${{ github.event.repository.name }}
           package-type: container
