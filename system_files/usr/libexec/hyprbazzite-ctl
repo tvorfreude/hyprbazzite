@@ -2,35 +2,407 @@
 set -euo pipefail
 
 # ===============================================================================
-# Hyprbazzite Control Center (hyprbazzite-ctl)
-# A unified manager for TDP, OSK, Power, and System settings.
-# ==============================================================================
+# HyprBazzite Control Center (hyprbazzite-ctl)
+# A unified manager for the entire HyprBazzite desktop.
+#
+# Modules: menu, gamemode, screenshot, wallpaper, chezmoi, refresh,
+#          quicksettings, theme, tdp, osk, power, automation, keybinds, lid
+# ===============================================================================
 
-# --- Shared Helpers ---
-log() { echo "[hyprbazzite-ctl] $*" >&2; }
+# --- Shared Library ---
+source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh 2>/dev/null || true
 
-notify() {
-    local title="$1"
-    local msg="$2"
-    local urgency="${3:-normal}"
-    if command -v notify-send >/dev/null 2>&1; then
-        notify-send -u "$urgency" "$title" "$msg"
+# Fallbacks if common.sh failed to load
+command -v notify >/dev/null 2>&1 || notify() {
+    local title="$1" msg="$2" urgency="${3:-normal}"
+    command -v notify-send >/dev/null 2>&1 && notify-send -u "$urgency" "$title" "$msg"
+}
+command -v json_escape >/dev/null 2>&1 || json_escape() {
+    local s="$1"; s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/\\n}; printf '%s' "$s"
+}
+: "${CONFIG_DIR:="${XDG_CONFIG_HOME:-$HOME/.config}"}"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MENU MODULE — interactive launcher (replaces TritonCtl)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+menu_show() {
+    local gamemode_status="Gamemode (disabled)"
+    local gamemode_enabled
+    gamemode_enabled=$(hyprctl getoption animations:enabled 2>/dev/null | awk 'NR==1{print $2}')
+    [[ "${gamemode_enabled:-1}" == "0" ]] && gamemode_status="Gamemode (enabled)"
+
+    local options
+    options=$(cat <<EOF
+$gamemode_status
+Screenshot
+Wallpaper
+Refresh Session
+Quick Settings
+Theme Update
+Power Menu
+TDP Profile
+OSK Toggle
+Keybind Profile
+Chezmoi Push
+Chezmoi Pull
+EOF
+)
+
+    local choice
+    choice=$(echo "$options" | wofi -dmenu -p "HyprBazzite" -i) || return 0
+
+    case "$choice" in
+        *"Gamemode"*)     gamemode_toggle ;;
+        "Screenshot")     screenshot_take "region" ;;
+        "Wallpaper")      wallpaper_pick ;;
+        "Refresh Session") session_refresh ;;
+        "Quick Settings") quicksettings_show ;;
+        "Theme Update")   theme_update ;;
+        "Power Menu")     power_menu ;;
+        "TDP Profile")    tdp_menu ;;
+        "OSK Toggle")     osk_toggle ;;
+        "Keybind Profile") keybinds_switch "toggle" ;;
+        "Chezmoi Push")   chezmoi_action "push" ;;
+        "Chezmoi Pull")   chezmoi_action "pull" ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GAMEMODE MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+gamemode_toggle() {
+    local notif_icon="$HOME/.config/swaync/images/ja.png"
+    local enabled
+    enabled=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
+
+    if [[ "$enabled" = "1" ]]; then
+        hyprctl keyword animations:enabled 0
+        hyprctl keyword decoration:shadow:enabled 0
+        hyprctl keyword decoration:blur:enabled 0
+        hyprctl keyword general:gaps_in 0
+        hyprctl keyword general:gaps_out 0
+        hyprctl keyword general:border_size 1
+        hyprctl keyword decoration:rounding 0
+        hyprctl keyword decoration:active_opacity 1.0
+        hyprctl keyword decoration:inactive_opacity 1.0
+        hyprctl keyword "windowrule opacity 1 override 1 override 1 override, ^(.*)$"
+        if command -v swww &>/dev/null; then
+            swww clear 000000
+        else
+            pkill swaybg || true
+        fi
+        notify-send -e -u low -i "$notif_icon" " Gamemode:" " enabled"
+    else
+        hyprctl keyword animations:enabled 1
+        hyprctl keyword decoration:shadow:enabled 1
+        hyprctl keyword decoration:blur:enabled 1
+        hyprctl keyword general:gaps_in 5
+        hyprctl keyword general:gaps_out 20
+        hyprctl keyword general:border_size 3
+        hyprctl keyword decoration:rounding 10
+        hyprctl keyword decoration:active_opacity 1.0
+        hyprctl keyword decoration:inactive_opacity 1.0
+        hyprctl keyword "windowrule opacity 1 override, ^(.*)$"
+        if command -v swww &>/dev/null; then
+            swww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" \
+                --transition-type wipe --transition-duration 2
+        else
+            swaybg -i "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" -m fill &
+        fi
+        sleep 0.5
+        notify-send -e -u normal -i "$notif_icon" " Gamemode:" " disabled"
+        hyprctl reload
     fi
 }
 
-json_escape() {
-    local s="$1"
-    s=${s//\\/\\\\}
-    s=${s//"/\\"}
-    s=${s//$'\n'/\\n}
-    printf '%s' "$s"
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCREENSHOT MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+screenshot_take() {
+    local mode="${1:-region}"
+    local output_dir="${XDG_PICTURES_DIR:-$HOME/Pictures}"
+    local timestamp filename
+
+    if [[ ! -d "$output_dir" ]]; then
+        notify "Screenshot" "Directory does not exist: $output_dir" "critical"
+        return 1
+    fi
+
+    timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
+    filename="screenshot-$timestamp.png"
+
+    _screenshot_editor() {
+        if command -v satty &>/dev/null; then
+            satty --filename - --output-filename "$output_dir/$filename" \
+                --early-exit --actions-on-enter save-to-clipboard \
+                --save-after-copy --copy-command wl-copy
+        elif command -v swappy &>/dev/null; then
+            swappy -f - -o "$output_dir/$filename"
+        else
+            cat > "$output_dir/$filename"
+        fi
+    }
+
+    if command -v hyprshot &>/dev/null; then
+        pkill slurp || true
+        case "$mode" in
+            clipboard) hyprshot -m region --raw | wl-copy; notify "Screenshot" "Copied to clipboard" ;;
+            window)    hyprshot -m window --raw | _screenshot_editor ;;
+            output)    hyprshot -m output --raw | _screenshot_editor ;;
+            *)         hyprshot -m region --raw | _screenshot_editor ;;
+        esac
+    elif command -v grim &>/dev/null; then
+        pkill slurp || true
+        case "$mode" in
+            clipboard) grim -g "$(slurp)" - | wl-copy; notify "Screenshot" "Copied to clipboard" ;;
+            output)    grim - | _screenshot_editor ;;
+            *)         grim -g "$(slurp)" - | _screenshot_editor ;;
+        esac
+    else
+        notify "Screenshot" "No screenshot tool found (hyprshot or grim)" "critical"
+        return 1
+    fi
 }
 
-# --- TDP Module ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# WALLPAPER MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+wallpaper_pick() {
+    local wall_dir="$HOME/Pictures/wallpapers"
+    local wallust_dir="$CONFIG_DIR/hypr/wallust"
+    local wallust_current="$wallust_dir/current_wallpaper.jpg"
+
+    if ! command -v magick &>/dev/null; then
+        notify "Wallpaper" "Missing dependency: imagemagick" "critical"
+        return 1
+    fi
+
+    mapfile -d '' wall_files < <(find "$wall_dir" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.bmp" -o -iname "*.webp" \) -print0 2>/dev/null)
+    if [[ ${#wall_files[@]} -eq 0 ]]; then
+        notify "Wallpaper" "No wallpapers found in $wall_dir" "critical"
+        return 1
+    fi
+
+    local random_wall="${wall_files[$((RANDOM % ${#wall_files[@]}))]}"
+
+    _generate_list() {
+        echo -e "Random\x00icon\x1f$random_wall"
+        for wall in "${wall_files[@]}"; do
+            local fname label
+            fname=$(basename "$wall")
+            label="${fname%.*}"
+            printf "%s\x00icon\x1f%s\n" "$label" "$wall"
+        done | sort
+    }
+
+    local choice
+    choice=$(_generate_list | wofi -dmenu -p "Wallpaper" -i) || return 0
+
+    local wall_path=""
+    if [[ "$choice" = "Random" ]]; then
+        wall_path="$random_wall"
+    else
+        wall_path=$(find "$wall_dir" -type f -name "$choice.*" -print -quit)
+    fi
+
+    if [[ -n "$wall_path" && -f "$wall_path" ]]; then
+        mkdir -p "$wallust_dir"
+        magick "$wall_path" "$wallust_dir/current_wallpaper.png"
+        cp "$wall_path" "$wallust_current"
+        touch "${XDG_RUNTIME_DIR:-/tmp}/wallpaper-pinned"
+
+        if command -v wallust &>/dev/null; then
+            wallust run "$wallust_current" -s
+            hyprctl reload
+        fi
+
+        if command -v swww &>/dev/null; then
+            swww img "$wallust_current" --transition-type wipe --transition-duration 2
+        else
+            pkill swaybg || true
+            swaybg -i "$wallust_current" -m fill &
+        fi
+        notify "Wallpaper" "Set to $(basename "$wall_path")"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CHEZMOI MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+chezmoi_action() {
+    local action="${1:-}"
+
+    if ! command -v chezmoi &>/dev/null; then
+        notify "Chezmoi" "chezmoi not installed" "critical"
+        return 1
+    fi
+
+    case "$action" in
+        push)
+            notify "Chezmoi" "Preparing push..."
+            if chezmoi git -- status --porcelain | grep -q .; then
+                local logfile="/tmp/chezmoi-push-$(date +%s).log"
+                chezmoi git -- add -A &>>"$logfile"
+                chezmoi git -- commit -m "chezmoi: update $(date -u +"%Y-%m-%dT%H:%M:%SZ")" &>>"$logfile" || true
+                if chezmoi git -- push &>>"$logfile"; then
+                    notify "Chezmoi" "Changes pushed successfully"
+                else
+                    notify "Chezmoi" "Push failed — see $logfile" "critical"
+                fi
+            else
+                notify "Chezmoi" "No local changes to push"
+            fi
+            ;;
+        pull)
+            local choice
+            choice=$(echo -e "Yes\nNo" | wofi -dmenu -p "Pull and apply chezmoi changes?" -i) || return 0
+            [[ "$choice" != "Yes" ]] && { notify "Chezmoi" "Pull cancelled"; return 0; }
+            notify "Chezmoi" "Pulling and applying dotfiles..."
+            local logfile="/tmp/chezmoi-pull-$(date +%s).log"
+            if chezmoi git -- pull --rebase --autostash &>>"$logfile"; then
+                if chezmoi apply &>>"$logfile"; then
+                    notify "Chezmoi" "Pull and apply succeeded"
+                else
+                    notify "Chezmoi" "Apply failed — see $logfile" "critical"
+                fi
+            else
+                notify "Chezmoi" "Git pull failed — see $logfile" "critical"
+            fi
+            ;;
+        *)
+            echo "Usage: hyprbazzite-ctl chezmoi [push|pull]"
+            return 1
+            ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SESSION REFRESH MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+session_refresh() {
+    local apps=(swayidle mako waybar fcitx5 swww-daemon)
+    for app in "${apps[@]}"; do
+        pkill "$app" || true
+    done
+
+    sleep 0.3
+    swayidle -C /etc/swayidle/config -w &
+    mako &
+    waybar &
+    fcitx5 &
+    swww-daemon &
+    sleep 0.5
+
+    if command -v wallpaper-cycle &>/dev/null && pgrep -x wallpaper-cycle >/dev/null 2>&1; then
+        pkill -USR1 wallpaper-cycle || true
+    elif [[ -f "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" ]]; then
+        swww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" --transition-type wipe --transition-duration 2
+    fi
+    notify "HyprBazzite" "Session apps refreshed"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# QUICK SETTINGS MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+quicksettings_show() {
+    local wofi_config="$CONFIG_DIR/wofi/config"
+
+    local gtk_mode
+    gtk_mode=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || echo "")
+    local mode_label="(light mode)"
+    [[ "$gtk_mode" == "'prefer-dark'" ]] && mode_label="(dark mode)"
+
+    local options="Choose Kitty Terminal Theme\nGTK Settings (nwg-look)\nQT Apps Settings (qt6ct)\nQT Apps Settings (qt5ct)\nSwitch Dark-Light Theme $mode_label"
+    local choice
+    choice=$(echo -e "$options" | wofi -i -dmenu -p "Configuration") || return 0
+
+    case "$choice" in
+        "Choose Kitty Terminal Theme"*)
+            local kitty_theme_dir="$CONFIG_DIR/kitty/themes"
+            if [[ ! -d "$kitty_theme_dir" ]]; then
+                notify "Settings" "Kitty themes directory not found."
+                return 1
+            fi
+            local themes selected_theme
+            themes=$(ls "$kitty_theme_dir" | grep '\.conf$' | sed 's/\.conf$//')
+            selected_theme=$(echo "$themes" | wofi -dmenu -p "Kitty Theme" -i) || return 0
+            if [[ -n "$selected_theme" ]]; then
+                sed -i "/^include themes\//d" "$CONFIG_DIR/kitty/kitty.conf"
+                echo "include themes/$selected_theme.conf" >> "$CONFIG_DIR/kitty/kitty.conf"
+                pkill -USR1 kitty || true
+                notify "Settings" "Kitty theme set to $selected_theme"
+            fi
+            ;;
+        "GTK Settings"*)
+            command -v nwg-look &>/dev/null && nwg-look || notify "Settings" "Install nwg-look first"
+            ;;
+        "QT Apps Settings (qt6ct)"*)
+            command -v qt6ct &>/dev/null && qt6ct || notify "Settings" "Install qt6ct first"
+            ;;
+        "QT Apps Settings (qt5ct)"*)
+            command -v qt5ct &>/dev/null && qt5ct || notify "Settings" "Install qt5ct first"
+            ;;
+        "Switch Dark-Light Theme"*)
+            local gtk_dark="Adwaita-dark" gtk_light="Adwaita"
+            if [[ "$gtk_mode" == "'prefer-dark'" ]]; then
+                gsettings set org.gnome.desktop.interface gtk-theme "$gtk_light"
+                gsettings set org.gnome.desktop.interface color-scheme 'prefer-light'
+                sed -i "s/^theme = .*/theme = $gtk_light/" "$CONFIG_DIR/qt5ct/qt5ct.conf" 2>/dev/null || true
+                sed -i "s/^theme = .*/theme = $gtk_light/" "$CONFIG_DIR/qt6ct/qt6ct.conf" 2>/dev/null || true
+                notify "Settings" "Switched to light mode"
+            else
+                gsettings set org.gnome.desktop.interface gtk-theme "$gtk_dark"
+                gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+                sed -i "s/^theme = .*/theme = $gtk_dark/" "$CONFIG_DIR/qt5ct/qt5ct.conf" 2>/dev/null || true
+                sed -i "s/^theme = .*/theme = $gtk_dark/" "$CONFIG_DIR/qt6ct/qt6ct.conf" 2>/dev/null || true
+                notify "Settings" "Switched to dark mode"
+            fi
+            hyprctl reload
+            ;;
+    esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# THEME UPDATE MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+theme_update() {
+    local wallpaper="${1:-$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg}"
+
+    if ! command -v wallust &>/dev/null; then
+        notify "Theme" "wallust is not installed" "critical"
+        return 1
+    fi
+    if [[ ! -f "$wallpaper" ]]; then
+        notify "Theme" "Wallpaper not found: $wallpaper" "critical"
+        return 1
+    fi
+
+    wallust run "$wallpaper"
+
+    # Reload running services
+    pgrep -x waybar >/dev/null && killall -SIGUSR2 waybar || true
+    pgrep -x mako >/dev/null && makoctl reload || true
+    hyprctl reload 2>/dev/null || true
+
+    notify "Theme" "Updated from $(basename "$wallpaper")"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TDP MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
 tdp_get_backend() {
     if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
     if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
-    if [ -d /sys/class/hwmon ]; then echo "sysfs"; return 0; fi
+    if [[ -d /sys/class/hwmon ]]; then echo "sysfs"; return 0; fi
     return 1
 }
 
@@ -40,10 +412,10 @@ tdp_get_current() {
     case "$backend" in
         ryzenadj) ryzenadj --info | grep -E 'TDP|CPU Name' ;;
         amdctl) amdctl info | grep -i 'power limit\|cpu model' ;;
-        sysfs) 
+        sysfs)
             local cap_file
-            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" | head -n1)
-            if [ -n "$cap_file" ]; then
+            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" 2>/dev/null | head -n1)
+            if [[ -n "$cap_file" ]]; then
                 echo "Current TDP: $(( $(cat "$cap_file") / 1000000 ))W"
             else
                 echo "TDP not found in sysfs"
@@ -56,18 +428,18 @@ tdp_get_current() {
 tdp_set() {
     local watts="$1"
     local backend
-    backend=$(tdp_get_backend || { notify "Error" "TDP backend not found"; exit 1; })
-    
+    backend=$(tdp_get_backend || { notify "Error" "TDP backend not found"; return 1; })
+
     case "$backend" in
         ryzenadj) sudo ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
         amdctl) sudo amdctl set power-limit "$watts" ;;
-        sysfs) 
+        sysfs)
             local cap_file
-            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" | head -n1)
+            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" 2>/dev/null | head -n1)
             echo $((watts * 1000000)) | sudo tee "$cap_file" >/dev/null
             ;;
     esac
-    notify "TDP Updated" "Set to ${watts}W via $backend"
+    notify "TDP" "Set to ${watts}W via $backend"
 }
 
 tdp_menu() {
@@ -75,17 +447,21 @@ tdp_menu() {
     current=$(tdp_get_current | grep -o '[0-9]\+' | head -n1 || echo "unknown")
     local options="10W\n15W\n25W\n35W\n45W"
     local choice
-    choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Set TDP (Current: ${current}W)")
-    if [ -n "$choice" ]; then
-        local watts=$(echo "$choice" | grep -o '[0-9]\+')
+    choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Set TDP (Current: ${current}W)") || return 0
+    if [[ -n "$choice" ]]; then
+        local watts
+        watts=$(echo "$choice" | grep -o '[0-9]\+')
         tdp_set "$watts"
     fi
 }
 
-# --- OSK Module ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# OSK MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
 osk_toggle() {
     local bin="wvkbd"
-    if command -v wvkbd-mobintl >/dev/null 2>&1; then bin="wvkbd-mobintl"; fi
+    command -v wvkbd-mobintl >/dev/null 2>&1 && bin="wvkbd-mobintl"
     if pgrep -x "$bin" >/dev/null 2>&1; then
         pkill -x "$bin"
         notify "Keyboard" "OSK hidden"
@@ -97,19 +473,47 @@ osk_toggle() {
     fi
 }
 
-# --- Power Module ---
+osk_swap_anchor() {
+    local state_file="${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor"
+    local current="bottom"
+    [[ -f "$state_file" ]] && current=$(cat "$state_file" 2>/dev/null || echo "bottom")
+
+    local next="top"
+    [[ "$current" = "top" ]] && next="bottom"
+
+    printf '%s\n' "$next" > "$state_file"
+
+    if command -v hyprctl >/dev/null 2>&1; then
+        if [[ "$next" = "top" ]]; then
+            hyprctl keyword windowrule "move 0 0, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+        else
+            hyprctl keyword windowrule "move 0 50%, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if pgrep -x wvkbd-mobintl >/dev/null 2>&1 || pgrep -x wvkbd >/dev/null 2>&1; then
+        pkill -x wvkbd-mobintl >/dev/null 2>&1 || true
+        pkill -x wvkbd >/dev/null 2>&1 || true
+        sleep 0.15
+        osk_toggle
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# POWER MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
 power_menu() {
-    local options="󰐥 Shutdown\n󰑐 Reboot\n󰒲 Suspend\n󰓅 Hybrid-Sleep\n󰌾 Lock\n󰗼 Logout"
+    local options="⏻ Shutdown\n Reboot\n Suspend\n⏾ Hybrid Sleep\n Lock\n Logout"
     local choice
-    choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "System Power")
+    choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Power") || return 0
     case "$choice" in
         *"Shutdown"*) power_action shutdown ;;
         *"Reboot"*) power_action reboot ;;
         *"Suspend"*) power_action suspend ;;
-        *"Hybrid-Sleep"*) power_action hybrid-sleep ;;
+        *"Hybrid"*"Sleep"*) power_action hybrid-sleep ;;
         *"Lock"*) power_action lock ;;
         *"Logout"*) power_action logout ;;
-        *) return 0 ;;
     esac
 }
 
@@ -122,7 +526,7 @@ power_action() {
         hybrid-sleep) systemctl suspend-then-hibernate ;;
         lock) hyprlock ;;
         logout) hyprctl dispatch exit ;;
-        *) echo "Unknown power action: $action"; exit 1 ;;
+        *) echo "Unknown power action: $action"; return 1 ;;
     esac
 }
 
@@ -141,18 +545,22 @@ power_profile_cycle() {
     elif command -v tuned-adm >/dev/null 2>&1 && sudo -n tuned-adm profile balanced >/dev/null 2>&1; then
         notify "Power Profile" "Switched to balanced via tuned-adm"
     else
-        notify "Error" "Could not switch power profile"
-        exit 1
+        notify "Error" "Could not switch power profile" "critical"
     fi
+    # Signal waybar to refresh
+    pkill -RTMIN+8 waybar 2>/dev/null || true
 }
 
-# --- Automation Module ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTOMATION MODULE (waybar exec helpers & background services)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 automation_dnd() {
-    if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
         echo "Hyprland instance signature not found." >&2
-        exit 1
+        return 1
     fi
-    socat -U - UNIX-CONNECT:/tmp/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock | while read -r line; do
+    socat -U - "UNIX-CONNECT:/tmp/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" | while read -r line; do
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
@@ -162,50 +570,52 @@ automation_dnd() {
 
 automation_osk() {
     local conf="/etc/hypr/wvkbd.conf"
-    [ -f "$conf" ] && . "$conf"
+    [[ -f "$conf" ]] && . "$conf"
     local layout="${WVKBD_LAYOUT:-mobintl}"
     local font="${WVKBD_FONT:-JetBrains Mono 20}"
-    local bg="${WVKBD_BG:-282a36}"
-    local fg="${WVKBD_FG:-44475a}"
-    local fg_sp="${WVKBD_FG_SP:-bd93f9}"
-    local press="${WVKBD_PRESS:-6272a4}"
-    local press_sp="${WVKBD_PRESS_SP:-ff79c6}"
-    local text="${WVKBD_TEXT:-f8f8f2}"
-    local text_sp="${WVKBD_TEXT_SP:-f8f8f2}"
-    local alpha="${WVKBD_ALPHA:-230}"
-    local height="${WVKBD_HEIGHT:-420}"
-    local height_land="${WVKBD_HEIGHT_LANDSCAPE:-320}"
+    local bg="${WVKBD_BG:-282a36}" fg="${WVKBD_FG:-44475a}"
+    local fg_sp="${WVKBD_FG_SP:-bd93f9}" press="${WVKBD_PRESS:-6272a4}"
+    local press_sp="${WVKBD_PRESS_SP:-ff79c6}" text="${WVKBD_TEXT:-f8f8f2}"
+    local text_sp="${WVKBD_TEXT_SP:-f8f8f2}" alpha="${WVKBD_ALPHA:-230}"
+    local height="${WVKBD_HEIGHT:-420}" height_land="${WVKBD_HEIGHT_LANDSCAPE:-320}"
     local layers="${WVKBD_LAYERS:-fullwide,special,emoji,nav}"
     local land_layers="${WVKBD_LANDSCAPE_LAYERS:-landscape,landscapespecial,emoji,nav}"
     local anchor="${WVKBD_ANCHOR:-bottom}"
     local state_file="${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor"
-    [ -f "$state_file" ] && anchor=$(cat "$state_file" 2>/dev/null || echo "$anchor")
+    [[ -f "$state_file" ]] && anchor=$(cat "$state_file" 2>/dev/null || echo "$anchor")
+
     local bin=""
-    command -v wvkbd-mobintl >/dev/null 2>&1 && bin="wvkbd-mobintl" || (command -v wvkbd >/dev/null 2>&1 && bin="wvkbd") || exit 0
-    sync_state() {
+    command -v wvkbd-mobintl >/dev/null 2>&1 && bin="wvkbd-mobintl" || \
+        (command -v wvkbd >/dev/null 2>&1 && bin="wvkbd") || return 0
+
+    _sync_state() {
         if compgen -G "/dev/input/by-id/*-event-kbd" >/dev/null; then
             pkill -x "$bin" >/dev/null 2>&1 || true
         else
             if ! pgrep -x "$bin" >/dev/null 2>&1; then
-                "$bin" --hidden -H "$height" -L "$height_land" -l "$layers" --landscape-layers "$land_layers" --fn "$font" --alpha "$alpha" --bg "$bg" --fg "$fg" --fg-sp "$fg_sp" --press "$press" --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 &
+                "$bin" --hidden -H "$height" -L "$height_land" -l "$layers" \
+                    --landscape-layers "$land_layers" --fn "$font" --alpha "$alpha" \
+                    --bg "$bg" --fg "$fg" --fg-sp "$fg_sp" --press "$press" \
+                    --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 &
             fi
         fi
     }
-    sync_state
+
+    _sync_state
     hyprctl keyword windowrule "float on, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
-    if [ "$anchor" = "top" ]; then
+    if [[ "$anchor" = "top" ]]; then
         hyprctl keyword windowrule "move 0 0, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
     else
         hyprctl keyword windowrule "move 0 50%, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
     fi
     udevadm monitor --udev --subsystem-match=input --property | while read -r line; do
-        [[ "$line" =~ ACTION=(add|remove|change) ]] && sync_state
+        [[ "$line" =~ ACTION=(add|remove|change) ]] && _sync_state
     done
 }
 
 automation_temp() {
     local best_temp_mc="" best_source="" best_score=-1
-    score_source() {
+    _score() {
         local src_lc=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
         if [[ "$src_lc" =~ (tctl|cpu|package|x86_pkg_temp|coretemp|k10temp|zenpower|soc_thermal) ]]; then echo 300
         elif [[ "$src_lc" =~ acpitz ]]; then echo 180
@@ -214,23 +624,27 @@ automation_temp() {
         else echo 60; fi
     }
     for zone in /sys/class/thermal/thermal_zone*; do
-        [ -r "$zone/temp" ] || continue
-        local temp_mc=$(cat "$zone/temp" 2>/dev/null || true)
-        local type=$(cat "$zone/type" 2>/dev/null || echo "unknown")
-        local score=$(score_source "$type")
-        if (( score > best_score )); then best_score=$score; best_temp_mc=$temp_mc; best_source="thermal:${type}"; fi
+        [[ -r "$zone/temp" ]] || continue
+        local temp_mc type score
+        temp_mc=$(cat "$zone/temp" 2>/dev/null || true)
+        type=$(cat "$zone/type" 2>/dev/null || echo "unknown")
+        score=$(_score "$type")
+        (( score > best_score )) && { best_score=$score; best_temp_mc=$temp_mc; best_source="thermal:${type}"; }
     done
     for hw in /sys/class/hwmon/hwmon*; do
-        [ -d "$hw" ] || continue
+        [[ -d "$hw" ]] || continue
         local name=$(cat "$hw/name" 2>/dev/null || echo "unknown")
         for input in "$hw"/temp*_input; do
-            [ -r "$input" ] || continue
-            local temp_mc=$(cat "$input" 2>/dev/null || true)
-            local label=$(cat "${input%_input}_label" 2>/dev/null || echo "temp")
-            local score=$(score_source "$name")
-            if (( score > best_score )); then best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"; fi
+            [[ -r "$input" ]] || continue
+            local temp_mc label score
+            temp_mc=$(cat "$input" 2>/dev/null || true)
+            label=$(cat "${input%_input}_label" 2>/dev/null || echo "temp")
+            score=$(_score "$name")
+            (( score > best_score )) && { best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"; }
         done
     done
+
+    local text tooltip class
     if [[ -z "$best_temp_mc" ]]; then
         text="N/A 󰔏"; tooltip="Unavailable"; class="missing"
     else
@@ -243,61 +657,115 @@ automation_temp() {
     printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' "$(json_escape "$text")" "$(json_escape "$tooltip")" "$class"
 }
 
-# --- Screenshot Module ---
-screenshot_take() {
-    local mode="${1:-full}"
-    local file="$HOME/Pictures/Screenshots/$(date +'%Y-%m-%d_%H-%M-%S').png"
-    mkdir -p "$HOME/Pictures/Screenshots"
-    if [ "$mode" == "area" ]; then
-        grim -g "$(slurp)" "$file"
+# ═══════════════════════════════════════════════════════════════════════════════
+# WAYBAR EXEC MODULES (JSON output for waybar custom modules)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+waybar_power_status() {
+    local backend="unknown" profile="unknown"
+
+    if busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile >/dev/null 2>&1; then
+        backend="tuned-ppd"
+        profile=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null | awk -F'"' '{print $2}')
+    elif command -v tuned-adm >/dev/null 2>&1; then
+        backend="tuned"
+        profile=$(tuned-adm active 2>/dev/null | sed -n 's/^Current active profile: *//p')
+    fi
+
+    local icon
+    case "$profile" in
+        throughput-performance*|latency-performance*|performance*) icon="" ;;
+        balanced*) icon="" ;;
+        powersave*|power-saver*) icon="" ;;
+        *) icon="" ;;
+    esac
+
+    local tdp="unavailable" tdp_supported=0
+    local current_tdp
+    current_tdp=$(tdp_get_current 2>/dev/null | grep -o '[0-9]\+' | head -n1 || true)
+    if [[ -n "${current_tdp:-}" ]] && [[ "$current_tdp" =~ ^[0-9]+$ ]]; then
+        tdp="${current_tdp}W"
+        tdp_supported=1
+    fi
+
+    local text tooltip
+    if [[ "$tdp_supported" -eq 1 ]]; then
+        printf -v tooltip 'Power profile: %s\nCurrent TDP: %s\nBackend: %s\n\nLeft click: Cycle profile\nRight click: Open TDP selector' "${profile:-unknown}" "$tdp" "$backend"
+        text="${tdp} ${icon}"
     else
-        grim "$file"
+        printf -v tooltip 'Power profile: %s\nBackend: %s\n\nLeft click: Cycle profile' "${profile:-unknown}" "$backend"
+        text="${icon}"
     fi
-    if [ -f "$file" ]; then
-        wl-copy < "$file"
-        notify "Screenshot Taken" "Saved to clipboard."
-    fi
+
+    printf '{"text":"%s ","tooltip":"%s","class":"%s","alt":"%s"}\n' \
+        "$(json_escape "$text")" "$(json_escape "$tooltip")" \
+        "$(json_escape "${profile:-unknown}")" "$(json_escape "${profile:-unknown}")"
 }
 
-# --- Lid Module ---
+waybar_headset_battery() {
+    local bin="/usr/bin/headsetcontrol"
+    if ! command -v "$bin" &>/dev/null; then
+        echo ""; return 0
+    fi
+    local out
+    out=$("$bin" -b 2>/dev/null) || { echo ""; return 0; }
+    local low_out
+    low_out=$(printf "%s" "$out" | tr '[:upper:]' '[:lower:]')
+
+    if printf "%s" "$low_out" | grep -E -q "not found|no headset|not connected|disconnected|power: *off|state: *off|status: *off"; then
+        printf "%s\n" "-1"; return 0
+    fi
+
+    local level_field
+    level_field=$(printf "%s" "$out" | awk -F'Level:' '/Level:/ {print $2; exit}' | tr -d ' \t')
+    [[ -z "$level_field" ]] && { echo ""; return 0; }
+
+    local pct_signed
+    pct_signed=$(printf "%s" "$level_field" | sed -n 's/^\([+-]\?[0-9]\+\).*/\1/p')
+    [[ -z "$pct_signed" || "$pct_signed" =~ ^- ]] && { echo ""; return 0; }
+
+    printf "%s\n" "${pct_signed#+}"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LID MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
 lid_handle() {
     local action="$1"
     local internal_output
     internal_output=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1)
     local external_count
     external_count=$(hyprctl -j monitors 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
+
     case "$action" in
         close)
             if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
                 hyprctl keyword monitor "$internal_output,disable"
             else
-                systemctl hybrid-sleep
+                loginctl lock-session 2>/dev/null || true
+                systemctl suspend
             fi
             ;;
         open)
-            if [[ -n "$internal_output" ]]; then
-                hyprctl reload
-            fi
+            [[ -n "$internal_output" ]] && hyprctl reload
             ;;
-        *) echo "Usage: hyprbazzite-ctl lid {close|open}"; exit 1 ;;
+        *) echo "Usage: hyprbazzite-ctl lid [close|open]"; return 1 ;;
     esac
 }
 
-# --- Keybinds Module ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# KEYBINDS MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
 keybinds_switch() {
     local action="${1:-}"
     local profile_file="/etc/hypr/keybind-profile"
-    local keyd_src="/usr/lib/hyprbazzite/keyd/macos.conf"
     local keyd_dst="/etc/keyd/default.conf"
     local current="linux"
 
-    if [[ -f "$profile_file" ]]; then
-        current=$(cat "$profile_file" 2>/dev/null | tr -d '[:space:]')
-    fi
+    [[ -f "$profile_file" ]] && current=$(cat "$profile_file" 2>/dev/null | tr -d '[:space:]')
 
-    # keyd has been retired. Both profiles now bind real physical keys directly
-    # (macos = ALT/Option modifier, exactly like AeroSpace). This helper only
-    # tears down any leftover keyd remap so an old install can't fight the binds.
     _apply_keyd() {
         if [[ -f "$keyd_dst" ]]; then
             sudo rm -f "$keyd_dst"
@@ -308,61 +776,73 @@ keybinds_switch() {
     case "$action" in
         macos|linux)
             echo "$action" > "$profile_file"
-            _apply_keyd "$action"
+            _apply_keyd
             notify "Keybinds" "Switched to ${action} profile. Reloading..."
             hyprctl reload
             ;;
         toggle)
             if [[ "$current" == "macos" ]]; then
-                echo "linux" > "$profile_file"
-                _apply_keyd "linux"
+                echo "linux" > "$profile_file"; _apply_keyd
                 notify "Keybinds" "Switched to linux profile. Reloading..."
             else
-                echo "macos" > "$profile_file"
-                _apply_keyd "macos"
+                echo "macos" > "$profile_file"; _apply_keyd
                 notify "Keybinds" "Switched to macos profile. Reloading..."
             fi
             hyprctl reload
             ;;
         status|"")
             echo "Current keybind profile: $current"
-            echo "keyd remap: retired (binds use real physical keys; macos = ALT/Option)"
-            if [[ -f "$keyd_dst" ]]; then
-                echo "note: a leftover $keyd_dst still exists — it will be removed on next profile switch"
-            fi
             ;;
         *)
             echo "Usage: hyprbazzite-ctl keybinds [macos|linux|toggle|status]"
-            exit 1
+            return 1
             ;;
     esac
 }
 
-# --- Main Entry Point ---
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN ENTRY POINT
+# ═══════════════════════════════════════════════════════════════════════════════
+
 main() {
     if [[ $# -eq 0 ]]; then
-        echo "Usage: hyprbazzite-ctl [module] [action] [args...]"
-        echo "Modules:"
-        echo "  automation [dnd|osk|temp]"
-        echo "  tdp [get|set <watts>|profile]"
-        echo "  osk toggle"
-        echo "  power [profile|menu|shutdown|reboot|suspend|hybrid-sleep|lock|logout]"
-        echo "  screenshot [full|area]"
-        echo "  keybinds [macos|linux|toggle|status]"
-        echo "  lid [close|open]"
-        exit 0
+        cat <<'USAGE'
+Usage: hyprbazzite-ctl <module> [action] [args...]
+
+Modules:
+  menu                          Interactive launcher menu
+  gamemode [toggle]             Toggle performance gamemode
+  screenshot [region|window|output|clipboard]
+  wallpaper [pick]              Interactive wallpaper picker
+  chezmoi [push|pull]           Dotfiles management
+  refresh                       Restart session apps (waybar, idle, etc.)
+  settings                      Quick settings menu
+  theme [update] [wallpaper]    Update color theme from wallpaper
+  tdp [get|set <watts>|profile] TDP power management
+  osk [toggle|swap-anchor]      On-screen keyboard control
+  power [profile|menu|shutdown|reboot|suspend|hybrid-sleep|lock|logout]
+  automation [dnd|osk|temp]     Background services & waybar helpers
+  waybar [power-status|headset-battery]  Waybar JSON exec modules
+  keybinds [macos|linux|toggle|status]
+  lid [close|open]              Lid switch handling
+USAGE
+        return 0
     fi
 
-    local module="$1"
-    shift
+    local module="$1"; shift
 
     case "$module" in
-        automation)
-            case "${1:-}" in
-                dnd) automation_dnd ;;
-                osk) automation_osk ;;
-                temp) automation_temp ;;
-                *) echo "Unknown automation action"; exit 1 ;;
+        menu) menu_show ;;
+        gamemode) gamemode_toggle ;;
+        screenshot) screenshot_take "${1:-region}" ;;
+        wallpaper) wallpaper_pick ;;
+        chezmoi) chezmoi_action "${1:-}" ;;
+        refresh) session_refresh ;;
+        settings) quicksettings_show ;;
+        theme)
+            case "${1:-update}" in
+                update) theme_update "${2:-}" ;;
+                *) theme_update "$1" ;;
             esac
             ;;
         tdp)
@@ -370,34 +850,44 @@ main() {
                 get) tdp_get_current ;;
                 set) tdp_set "${2:-}" ;;
                 profile) tdp_menu ;;
-                *) echo "Unknown TDP action"; exit 1 ;;
+                *) echo "Usage: hyprbazzite-ctl tdp [get|set <watts>|profile]"; return 1 ;;
             esac
             ;;
         osk)
-            case "${1:-}" in
+            case "${1:-toggle}" in
                 toggle) osk_toggle ;;
-                *) echo "Unknown OSK action"; exit 1 ;;
+                swap-anchor) osk_swap_anchor ;;
+                *) echo "Usage: hyprbazzite-ctl osk [toggle|swap-anchor]"; return 1 ;;
             esac
             ;;
         power)
-            case "${1:-}" in
+            case "${1:-menu}" in
                 profile) power_profile_cycle ;;
                 menu) power_menu ;;
                 *) power_action "${1:-}" ;;
             esac
             ;;
-        screenshot)
-            screenshot_take "${1:-full}"
+        automation)
+            case "${1:-}" in
+                dnd) automation_dnd ;;
+                osk) automation_osk ;;
+                temp) automation_temp ;;
+                *) echo "Usage: hyprbazzite-ctl automation [dnd|osk|temp]"; return 1 ;;
+            esac
             ;;
-        keybinds)
-            keybinds_switch "${1:-}"
+        waybar)
+            case "${1:-}" in
+                power-status) waybar_power_status ;;
+                headset-battery) waybar_headset_battery ;;
+                *) echo "Usage: hyprbazzite-ctl waybar [power-status|headset-battery]"; return 1 ;;
+            esac
             ;;
-        lid)
-            lid_handle "${1:-}"
-            ;;
+        keybinds) keybinds_switch "${1:-}" ;;
+        lid) lid_handle "${1:-}" ;;
         *)
-            echo "Unknown module: $module"
-            exit 1
+            echo "Unknown module: $module" >&2
+            echo "Run 'hyprbazzite-ctl' for usage." >&2
+            return 1
             ;;
     esac
 }

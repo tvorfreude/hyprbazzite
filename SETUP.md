@@ -76,6 +76,40 @@ To pull the latest changes from your dotfiles repo after provisioning:
 chezmoi update
 ```
 
+## Important: Configuration Updates for Existing Users
+
+On an immutable (bootc) image, system defaults in `/etc/skel/` are only applied when
+a new user account is created. **Existing users do not automatically receive configuration
+updates** shipped in newer image builds.
+
+This means if you rebase to a newer HyprBazzite image that ships updated Hyprland configs,
+Waybar layouts, or other dotfiles, your existing `~/.config/` will remain unchanged.
+
+### How to stay up to date
+
+1. **Chezmoi (recommended)**: If you use chezmoi to manage your dotfiles, run
+   `chezmoi update` after rebasing. Your dotfiles repo is the source of truth.
+
+2. **Manual sync**: Compare your local config against the shipped defaults:
+   ```bash
+   diff -r ~/.config/hypr /usr/share/hyprbazzite/config/hypr
+   ```
+   Then selectively copy any changes you want.
+
+3. **Nuclear option**: Remove your local config and let the skel defaults re-apply
+   on next login (you'll lose any personal customizations):
+   ```bash
+   rm -rf ~/.config/hypr ~/.config/waybar ~/.config/wofi
+   # Log out and back in — symlinks from /etc/skel will be recreated
+   ```
+
+### Why this happens
+
+Bootc images are immutable — the system partition is read-only and atomically
+swapped on updates. User home directories persist across updates by design.
+This is a feature (your customizations survive reboots and updates), but it
+means you must actively pull in new defaults when desired.
+
 ## Troubleshooting
 
 ### Hyprland won't start

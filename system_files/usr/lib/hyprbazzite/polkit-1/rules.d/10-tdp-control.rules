@@ -1,7 +1,23 @@
-# Polkit rule to allow users in the 'wheel' group to use TDP control without password
+# Polkit rule to allow users in the 'wheel' group to use TDP control without password.
+# Scoped to only the specific binaries needed for TDP management.
 polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.policykit.exec" && 
+    if (action.id == "org.freedesktop.policykit.exec" &&
         subject.isInGroup("wheel")) {
-        return polkit.Result.YES;
+        // Only allow passwordless execution for TDP-related binaries
+        var allowedPrograms = [
+            "/usr/bin/ryzenadj",
+            "/usr/sbin/ryzenadj",
+            "/usr/bin/amdctl",
+            "/usr/sbin/amdctl",
+            "/usr/libexec/hyprbazzite-ctl"
+        ];
+        var program = action.lookup("program");
+        if (program) {
+            for (var i = 0; i < allowedPrograms.length; i++) {
+                if (program == allowedPrograms[i]) {
+                    return polkit.Result.YES;
+                }
+            }
+        }
     }
 });

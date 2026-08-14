@@ -319,7 +319,7 @@ else
     hl.bind(m .. " + N",         hl.dsp.exec_cmd("swaync-client -t -sw"))
     hl.bind(m .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
     hl.bind(m .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
-    hl.bind(m .. " + SHIFT + K", hl.dsp.exec_cmd("/etc/hypr/scripts/swap-osk-half.sh"))
+    hl.bind(m .. " + SHIFT + K", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk swap-anchor"))
     hl.bind(m .. " + O",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
     hl.bind(m .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
 
@@ -344,8 +344,8 @@ hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),                    
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),                         { locked = true })
 
 -- ─── Lid Switch ──────────────────────────────────────────────────────────────
-hl.bind("switch:on:Lid Switch",  hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh lid-close"), { locked = true })
-hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/etc/hypr/scripts/lidact.sh lid-open"),  { locked = true })
+hl.bind("switch:on:Lid Switch",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl lid close"), { locked = true })
+hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl lid open"),  { locked = true })
 
 -- ─── Gestures ────────────────────────────────────────────────────────────────
 hl.gesture({

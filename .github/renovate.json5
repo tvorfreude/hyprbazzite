@@ -6,16 +6,48 @@
 
   "rebaseWhen": "never",
 
+  // Ensure Renovate detects 'Containerfile' (not just 'Dockerfile')
+  "dockerfile": {
+    "fileMatch": ["(^|/)Containerfile$", "(^|/)Dockerfile$"]
+  },
+
+  // Track custom version ARGs in the Containerfile
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["(^|/)Containerfile$"],
+      "matchStrings": [
+        "ARG NERD_FONTS_VERSION=(?<currentValue>v[\\d\\.]+)"
+      ],
+      "depNameTemplate": "ryanoasis/nerd-fonts",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["(^|/)Justfile$"],
+      "matchStrings": [
+        "bib_image\\s*:=\\s*\"(?<depName>[^:]+):(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+
   "packageRules": [
     {
       "automerge": true,
       "matchUpdateTypes": ["pin", "pinDigest"]
     },
     {
-      "enabled": false,
-      "matchUpdateTypes": ["digest", "pinDigest", "pin"],
-      "matchDepTypes": ["container"],
-      "matchFileNames": [".github/workflows/**.yaml", ".github/workflows/**.yml"],
+      // Pin GitHub Actions by SHA (allow digest updates for actions)
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
     },
+    {
+      // Group all GitHub Actions updates together
+      "groupName": "github-actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest"]
+    }
   ]
 }
