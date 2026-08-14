@@ -1,0 +1,31 @@
+# Pre-commit hooks for HyprBazzite
+# Install: pip install pre-commit && pre-commit install
+# See https://pre-commit.com for more information
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: detect-private-key
+        name: Detect private keys (including Secure Boot keys)
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  - repo: local
+    hooks:
+      - id: no-secureboot-keys
+        name: Prevent Secure Boot private key commits
+        entry: bash -c 'echo "ERROR: Secure Boot private key (.key file) detected in commit!" && exit 1'
+        language: system
+        files: '\.key$'
+        types: [file]
+
+      - id: shellcheck
+        name: ShellCheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+        args: ['-e', 'SC1091']  # Don't fail on non-resolvable source paths

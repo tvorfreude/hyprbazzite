@@ -1,38 +1,50 @@
--- Autostart necessary processes
-hl.on("hyprland.start", function ()
-    -- CORE SERVICES
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- HyprBazzite Autostart
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- All processes are guarded against duplicates so that a `hyprctl reload`
+-- doesn't spawn second instances.
+
+local function exec_once(cmd, process_name)
+    process_name = process_name or cmd:match("^(%S+)")
+    hl.exec_cmd(string.format("pgrep -x %s >/dev/null 2>&1 || %s", process_name, cmd))
+end
+
+hl.on("hyprland.start", function()
+    -- CORE SERVICES (session bus, polkit, keyring)
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
     hl.exec_cmd("systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    hl.exec_cmd("/usr/libexec/lxqt-policykit-agent")
-    hl.exec_cmd("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg")
+    exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit")
+    exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
 
     -- UI ELEMENTS
-    hl.exec_cmd("waybar --config /etc/waybar/config.jsonc --style /etc/waybar/style.css")
-    hl.exec_cmd("swaync -c /etc/swaync/config.json -s /etc/swaync/style.css")
-    hl.exec_cmd("swayidle -C /etc/swayidle/config -w")
-    hl.exec_cmd("fcitx5")
-    
-    -- WALLPAPER & AUTOMATION
-    hl.exec_cmd("swww-daemon")
-    hl.exec_cmd("wallpaper-cycle")
-    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl automation dnd")
-    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl automation osk")
+    exec_once("waybar --config /etc/waybar/config.jsonc --style /etc/waybar/style.css", "waybar")
+    exec_once("swaync -c /etc/swaync/config.json -s /etc/swaync/style.css", "swaync")
+    exec_once("swayidle -C /etc/swayidle/config -w", "swayidle")
+    exec_once("fcitx5", "fcitx5")
+
+    -- WALLPAPER
+    exec_once("swww-daemon", "swww-daemon")
+    exec_once("wallpaper-cycle", "wallpaper-cycle")
+
+    -- AUTOMATION (hyprbazzite-ctl long-running services)
+    exec_once("/usr/libexec/hyprbazzite-ctl automation dnd", "socat")
+    exec_once("/usr/libexec/hyprbazzite-ctl automation osk", "udevadm")
 
     -- UTILITIES
-    hl.exec_cmd("wl-paste --watch cliphist store")
-    hl.exec_cmd("blueman-applet")
-    hl.exec_cmd("cursor-clip --daemon")
-    hl.exec_cmd("sh -c 'pgrep -x nm-applet >/dev/null || nm-applet --indicator'")
-    hl.exec_cmd("flatpak run com.bitwarden.desktop")
+    exec_once("wl-paste --watch cliphist store", "wl-paste")
+    exec_once("blueman-applet", "blueman-applet")
+    exec_once("nm-applet --indicator", "nm-applet")
 
-    -- HARDWARE SPECIFIC LOGIC (Lua Native)
-    -- This checks for IIO devices (OXP/Handheld rotation)
-    if os.execute("test -d /sys/bus/iio/devices") == 0 then
-        hl.exec_cmd("iio-hyprland")
+    -- OPTIONAL (only start if binary exists)
+    if os.execute("command -v cursor-clip >/dev/null 2>&1") == 0 then
+        exec_once("cursor-clip --daemon", "cursor-clip")
     end
 
-    -- This checks for ASUS/ROG hardware
+    -- HARDWARE-SPECIFIC
+    if os.execute("test -d /sys/bus/iio/devices") == 0 then
+        exec_once("iio-hyprland", "iio-hyprland")
+    end
     if os.execute("test -d /sys/module/asus_nb_wmi") == 0 then
-        hl.exec_cmd("rog-control-center")
+        exec_once("rog-control-center", "rog-control-ce")
     end
 end)

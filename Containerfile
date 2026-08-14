@@ -5,7 +5,8 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Download external assets (fonts, themes)
 # ---------------------------------------------------------------------------
-FROM fedora:latest AS assets
+# renovate: datasource=docker depName=fedora
+FROM fedora:42 AS assets
 
 ARG NERD_FONTS_VERSION=v3.4.0
 
@@ -31,6 +32,7 @@ RUN mkdir -p /qt5ct/colors && \
 # ===========================================================================
 # Stage 3: Final Image
 # ===========================================================================
+# renovate: datasource=docker depName=ghcr.io/ublue-os/bazzite
 FROM ghcr.io/ublue-os/bazzite:stable
 
 # Build arguments for versioning
@@ -64,36 +66,45 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y clean all
 
 # ---------------------------------------------------------------------------
-# Step 4: Install HyprBazzite packages
+# Step 4: Install HyprBazzite packages (split by change frequency for caching)
 # ---------------------------------------------------------------------------
+
+# Core Hyprland + desktop session (changes rarely)
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install --skip-unavailable \
-    # Hyprland core
     hyprland hyprland-guiutils hyprlock swayidle hyprpaper uwsm hyprland-uwsm \
-    # Desktop utilities
-    swww waybar SwayNotificationCenter wofi wvkbd hhd adjustor hhd-ui lact \
-    # Shell and CLI tools
-    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep \
-    # File management
-    thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 \
-    # System utilities
-    network-manager-applet pavucontrol xdg-desktop-portal-hyprland lxqt-policykit \
-    # Input remapping (for macOS keybind profile)
-    keyd \
-    # Security and encryption
-    gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
-    # Theming
-    blueman breeze-icon-theme qt5ct \
-    # Gaming
+    swww waybar SwayNotificationCenter wofi wvkbd \
+    xdg-desktop-portal-hyprland lxqt-policykit sddm \
+    openrgb openrgb-udev-rules && \
+    dnf5 -y clean all
+
+# Shell, CLI tools, and terminal (changes occasionally)
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    dnf5 -y install --skip-unavailable \
+    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep && \
+    dnf5 -y clean all
+
+# Gaming and hardware support (changes with upstream)
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    dnf5 -y install --skip-unavailable \
+    hhd adjustor hhd-ui lact keyd \
     rom-properties lutris steam-devices \
-    # Fonts
+    brightnessctl gparted systemd-devel btop && \
+    dnf5 -y clean all
+
+# Desktop apps, theming, and utilities (changes more frequently)
+RUN --mount=type=cache,dst=/var/cache \
+    --mount=type=cache,dst=/var/log \
+    dnf5 -y install --skip-unavailable \
+    thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 \
+    network-manager-applet pavucontrol \
+    gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
+    blueman breeze-icon-theme qt5ct \
     jetbrains-mono jetbrains-mono-fonts \
-    # Media and clipboard
-    wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
-    # Hardware and system tools
-    brightnessctl swappy gparted systemd-devel btop \
-    openrgb openrgb-udev-rules sddm && \
+    wl-clipboard grim slurp playerctl imv swappy mpv cliphist && \
     dnf5 -y autoremove && \
     dnf5 -y clean all
 
@@ -106,10 +117,15 @@ COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
 COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
 
 # ---------------------------------------------------------------------------
-# Step 6: Fix terra-mesa GPG key issue
+# Step 6: Import terra-mesa GPG key (instead of disabling gpgcheck)
 # ---------------------------------------------------------------------------
-RUN sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/null || true && \
-    sed -i 's/^repo_gpgcheck=1/repo_gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo 2>/dev/null || true
+RUN if [ -f /etc/yum.repos.d/terra-mesa.repo ]; then \
+        rpm --import https://repos.fyralabs.com/terra42/key.asc 2>/dev/null || \
+        rpm --import https://repos.fyralabs.com/terra41/key.asc 2>/dev/null || \
+        (echo "Warning: Could not import terra GPG key, disabling gpgcheck as fallback" && \
+         sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo && \
+         sed -i 's/^repo_gpgcheck=1/repo_gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo); \
+    fi
 
 # ---------------------------------------------------------------------------
 # Step 7: Set up user config symlinks (bootc-compliant)
@@ -128,8 +144,10 @@ RUN mkdir -p /usr/share/hyprbazzite/config && \
 RUN chmod +x /usr/bin/wallpaper-cycle && \
     # Ensure all libexec scripts are executable
     find /usr/libexec/ -type f -exec chmod +x {} + && \
-    # Ensure all Hyprland scripts are executable
-    find /usr/lib/hyprbazzite/hypr/scripts/ -type f -exec chmod +x {} +
+    # Ensure remaining Hyprland helper scripts are executable
+    chmod +x /usr/lib/hyprbazzite/hypr/scripts/disable-nonpower-wakeup.sh && \
+    # Common library is sourced, not executed
+    chmod 0644 /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh
 
 # ---------------------------------------------------------------------------
 # Step 9: Configure user defaults, environment, and systemd presets

@@ -14,10 +14,17 @@ readonly TRANSITION_FPS=30
 readonly TRANSITION_STEP=90
 readonly TRANSITION_DURATION=2
 readonly CYCLE_INTERVAL=900  # seconds (15 minutes)
+readonly FILTER="${WALLPAPER_FILTER:-Lanczos3}"  # Lanczos3 for smooth scaling, Nearest for pixel art
 
 # -- Helpers ------------------------------------------------------------------
 
 cycle_now() {
+    # Skip if user has pinned a wallpaper via the wallpaper picker
+    local runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+    if [[ -f "${runtime_dir}/wallpaper-pinned" ]]; then
+        return 0
+    fi
+
     # Re-scan directory (in case files change)
     if [[ ! -d "$DIR" ]]; then
         return 1
@@ -38,7 +45,7 @@ cycle_now() {
             --transition-step "$TRANSITION_STEP" \
             --transition-duration "$TRANSITION_DURATION" \
             --resize crop \
-            --filter Nearest \
+            --filter "$FILTER" \
             "$wallpaper"
     fi
 }

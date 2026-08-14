@@ -249,11 +249,11 @@
       "weeks-pos": "right",
       "on-scroll": 1,
       "format": {
-        "months":   "<span color='#ffead3'><b>{}</b></span>",
-        "days":     "<span color='#ecc6d9'><b>{}</b></span>",
-        "weeks":    "<span color='#99ffdd'><b>W{:%V}</b></span>",
-        "weekdays": "<span color='#ffcc66'><b>{}</b></span>",
-        "today":    "<span color='#ff6699'><b><u>{}</u></b></span>"
+        "months":   "<span color='#f8f8f2'><b>{}</b></span>",
+        "days":     "<span color='#bd93f9'><b>{}</b></span>",
+        "weeks":    "<span color='#50fa7b'><b>W{:%V}</b></span>",
+        "weekdays": "<span color='#f1fa8c'><b>{}</b></span>",
+        "today":    "<span color='#ff79c6'><b><u>{}</u></b></span>"
       }
     },
     "actions": {
@@ -319,7 +319,7 @@
     "format-time": "{H}h {M}min",
     "tooltip": true,
     "tooltip-format": "{timeTo} — {power}w",
-    "on-click-right": "$HOME/.config/hypr/scripts/Wlogout.sh"
+    "on-click-right": "/usr/libexec/hyprbazzite-ctl power menu"
   },
 
   "bluetooth": {
@@ -343,7 +343,7 @@
     "tooltip-format-disconnected": "󰌙 Disconnected",
     "max-length": 30,
     "format-icons": ["󰤯 ","󰤟 ","󰤢 ","󰤥 ","󰤨 "],
-    "on-click-right": "$HOME/.config/hypr/scripts/WaybarScripts.sh --nmtui"
+    "on-click-right": "kitty -e nmtui"
   },
 
   "pulseaudio": {
@@ -389,8 +389,8 @@
     "on-click":        "playerctl previous",
     "on-click-right":  "playerctl next",
     "scroll-step": 5.0,
-    "on-scroll-up":   "$HOME/.config/hypr/scripts/Volume.sh --inc",
-    "on-scroll-down": "$HOME/.config/hypr/scripts/Volume.sh --dec",
+    "on-scroll-up":   "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
+    "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-",
     "smooth-scrolling-threshold": 1,
     "tooltip": true,
     "tooltip-format": "{status_icon} {dynamic}\nLeft: previous  Mid: pause  Right: next",
@@ -501,21 +501,22 @@
     "return-type": "json",
     "exec": "/usr/libexec/hyprbazzite-ctl automation temp",
     "interval": 10,
-    "on-click-right": "$HOME/.config/hypr/scripts/WaybarScripts.sh --nvtop"
+    "on-click-right": "kitty -e btop"
   },
 
   "custom/power-profiles-daemon": {
     "return-type": "json",
-    "exec": "bash /etc/hypr/scripts/waybar-power-tdp-status.sh",
-    "interval": 2,
+    "exec": "/usr/libexec/hyprbazzite-ctl waybar power-status",
+    "interval": 30,
+    "signal": 8,
     "on-click":       "/usr/libexec/hyprbazzite-ctl power profile",
     "on-click-right": "/usr/libexec/hyprbazzite-ctl tdp profile"
   },
 
   "custom/headset-battery": {
     "format": "󰠇 {}%",
-    "exec": "/usr/lib/hyprbazzite/hypr/scripts/logibattery.sh",
-    "interval": 5,
+    "exec": "/usr/libexec/hyprbazzite-ctl waybar headset-battery",
+    "interval": 60,
     "on-click": "solaar",
     "return-type": "integer"
   },
@@ -591,11 +592,13 @@
   },
   "custom/light_dark": {
     "format": "󰔎",
+    "on-click": "/usr/libexec/hyprbazzite-ctl settings",
     "tooltip": true,
     "tooltip-format": "Toggle Light / Dark"
   },
   "custom/settings": {
     "format": "󰒓",
+    "on-click": "nwg-look || true",
     "tooltip": true,
     "tooltip-format": "Settings"
   },

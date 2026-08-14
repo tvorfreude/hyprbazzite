@@ -1,9 +1,9 @@
-# Lock screen after 5 minutes
-timeout 300 'hyprlock -c /etc/hypr/hyprlock.conf'
+# Lock screen after 5 minutes (skip if already locked)
+timeout 300 'pgrep -x hyprlock || hyprlock -c /etc/hypr/hyprlock.conf'
 
 # Turn off displays after 10 minutes
 timeout 600 'hyprctl dispatch dpms off'
 resume 'hyprctl dispatch dpms on'
 
-# Lock before the system suspends
-before-sleep 'hyprlock -c /etc/hypr/hyprlock.conf'
+# Lock before the system suspends (skip if already locked)
+before-sleep 'pgrep -x hyprlock || hyprlock -c /etc/hypr/hyprlock.conf'

@@ -581,7 +581,7 @@ Rectangle {
 
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: Qt.formatDateTime(new Date(), "HH:mm")
+                    text: { void(root.tick); return Qt.formatDateTime(new Date(), "HH:mm"); }
                     color: "#f8f8f2"
                     font.family: "JetBrains Mono, Symbols Nerd Font"
                     font.weight: Font.Thin
@@ -609,7 +609,7 @@ Rectangle {
                     spacing: 12
 
                     Text {
-                        text: Qt.formatDateTime(new Date(), "MMMM d, dddd")
+                        text: { void(root.tick); return Qt.formatDateTime(new Date(), "MMMM d, dddd"); }
                         color: "#8be9fd"
                         font.family: "JetBrains Mono, Symbols Nerd Font"
                         font.pixelSize: Math.max(13, root.height * 0.017)
@@ -971,11 +971,47 @@ Rectangle {
         }
     }
 
+    // Tick property for forcing time re-evaluation
+    property int tick: 0
+
     Timer {
         interval: 1000
         running: true
         repeat: true
         onTriggered: {
+            root.tick++;
+        }
+    }
+
+    // Login failure handling
+    Connections {
+        target: sddm
+        function onLoginFailed() {
+            passwordInput.text = "";
+            passwordBox.border.color = "#ff5555";
+            errorText.visible = true;
+            errorTimer.start();
+        }
+    }
+
+    Text {
+        id: errorText
+        visible: false
+        text: "Authentication failed"
+        color: "#ff5555"
+        font.family: "JetBrains Mono, Symbols Nerd Font"
+        font.pixelSize: 12
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 20
+    }
+
+    Timer {
+        id: errorTimer
+        interval: 3000
+        onTriggered: {
+            errorText.visible = false;
+            passwordBox.border.color = passwordInput.activeFocus ? "#bd93f9" : "#2a2d3a";
         }
     }
 
