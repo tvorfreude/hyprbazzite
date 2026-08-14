@@ -1,83 +1,65 @@
 {
-  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-  extends: [
-    'config:best-practices',
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices"
   ],
-  rebaseWhen: 'auto',
-  dockerfile: {
-    managerFilePatterns: [
-      '/(^|/)Containerfile$/',
-      '/(^|/)Dockerfile$/',
-    ],
+
+  "rebaseWhen": "auto",
+
+  "dockerfile": {
+    "fileMatch": ["(^|/)Containerfile$", "(^|/)Dockerfile$"]
   },
-  customManagers: [
+
+  "customManagers": [
     {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/(^|/)Containerfile$/',
+      "customType": "regex",
+      "fileMatch": ["(^|/)Containerfile$"],
+      "matchStrings": [
+        "ARG NERD_FONTS_VERSION=(?<currentValue>v[\\d\\.]+)"
       ],
-      matchStrings: [
-        'ARG NERD_FONTS_VERSION=(?<currentValue>v[\\d\\.]+)',
-      ],
-      depNameTemplate: 'ryanoasis/nerd-fonts',
-      datasourceTemplate: 'github-releases',
-      versioningTemplate: 'semver',
+      "depNameTemplate": "ryanoasis/nerd-fonts",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
     },
     {
-      customType: 'regex',
-      managerFilePatterns: [
-        '/(^|/)Justfile$/',
+      "customType": "regex",
+      "fileMatch": ["(^|/)Justfile$"],
+      "matchStrings": [
+        "bib_image\\s*:=\\s*\"(?<depName>[^:]+):(?<currentValue>[^\"]+)\""
       ],
-      matchStrings: [
-        'bib_image\\s*:=\\s*"(?<depName>[^:]+):(?<currentValue>[^"]+)"',
-      ],
-      datasourceTemplate: 'docker',
-    },
+      "datasourceTemplate": "docker"
+    }
   ],
-  packageRules: [
+
+  "packageRules": [
     {
-      automerge: true,
-      matchUpdateTypes: [
-        'pin',
-        'pinDigest',
-        'digest',
-      ],
+      "automerge": true,
+      "matchUpdateTypes": ["pin", "pinDigest", "digest"]
     },
     {
-      automerge: true,
-      groupName: 'github-actions',
-      matchManagers: [
-        'github-actions',
-      ],
-      matchUpdateTypes: [
-        'minor',
-        'patch',
-        'digest',
-        'pin',
-        'pinDigest',
-      ],
+      "automerge": true,
+      "groupName": "github-actions",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"]
     },
     {
-      automerge: true,
-      matchUpdateTypes: [
-        'patch',
-      ],
+      "automerge": true,
+      "matchUpdateTypes": ["patch"]
     },
     {
-      automerge: true,
-      matchDatasources: [
-        'github-releases',
-      ],
-      matchUpdateTypes: [
-        'minor',
-        'patch',
-      ],
+      "automerge": true,
+      "matchDatasources": ["github-releases"],
+      "matchUpdateTypes": ["minor", "patch"]
     },
     {
-      matchManagers: [
-        'github-actions',
-      ],
-      pinDigests: true,
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
     },
-  ],
+    {
+      // Don't auto-bump or digest-pin the Fedora assets stage
+      // It only needs curl+unzip; tracking latest is unnecessary churn
+      "matchPackageNames": ["fedora"],
+      "enabled": false
+    }
+  ]
 }
