@@ -4,7 +4,7 @@
     "config:best-practices",
   ],
 
-  "rebaseWhen": "never",
+  "rebaseWhen": "auto",
 
   // Ensure Renovate detects 'Containerfile' (not just 'Dockerfile')
   "dockerfile": {
@@ -35,19 +35,32 @@
 
   "packageRules": [
     {
+      // Auto-merge all pin/digest updates (low risk — same code, just pinning)
       "automerge": true,
-      "matchUpdateTypes": ["pin", "pinDigest"]
+      "matchUpdateTypes": ["pin", "pinDigest", "digest"]
     },
     {
-      // Pin GitHub Actions by SHA (allow digest updates for actions)
-      "matchManagers": ["github-actions"],
-      "pinDigests": true
-    },
-    {
-      // Group all GitHub Actions updates together
+      // Auto-merge minor and patch updates for GitHub Actions
+      "automerge": true,
       "groupName": "github-actions",
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "digest"]
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"]
+    },
+    {
+      // Auto-merge patch updates for everything else (Containerfile deps, etc.)
+      "automerge": true,
+      "matchUpdateTypes": ["patch"]
+    },
+    {
+      // Auto-merge minor updates for GitHub releases (nerd-fonts, etc.)
+      "automerge": true,
+      "matchDatasources": ["github-releases"],
+      "matchUpdateTypes": ["minor", "patch"]
+    },
+    {
+      // Pin GitHub Actions by SHA
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
     }
   ]
 }
