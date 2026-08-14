@@ -1,66 +1,83 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:best-practices",
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:best-practices',
   ],
-
-  "rebaseWhen": "auto",
-
-  // Ensure Renovate detects 'Containerfile' (not just 'Dockerfile')
-  "dockerfile": {
-    "fileMatch": ["(^|/)Containerfile$", "(^|/)Dockerfile$"]
+  rebaseWhen: 'auto',
+  dockerfile: {
+    managerFilePatterns: [
+      '/(^|/)Containerfile$/',
+      '/(^|/)Dockerfile$/',
+    ],
   },
-
-  // Track custom version ARGs in the Containerfile
-  "customManagers": [
+  customManagers: [
     {
-      "customType": "regex",
-      "fileMatch": ["(^|/)Containerfile$"],
-      "matchStrings": [
-        "ARG NERD_FONTS_VERSION=(?<currentValue>v[\\d\\.]+)"
+      customType: 'regex',
+      managerFilePatterns: [
+        '/(^|/)Containerfile$/',
       ],
-      "depNameTemplate": "ryanoasis/nerd-fonts",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
+      matchStrings: [
+        'ARG NERD_FONTS_VERSION=(?<currentValue>v[\\d\\.]+)',
+      ],
+      depNameTemplate: 'ryanoasis/nerd-fonts',
+      datasourceTemplate: 'github-releases',
+      versioningTemplate: 'semver',
     },
     {
-      "customType": "regex",
-      "fileMatch": ["(^|/)Justfile$"],
-      "matchStrings": [
-        "bib_image\\s*:=\\s*\"(?<depName>[^:]+):(?<currentValue>[^\"]+)\""
+      customType: 'regex',
+      managerFilePatterns: [
+        '/(^|/)Justfile$/',
       ],
-      "datasourceTemplate": "docker"
-    }
+      matchStrings: [
+        'bib_image\\s*:=\\s*"(?<depName>[^:]+):(?<currentValue>[^"]+)"',
+      ],
+      datasourceTemplate: 'docker',
+    },
   ],
-
-  "packageRules": [
+  packageRules: [
     {
-      // Auto-merge all pin/digest updates (low risk — same code, just pinning)
-      "automerge": true,
-      "matchUpdateTypes": ["pin", "pinDigest", "digest"]
+      automerge: true,
+      matchUpdateTypes: [
+        'pin',
+        'pinDigest',
+        'digest',
+      ],
     },
     {
-      // Auto-merge minor and patch updates for GitHub Actions
-      "automerge": true,
-      "groupName": "github-actions",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"]
+      automerge: true,
+      groupName: 'github-actions',
+      matchManagers: [
+        'github-actions',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+        'digest',
+        'pin',
+        'pinDigest',
+      ],
     },
     {
-      // Auto-merge patch updates for everything else (Containerfile deps, etc.)
-      "automerge": true,
-      "matchUpdateTypes": ["patch"]
+      automerge: true,
+      matchUpdateTypes: [
+        'patch',
+      ],
     },
     {
-      // Auto-merge minor updates for GitHub releases (nerd-fonts, etc.)
-      "automerge": true,
-      "matchDatasources": ["github-releases"],
-      "matchUpdateTypes": ["minor", "patch"]
+      automerge: true,
+      matchDatasources: [
+        'github-releases',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      // Pin GitHub Actions by SHA
-      "matchManagers": ["github-actions"],
-      "pinDigests": true
-    }
-  ]
+      matchManagers: [
+        'github-actions',
+      ],
+      pinDigests: true,
+    },
+  ],
 }
