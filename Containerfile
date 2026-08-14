@@ -6,7 +6,7 @@
 # Stage 1: Download external assets (fonts, themes)
 # ---------------------------------------------------------------------------
 # renovate: datasource=docker depName=fedora
-FROM fedora:42 AS assets
+FROM fedora:42@sha256:99e203b80b1c3d8f7e161ec10a68fd02b081ef83a3963553e513c82846b97814 AS assets
 
 ARG NERD_FONTS_VERSION=v3.4.0
 
@@ -33,7 +33,7 @@ RUN mkdir -p /qt5ct/colors && \
 # Stage 3: Final Image
 # ===========================================================================
 # renovate: datasource=docker depName=ghcr.io/ublue-os/bazzite
-FROM ghcr.io/ublue-os/bazzite:stable
+FROM ghcr.io/ublue-os/bazzite:stable@sha256:fbd9a04cf9fa5166b4b4fffa1efbd87433c8bc94027182a338f0b7c0b8acde82
 
 # Build arguments for versioning
 ARG SHA_HEAD_SHORT=unknown
