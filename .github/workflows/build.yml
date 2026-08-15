@@ -209,12 +209,25 @@ jobs:
           # Use the first tag from metadata for verification
           TAGS=(${{ steps.metadata.outputs.tags }})
           FIRST_TAG=${TAGS[0]}
+          echo "first_tag=$FIRST_TAG" >> "$GITHUB_ENV"
           echo "Verifying image with tag: $FIRST_TAG"
           podman run --rm --pull=never \
             -v "${{ github.workspace }}/scripts/verify-image.sh:/tmp/verify-image.sh:ro" \
             "localhost/${{ env.IMAGE_NAME }}:$FIRST_TAG" \
             bash /tmp/verify-image.sh
-            
+
+      # Generate the SBOM against the image already in LOCAL container storage,
+      # BEFORE pushing. This avoids syft re-downloading the ~13GB image from the
+      # registry (which added ~10 min). The resulting file is attested against
+      # the pushed digest after the push below.
+      - name: Generate SBOM (local image)
+        if: github.event_name != 'pull_request'
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: "containers-storage:localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}"
+          format: spdx-json
+          output-file: sbom.spdx.json
+
       - name: Push Image to GHCR
         if: github.event_name != 'pull_request'
         uses: redhat-actions/push-to-registry@94ade333c38ecc0e60e94785125d9a52ca423b37 # v3
@@ -225,14 +238,6 @@ jobs:
           registry: ${{ env.IMAGE_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate SBOM
-        if: github.event_name != 'pull_request'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
-        with:
-          image: "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
-          format: spdx-json
-          output-file: sbom.spdx.json
 
       - name: Attest SBOM
         if: github.event_name != 'pull_request'
