@@ -112,12 +112,19 @@ jobs:
 
   build_push:
     name: Build and push image
-    needs: check_base_image
+    needs: [lint, check_base_image]
+    # Fail fast: only build if lint passed (skips a ~40-60 min build when a
+    # cheap shellcheck/hadolint error would fail it anyway).
+    #
+    # PR builds are lean: they build + verify the image only (to prove changes
+    # compile into a valid image) and skip everything prod-related — no push,
+    # SBOM, signing, or cleanup. Draft PRs don't build at all until marked ready.
     if: |
       always() &&
+      needs.lint.result == 'success' &&
       (github.event_name == 'workflow_dispatch' ||
        github.event_name == 'push' ||
-       github.event_name == 'pull_request' ||
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
        (github.event_name == 'schedule' && needs.check_base_image.outputs.base-updated == 'true'))
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -143,14 +150,18 @@ jobs:
         id: date
         run: echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
 
+      # Only needed for the base.digest label on pushed images — skip on PRs.
       - name: Get base image digest
         id: base_digest
+        if: github.event_name != 'pull_request'
         run: |
           BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
           echo "digest=${BASE_DIGEST}" >> $GITHUB_OUTPUT
           echo "Base image digest: ${BASE_DIGEST}"
 
+      # Cosign is only used for signing/attestation, which PRs skip.
       - name: Install Cosign
+        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Set short SHA
