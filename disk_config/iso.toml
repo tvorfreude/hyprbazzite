@@ -11,7 +11,7 @@ type = "ext4"
 [customizations.installer.kickstart]
 contents = '''
 %post
-bootc switch --mutate-in-place --transport registry ghcr.io/tristanbollard/tblue-bazzite:latest
+bootc switch --mutate-in-place --transport registry ghcr.io/tvorfreude/hyprbazzite:latest
 %end
 
 %post --nochroot --log=/tmp/anacoda_custom_logs/secureboot-enroll-key.log

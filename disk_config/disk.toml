@@ -1,13 +1,29 @@
-[[customizations.filesystem]]
-mountpoint = "/boot"
-minsize = "1 GiB"
-type = "ext4"
+# ============================================================================
+# disk.toml — bootc-image-builder config for LOCAL TEST images (qcow2/raw)
+# ============================================================================
+# This config is ONLY used to build local VM images for testing via
+# `just build-qcow2` / `just run-vm-qcow2`. It is NOT the real installer
+# (that's disk_config/iso.toml).
+#
+# Filesystem note:
+#   The Justfile's _build-bib recipe passes `--rootfs=btrfs`, and the
+#   hibernate setup service (tblue-hibernate-setup) creates a btrfs swapfile
+#   at runtime. So the root filesystem MUST be btrfs. We intentionally do NOT
+#   declare conflicting `[[customizations.filesystem]]` entries here — mixing a
+#   custom xfs/ext4 layout with `--rootfs=btrfs` produces an inconsistent
+#   partition table that fails to boot ("Failed to read the GPT partition
+#   entry array"). Let --rootfs govern the layout.
+#
+# Swap note:
+#   No swap partition — hibernation uses a runtime btrfs swapfile created by
+#   tblue-hibernate-setup.service (/var/swap/swapfile).
 
-[[customizations.filesystem]]
-mountpoint = "/"
-minsize = "20 GiB"
-type = "xfs"
-
-[[customizations.filesystem]]
-minsize = "8 GiB"
-type = "swap"
+# ---------------------------------------------------------------------------
+# TEST-ONLY user. These credentials exist purely so local VM images are
+# loginable. They are NOT used by the real ISO installer (iso.toml), and must
+# never be relied on for anything but throwaway test VMs.
+# ---------------------------------------------------------------------------
+[[customizations.user]]
+name = "test"
+password = "test"
+groups = ["wheel"]
