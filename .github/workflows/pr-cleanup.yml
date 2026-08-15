@@ -1,0 +1,49 @@
+name: Cleanup PR image
+# When a PR closes (merged or not), delete the `pr-<N>` image it published so
+# test images don't accumulate in the registry. Kept separate from build.yml so
+# closing a PR doesn't trigger a build.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  delete-pr-image:
+    name: Delete pr-${{ github.event.pull_request.number }} image
+    # Fork PRs never publish an image (their token is read-only), so only
+    # same-repo PRs have anything to clean up.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      packages: write
+    steps:
+      - name: Delete the pr-<N> tagged image version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ${{ github.event.repository.name }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          TAG="pr-${PR}"
+          echo "Searching for image versions tagged '${TAG}'..."
+
+          ids=$(gh api --paginate "/user/packages/container/${PACKAGE}/versions" \
+            --jq ".[] | select(.metadata.container.tags | index(\"${TAG}\")) | .id" || true)
+
+          if [ -z "${ids}" ]; then
+            echo "No image tagged '${TAG}' found — nothing to clean up."
+            exit 0
+          fi
+
+          for id in ${ids}; do
+            echo "Deleting version ${id} (tagged ${TAG})"
+            gh api --method DELETE "/user/packages/container/${PACKAGE}/versions/${id}" || true
+          done
+          echo "Done."

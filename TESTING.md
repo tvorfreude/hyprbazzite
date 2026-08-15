@@ -147,7 +147,7 @@ CI publishes images per branch (see `.github/workflows/build.yml`):
 |----------------|---------------|
 | `main` | `latest`, `stable.YYYYMMDD-<sha>` |
 | `testing` | `testing`, `testing.YYYYMMDD-<sha>` |
-| Pull request | `pr-<number>` (built, not pushed) |
+| Pull request (same-repo, non-draft) | `pr-<number>` (pushed + signed, for testing) |
 
 This lets you keep daily drivers on `latest` while testing risky changes on the
 `testing` tag first.
@@ -171,6 +171,21 @@ Roll back at any time — bootc keeps the previous deployment:
 sudo bootc rollback
 sudo systemctl reboot
 ```
+
+### Testing a pull request
+
+Every same-repo, non-draft PR publishes a signed `pr-<number>` image. The PR's
+auto-generated change-summary comment includes a ready-to-paste snippet:
+
+```bash
+sudo bootc switch ghcr.io/tvorfreude/hyprbazzite:pr-42
+sudo systemctl reboot
+# when done, go back to your normal stream:
+sudo bootc rollback   # or: sudo bootc switch ghcr.io/tvorfreude/hyprbazzite:latest
+```
+
+These `pr-<number>` images are automatically deleted from the registry when the
+PR is closed (see `.github/workflows/pr-cleanup.yml`), so they don't accumulate.
 
 ### Verifying image signatures
 
