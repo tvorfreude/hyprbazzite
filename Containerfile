@@ -32,8 +32,11 @@ RUN mkdir -p /qt5ct/colors && \
 # ===========================================================================
 # Stage 3: Final Image
 # ===========================================================================
-# renovate: datasource=docker depName=ghcr.io/ublue-os/bazzite
-FROM ghcr.io/ublue-os/bazzite:stable@sha256:fbd9a04cf9fa5166b4b4fffa1efbd87433c8bc94027182a338f0b7c0b8acde82
+# Base image tracks the floating :stable tag intentionally — this is a rolling
+# bootc image that rebuilds on a schedule to follow upstream Bazzite. Do NOT
+# pin this to a digest (Renovate is configured to leave it alone): a digest pin
+# forces a full ~8GB re-pull on every build and stops us tracking upstream.
+FROM ghcr.io/ublue-os/bazzite:stable
 
 # Build arguments for versioning
 ARG SHA_HEAD_SHORT=unknown

@@ -85,5 +85,15 @@
       ],
       enabled: false,
     },
+    {
+      // Keep the Bazzite base tracking the floating :stable tag.
+      // Do NOT pin its digest — this is a rolling image that rebuilds daily to
+      // follow upstream, and a digest pin forces a full ~8GB re-pull each build.
+      matchPackageNames: [
+        'ghcr.io/ublue-os/bazzite',
+      ],
+      pinDigests: false,
+      enabled: false,
+    },
   ],
 }
