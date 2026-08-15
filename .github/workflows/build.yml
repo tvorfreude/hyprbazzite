@@ -241,6 +241,11 @@ jobs:
       - name: Generate SBOM (local OCI archive)
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        env:
+          # Skip per-file metadata + digest cataloging (hashing every file in a
+          # 13GB image is what made this slow). We still get the full RPM
+          # package inventory, which is what the SBOM needs.
+          SYFT_FILE_METADATA_SELECTION: "none"
         with:
           image: "oci-archive:${{ runner.temp }}/hyprbazzite-oci.tar"
           format: spdx-json
