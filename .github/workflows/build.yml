@@ -150,18 +150,14 @@ jobs:
         id: date
         run: echo "date=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)" >> $GITHUB_OUTPUT
 
-      # Only needed for the base.digest label on pushed images — skip on PRs.
       - name: Get base image digest
         id: base_digest
-        if: github.event_name != 'pull_request'
         run: |
           BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
           echo "digest=${BASE_DIGEST}" >> $GITHUB_OUTPUT
           echo "Base image digest: ${BASE_DIGEST}"
 
-      # Cosign is only used for signing/attestation, which PRs skip.
       - name: Install Cosign
-        if: github.event_name != 'pull_request'
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
       - name: Set short SHA
@@ -227,20 +223,34 @@ jobs:
             "localhost/${{ env.IMAGE_NAME }}:$FIRST_TAG" \
             bash /tmp/verify-image.sh
 
-      # Generate the SBOM against the image already in LOCAL container storage,
-      # BEFORE pushing. This avoids syft re-downloading the ~13GB image from the
-      # registry (which added ~10 min). The resulting file is attested against
-      # the pushed digest after the push below.
-      - name: Generate SBOM (local image)
+      # SBOM generation + attestation is the only prod-only supply-chain step.
+      # It's skipped on PRs (PR images are for testing, not distribution) — this
+      # is the expensive part we keep off the PR path.
+      #
+      # syft can't read buildah's rootless container storage on the runner
+      # (no podman socket), and scanning the remote registry image would
+      # re-download ~13GB. So we export the locally-built image to an OCI
+      # archive once and scan that — local, no network round-trip.
+      - name: Export image for SBOM scan
+        if: github.event_name != 'pull_request'
+        run: |
+          podman save --format oci-archive \
+            -o "${RUNNER_TEMP}/hyprbazzite-oci.tar" \
+            "localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}"
+
+      - name: Generate SBOM (local OCI archive)
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
-          image: "containers-storage:localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}"
+          image: "oci-archive:${{ runner.temp }}/hyprbazzite-oci.tar"
           format: spdx-json
           output-file: sbom.spdx.json
 
+      # Push on every build EXCEPT fork PRs (their token is read-only).
+      # Same-repo PRs publish a `pr-N` tag so reviewers can `bootc switch` to the
+      # image; branches publish latest/testing/dated tags.
       - name: Push Image to GHCR
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: redhat-actions/push-to-registry@94ade333c38ecc0e60e94785125d9a52ca423b37 # v3
         id: push
         with:
@@ -260,8 +270,10 @@ jobs:
             --type spdxjson \
             "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
 
+      # Sign every pushed image (including same-repo PR images) so `bootc switch`
+      # works even when the host enforces a signature policy.
       - name: Sign Image
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           COSIGN_REGISTRY_USERNAME: ${{ github.actor }}
           COSIGN_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
@@ -269,7 +281,7 @@ jobs:
           cosign sign --yes "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
 
       - name: Verify Signature
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: |
           cosign verify \
             --certificate-identity-regexp="https://github.com/${{ github.repository_owner }}/" \
@@ -310,3 +322,111 @@ jobs:
               gh api --method DELETE \
                 "/user/packages/container/${PACKAGE}/versions/${version_id}" || true
             done
+
+  pr_summary:
+    name: PR change summary
+    # Same-repo, non-draft PRs only. Fork PRs get a read-only token so they
+    # can't post comments; restricting to same-repo avoids a guaranteed failure.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Post / update change summary comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # 1. Changed files vs base branch — one fast paginated API call,
+          #    no git history checkout required.
+          gh api --paginate "/repos/${REPO}/pulls/${PR}/files" > files.json
+
+          total_files=$(jq 'length' files.json)
+          total_add=$(jq '[.[].additions] | add // 0' files.json)
+          total_del=$(jq '[.[].deletions] | add // 0' files.json)
+          short_sha=$(echo "${HEAD_SHA}" | cut -c1-7)
+          image_lc=$(echo "ghcr.io/${REPO}" | tr '[:upper:]' '[:lower:]')
+
+          # 2. Group files by project area and render a table per area.
+          cat > cat.jq <<'JQ'
+          def category:
+            .filename as $f |
+            if $f == "Containerfile" then "Container build"
+            elif ($f | startswith(".github/")) then "CI / automation"
+            elif ($f | startswith("disk_config/")) then "Disk / ISO config"
+            elif ($f | test("system_files/usr/lib/hyprbazzite/hypr/")) then "Hyprland"
+            elif ($f | test("system_files/usr/lib/hyprbazzite/waybar/")) then "Waybar"
+            elif ($f | test("system_files/usr/lib/hyprbazzite/wofi/")) then "Wofi"
+            elif ($f | test("system_files/usr/lib/hyprbazzite/xdg/swaync/")) then "Notifications"
+            elif ($f | test("system_files/usr/share/sddm/")) then "Login (SDDM)"
+            elif ($f | test("system_files/usr/lib/systemd/")) then "systemd units"
+            elif ($f | test("system_files/usr/(bin|libexec)/")) then "Scripts / binaries"
+            elif ($f | startswith("system_files/")) then "System files (other)"
+            elif ($f | test("\\.md$")) then "Docs"
+            else "Other" end;
+          def statusword:
+            {"added":"Added","removed":"Removed","renamed":"Renamed","modified":"Modified","changed":"Modified"}[.status] // "Modified";
+          (map(. + {cat: category}) | sort_by(.cat, .filename) | group_by(.cat))
+          | map(
+              "#### \(.[0].cat) (\(length))\n\n"
+              + "| File | Change | Lines |\n|---|---|---|\n"
+              + ( map(
+                    "| `\(if .status=="renamed" then (.previous_filename + " → " + .filename) else .filename end)` "
+                    + "| \(statusword) "
+                    + "| `+\(.additions) / -\(.deletions)` |"
+                  ) | join("\n") )
+            )
+          | join("\n\n")
+          JQ
+
+          sections=$(jq -r -f cat.jq files.json)
+
+          # 3. Assemble the comment body. Headline stats stay visible; the full
+          #    per-area breakdown is collapsible so the comment stays compact.
+          MARKER="<!-- hyprbazzite-pr-change-summary -->"
+          {
+            echo "${MARKER}"
+            echo "## PR change summary"
+            echo ""
+            echo "**${total_files} file(s) changed**  ·  \`+${total_add} / -${total_del}\`  ·  base \`${BASE_REF}\` ← \`${HEAD_REF}\`"
+            echo ""
+            echo "<details><summary><b>Changed files by area</b> (click to expand)</summary>"
+            echo ""
+            echo "${sections}"
+            echo ""
+            echo "</details>"
+            echo ""
+            echo "---"
+            echo "> **Test this PR on real hardware** once the build finishes:"
+            echo "> \`\`\`bash"
+            echo "> sudo bootc switch ${image_lc}:pr-${PR}"
+            echo "> sudo systemctl reboot"
+            echo "> # roll back with: sudo bootc rollback"
+            echo "> \`\`\`"
+            echo ""
+            echo "<sub>Auto-updated for commit \`${short_sha}\` · $(date -u '+%Y-%m-%d %H:%M UTC')</sub>"
+          } > body.md
+
+          # 4. Upsert: find our comment by its hidden marker, update it if it
+          #    exists, otherwise create it. Keeps a single sticky comment.
+          existing=$(gh api --paginate "/repos/${REPO}/issues/${PR}/comments" \
+            --jq ".[] | select(.body | contains(\"${MARKER}\")) | .id" | head -n1 || true)
+
+          if [ -n "${existing}" ]; then
+            gh api --method PATCH "/repos/${REPO}/issues/comments/${existing}" -F body=@body.md >/dev/null
+            echo "Updated existing summary comment (${existing})."
+          else
+            gh api --method POST "/repos/${REPO}/issues/${PR}/comments" -F body=@body.md >/dev/null
+            echo "Created new summary comment."
+          fi
