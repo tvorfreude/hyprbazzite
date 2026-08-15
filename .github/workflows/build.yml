@@ -223,31 +223,33 @@ jobs:
             "localhost/${{ env.IMAGE_NAME }}:$FIRST_TAG" \
             bash /tmp/verify-image.sh
 
-      # SBOM generation + attestation is the only prod-only supply-chain step.
-      # It's skipped on PRs (PR images are for testing, not distribution) — this
-      # is the expensive part we keep off the PR path.
-      #
-      # syft can't read buildah's rootless container storage on the runner
-      # (no podman socket), and scanning the remote registry image would
-      # re-download ~13GB. So we export the locally-built image to an OCI
-      # archive once and scan that — local, no network round-trip.
-      - name: Export image for SBOM scan
+      # SBOM generation + attestation is the only prod-only supply-chain step
+      # (skipped on PRs). Rather than have syft ingest the entire ~13GB image
+      # (which took ~6 min and ~40GB RAM, swapping the runner to a crawl), we
+      # extract just the RPM database (~110MB) and scan that. This is an
+      # RPM-based image, so the rpmdb IS the package inventory. Measured locally:
+      # ~3s and <300MB RAM vs 6+ min and 40GB.
+      - name: Extract RPM database for SBOM
         if: github.event_name != 'pull_request'
         run: |
-          podman save --format oci-archive \
-            -o "${RUNNER_TEMP}/hyprbazzite-oci.tar" \
-            "localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}"
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/sbomroot"
+          mkdir -p "${dest}/usr/lib/sysimage"
+          cid=$(podman create "localhost/${IMAGE_NAME}:${first_tag}")
+          # Fedora bootc keeps the rpmdb at /usr/lib/sysimage/rpm
+          # (/var/lib/rpm is a symlink to it). Fall back just in case.
+          if ! podman cp "${cid}:/usr/lib/sysimage/rpm" "${dest}/usr/lib/sysimage/rpm" 2>/dev/null; then
+            mkdir -p "${dest}/var/lib"
+            podman cp "${cid}:/var/lib/rpm" "${dest}/var/lib/rpm"
+          fi
+          podman rm "${cid}" >/dev/null
+          du -sh "${dest}"
 
-      - name: Generate SBOM (local OCI archive)
+      - name: Generate SBOM (RPM database)
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
-        env:
-          # Skip per-file metadata + digest cataloging (hashing every file in a
-          # 13GB image is what made this slow). We still get the full RPM
-          # package inventory, which is what the SBOM needs.
-          SYFT_FILE_METADATA_SELECTION: "none"
         with:
-          image: "oci-archive:${{ runner.temp }}/hyprbazzite-oci.tar"
+          path: "${{ runner.temp }}/sbomroot"
           format: spdx-json
           output-file: sbom.spdx.json
 
