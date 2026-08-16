@@ -16,7 +16,7 @@ ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable
 # are plain data files COPY'd into the final image (no musl/glibc concern).
 # Alpine (~7MB) instead of Fedora (~150MB) makes this stage pull faster.
 # Renovate manages this tag (tag-only, no digest pin) — see .github/renovate.json5.
-FROM alpine:3.21 AS assets
+FROM alpine:3.24 AS assets
 
 ARG NERD_FONTS_VERSION=v3.5.0
 
