@@ -80,17 +80,26 @@
       pinDigests: true,
     },
     {
+      // Assets stage is a tiny, build-only base (curl + unzip only). Let
+      // Renovate keep its tag current so we don't drift onto an EOL Alpine, but
+      // DON'T pin a digest: tag-only updates avoid the tag/digest-mismatch class
+      // of failure, and the exact digest is irrelevant for a throwaway build
+      // stage whose output is just downloaded data files.
       matchPackageNames: [
-        'fedora',
+        'alpine',
       ],
-      enabled: false,
+      pinDigests: false,
     },
     {
-      // Keep the Bazzite base tracking the floating :stable tag.
-      // Do NOT pin its digest — this is a rolling image that rebuilds daily to
-      // follow upstream, and a digest pin forces a full ~8GB re-pull each build.
+      // Keep the Bazzite bases (both the default and the -nvidia-open variant)
+      // tracking the floating :stable tag. Do NOT pin their digests — this is a
+      // rolling image that rebuilds daily to follow upstream, and a digest pin
+      // forces a full ~8GB re-pull each build. The glob covers any future
+      // bazzite-* variant we add to the matrix.
       matchPackageNames: [
         'ghcr.io/ublue-os/bazzite',
+        'ghcr.io/ublue-os/bazzite-nvidia-open',
+        '/^ghcr\\.io/ublue-os/bazzite/',
       ],
       pinDigests: false,
       enabled: false,
