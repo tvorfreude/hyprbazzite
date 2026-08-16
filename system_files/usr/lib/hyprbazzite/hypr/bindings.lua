@@ -33,7 +33,7 @@ end
 -- ═══════════════════════════════════════════════════════════════════════════════
 local terminal = "kitty"
 local browser = "flatpak run io.github.zen_browser.zen"
-local filemanager = "thunar"
+local filemanager = "nemo"
 local launcher = "wofi -wass"
 
 -- ═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,12 @@
+[Unit]
+Description=HyprBazzite per-user first-login setup
+# %S is the user's state dir (~/.local/state). Skip once the marker exists.
+ConditionPathExists=!%S/hyprbazzite/user-firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/hyprbazzite-user-firstboot
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

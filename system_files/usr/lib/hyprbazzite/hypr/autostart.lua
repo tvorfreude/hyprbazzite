@@ -19,11 +19,11 @@ hl.on("hyprland.start", function()
     -- UI ELEMENTS
     exec_once("waybar --config /etc/waybar/config.jsonc --style /etc/waybar/style.css", "waybar")
     exec_once("swaync -c /etc/swaync/config.json -s /etc/swaync/style.css", "swaync")
-    exec_once("swayidle -C /etc/swayidle/config -w", "swayidle")
+    exec_once("hypridle -c /etc/hypr/hypridle.conf", "hypridle")
     exec_once("fcitx5", "fcitx5")
 
     -- WALLPAPER
-    exec_once("swww-daemon", "swww-daemon")
+    exec_once("awww-daemon", "awww-daemon")
     exec_once("wallpaper-cycle", "wallpaper-cycle")
 
     -- AUTOMATION (hyprbazzite-ctl long-running services)

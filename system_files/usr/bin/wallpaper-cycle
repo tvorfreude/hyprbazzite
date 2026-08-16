@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wallpaper-cycle - Cycle through GIF wallpapers using swww
+# wallpaper-cycle - Cycle through GIF wallpapers using awww
 #
 # This script sets a random GIF wallpaper from the configured directory,
 # cycles it at regular intervals, and responds to monitor hotplug events.
@@ -38,7 +38,7 @@ cycle_now() {
 
     local wallpaper="${files[RANDOM % ${#files[@]}]}"
     if [[ -f "$wallpaper" ]]; then
-        swww img \
+        awww img \
             --transition-type "$TRANSITION_TYPE" \
             --transition-pos "$TRANSITION_POS" \
             --transition-fps "$TRANSITION_FPS" \
@@ -67,7 +67,7 @@ main() {
     # Trap USR1 signal for manual cycle
     trap cycle_now USR1
 
-    # Initial delay to ensure swww daemon is ready
+    # Initial delay to ensure awww daemon is ready
     sleep 2
     cycle_now || true
 

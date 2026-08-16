@@ -63,7 +63,7 @@ RUN build_id="${BUILD_STAMP:-stable.$(date -u +%Y%m%d)-${SHA_HEAD_SHORT:-unknown
 # Step 2: Enable COPR repositories
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,dst=/var/cache \
-    for repo in sdegler/hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship alternateved/keyd; do \
+    for repo in lionheartp/Hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship alternateved/keyd; do \
       dnf5 -y copr enable "$repo"; \
     done && \
     dnf5 -y clean all
@@ -83,18 +83,18 @@ RUN --mount=type=cache,dst=/var/cache \
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install --skip-unavailable \
-    hyprland hyprland-guiutils hyprlock swayidle hyprpaper uwsm hyprland-uwsm \
-    swww waybar SwayNotificationCenter wofi wvkbd \
+    hyprland hyprland-guiutils hyprlock hypridle hyprpicker hyprpaper uwsm hyprland-uwsm \
+    awww waybar SwayNotificationCenter wofi wvkbd \
     xdg-desktop-portal-hyprland lxqt-policykit sddm \
     openrgb openrgb-udev-rules \
     zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep \
     hhd adjustor hhd-ui lact keyd \
     rom-properties lutris steam-devices \
     brightnessctl gparted systemd-devel btop \
-    thunar tumbler gvfs gvfs-mtp gvfs-gphoto2 \
+    nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 \
     network-manager-applet pavucontrol \
     gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
-    blueman breeze-icon-theme qt5ct \
+    blueman breeze-icon-theme qt5ct qt6ct \
     jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist && \
     dnf5 -y autoremove && \
@@ -137,9 +137,9 @@ RUN chmod +x /usr/bin/wallpaper-cycle && \
     # Ensure all libexec scripts are executable
     find /usr/libexec/ -type f -exec chmod +x {} + && \
     # Ensure remaining Hyprland helper scripts are executable
-    chmod +x /usr/lib/hyprbazzite/hypr/scripts/disable-nonpower-wakeup.sh && \
-    # Common library is sourced, not executed
-    chmod 0644 /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh
+RUN chmod +x /usr/bin/wallpaper-cycle /usr/bin/hyprbazzite-session && \
+    # Ensure all libexec scripts are executable
+    find /usr/libexec/ -type f -exec chmod +x {} + && \mmon.sh
 
 # ---------------------------------------------------------------------------
 # Step 9: Configure user defaults, environment, and systemd presets
@@ -158,12 +158,21 @@ RUN usermod -s /bin/zsh root && \
     # Set SDDM theme permissions
     chmod -R 0755 /usr/share/sddm/themes && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
-    # Enable systemd services via preset
+    # Enable system services via preset
     mkdir -p /usr/lib/systemd/system-preset && \
     echo "enable hhd.service" > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable sddm.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable tblue-hibernate-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable tblue-disable-nonpower-wakeup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    echo "enable hyprbazzite-flatpak-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    # Enable the per-user first-login service for all users (global user preset
+    # + an explicit default.target.wants symlink so it activates without relying
+    # on preset timing for freshly-created users)
+    mkdir -p /usr/lib/systemd/user-preset && \
+    echo "enable hyprbazzite-user-firstboot.service" > /usr/lib/systemd/user-preset/50-hyprbazzite.preset && \
+    mkdir -p /usr/lib/systemd/user/default.target.wants && \
+    ln -sf ../hyprbazzite-user-firstboot.service \
+        /usr/lib/systemd/user/default.target.wants/hyprbazzite-user-firstboot.service && \
     # Copy dconf theme settings
     mkdir -p /etc/dconf/db/distro.d/ && \
     cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme /etc/dconf/db/distro.d/

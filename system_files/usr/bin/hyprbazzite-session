@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# hyprbazzite-session - Hyprland session launcher.
+#
+# Config precedence:
+#   1. The user's own Hyprland config (dotfiles / chezmoi) at
+#      ~/.config/hypr/hyprland.lua, if it exists.
+#   2. Otherwise the system config shipped by the image at /etc/hypr/hyprland.lua.
+#
+# The Lua config uses require() for its sibling modules (autostart, bindings,
+# etc.), which resolve relative to the chosen hyprland.lua's directory — so a
+# user providing their own hyprland.lua is expected to ship the full set.
+set -euo pipefail
+
+user_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua"
+
+if [[ -f "$user_cfg" ]]; then
+    echo "hyprbazzite-session: using user config $user_cfg" >&2
+    exec start-hyprland -- --config "$user_cfg"
+fi
+
+echo "hyprbazzite-session: using system config /etc/hypr/hyprland.lua" >&2
+exec start-hyprland -- --config /etc/hypr/hyprland.lua

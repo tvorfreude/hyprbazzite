@@ -88,8 +88,8 @@ gamemode_toggle() {
         hyprctl keyword decoration:active_opacity 1.0
         hyprctl keyword decoration:inactive_opacity 1.0
         hyprctl keyword "windowrule opacity 1 override 1 override 1 override, ^(.*)$"
-        if command -v swww &>/dev/null; then
-            swww clear 000000
+        if command -v awww &>/dev/null; then
+            awww clear 000000 2>/dev/null || true
         else
             pkill swaybg || true
         fi
@@ -105,8 +105,8 @@ gamemode_toggle() {
         hyprctl keyword decoration:active_opacity 1.0
         hyprctl keyword decoration:inactive_opacity 1.0
         hyprctl keyword "windowrule opacity 1 override, ^(.*)$"
-        if command -v swww &>/dev/null; then
-            swww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" \
+        if command -v awww &>/dev/null; then
+            awww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" \
                 --transition-type wipe --transition-duration 2
         else
             swaybg -i "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" -m fill &
@@ -220,8 +220,8 @@ wallpaper_pick() {
             hyprctl reload
         fi
 
-        if command -v swww &>/dev/null; then
-            swww img "$wallust_current" --transition-type wipe --transition-duration 2
+        if command -v awww &>/dev/null; then
+            awww img "$wallust_current" --transition-type wipe --transition-duration 2
         else
             pkill swaybg || true
             swaybg -i "$wallust_current" -m fill &
@@ -286,23 +286,23 @@ chezmoi_action() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 session_refresh() {
-    local apps=(swayidle mako waybar fcitx5 swww-daemon)
+    local apps=(hypridle mako waybar fcitx5 awww-daemon)
     for app in "${apps[@]}"; do
         pkill "$app" || true
     done
 
     sleep 0.3
-    swayidle -C /etc/swayidle/config -w &
+    hypridle -c /etc/hypr/hypridle.conf &
     mako &
     waybar &
     fcitx5 &
-    swww-daemon &
+    awww-daemon &
     sleep 0.5
 
     if command -v wallpaper-cycle &>/dev/null && pgrep -x wallpaper-cycle >/dev/null 2>&1; then
         pkill -USR1 wallpaper-cycle || true
     elif [[ -f "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" ]]; then
-        swww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" --transition-type wipe --transition-duration 2
+        awww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" --transition-type wipe --transition-duration 2
     fi
     notify "HyprBazzite" "Session apps refreshed"
 }

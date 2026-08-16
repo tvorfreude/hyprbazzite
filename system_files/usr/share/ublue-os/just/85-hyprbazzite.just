@@ -2,11 +2,11 @@
 
 # Reset Hyprland config to image defaults
 hypr-reset:
-    echo "Resetting Hyprland configuration to defaults..."
+    echo "Resetting Hyprland to image defaults (removing ~/.config/hypr)..."
     rm -rf ~/.config/hypr
-    mkdir -p ~/.config/hypr
-    cp -r /usr/lib/hyprbazzite/hypr/* ~/.config/hypr/
-    echo "Configuration reset complete. Please restart Hyprland."
+    echo "Done. Your session will now use the system config in /etc/hypr."
+    echo "(To customize, place your own config at ~/.config/hypr/hyprland.lua.)"
+    echo "Restart Hyprland to apply."
 
 # Refresh system configuration links
 hypr-refresh-links:

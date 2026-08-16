@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# hyprbazzite-user-firstboot - one-time per-user first-login setup.
+#
+# Ensures the image's system Hyprland config (/etc/hypr) is authoritative by
+# removing stale/default Hyprland dotfiles that may have been left behind (e.g.
+# by a previous image, a rebase, or Hyprland's own first-run generation).
+#
+# It will NOT touch a config the user intentionally provides: if
+# ~/.config/hypr/hyprland.lua exists (dotfiles / chezmoi), it is left alone and
+# the session launcher (hyprbazzite-session) will use it.
+set -euo pipefail
+
+log() { echo "[user-firstboot] $*" >&2; }
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/hyprbazzite"
+marker="$state_dir/user-firstboot.done"
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
+hypr_dir="$config_dir/hypr"
+
+# Already provisioned for this user.
+[[ -f "$marker" ]] && exit 0
+
+if [[ -d "$hypr_dir" ]]; then
+    if [[ -f "$hypr_dir/hyprland.lua" ]]; then
+        log "User Hyprland config detected ($hypr_dir/hyprland.lua) — leaving it untouched."
+    else
+        log "Removing stale default Hyprland dotfiles at $hypr_dir (no user hyprland.lua present)."
+        rm -rf "$hypr_dir"
+    fi
+else
+    log "No ~/.config/hypr present — nothing to clean."
+fi
+
+mkdir -p "$state_dir"
+: > "$marker"
+log "First-login setup complete."

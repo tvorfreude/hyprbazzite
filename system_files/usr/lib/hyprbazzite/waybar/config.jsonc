@@ -479,7 +479,7 @@
       "firefox","org.mozilla.firefox",
       "google-chrome","com.google.Chrome",
       "io.github.zen_browser.zen","com.brave.Browser",
-      "thunar","org.gnome.Nautilus",
+      "nemo","org.gnome.Nautilus",
       "steam","com.valvesoftware.Steam",
       "lutris","net.lutris.Lutris",
       "com.bitwarden.desktop","neovide",
@@ -562,7 +562,7 @@
   },
   "custom/file_manager": {
     "format": "󰉋",
-    "on-click": "thunar",
+    "on-click": "nemo",
     "tooltip": true,
     "tooltip-format": "File Manager"
   },
