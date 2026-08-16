@@ -7,7 +7,7 @@ set -e
 echo "Starting HyprBazzite Image Verification..."
 
 # 1. Critical Package Checks
-declare -a REQUIRED_PKGS=("hyprland" "waybar" "wofi" "zsh" "starship" "sddm" "kitty" "swww")
+declare -a REQUIRED_PKGS=("hyprland" "waybar" "wofi" "zsh" "starship" "sddm" "kitty" "awww" "hypridle" "nemo")
 for pkg in "${REQUIRED_PKGS[@]}"; do
     if ! rpm -q "$pkg" > /dev/null 2>&1; then
         echo "ERROR: Required package '$pkg' is missing from the image."
@@ -39,10 +39,13 @@ echo "Essential configuration files are in place."
 declare -a REQUIRED_SCRIPTS=(
     "/usr/libexec/hyprbazzite-ctl"
     "/usr/libexec/hyprbazzite-install-apps"
+    "/usr/libexec/hyprbazzite-flatpak-setup"
+    "/usr/libexec/hyprbazzite-user-firstboot"
     "/usr/libexec/tblue-secureboot-firstboot"
     "/usr/libexec/tblue-hibernate-setup"
     "/usr/libexec/tblue-hhd-enable-user"
     "/usr/bin/wallpaper-cycle"
+    "/usr/bin/hyprbazzite-session"
 )
 for script in "${REQUIRED_SCRIPTS[@]}"; do
     if [ ! -x "$script" ]; then
@@ -58,6 +61,8 @@ declare -a REQUIRED_UNITS=(
     "/usr/lib/systemd/system/tblue-hibernate-setup.service"
     "/usr/lib/systemd/system/tblue-hhd-enable-user.service"
     "/usr/lib/systemd/system/tblue-disable-nonpower-wakeup.service"
+    "/usr/lib/systemd/system/hyprbazzite-flatpak-setup.service"
+    "/usr/lib/systemd/user/hyprbazzite-user-firstboot.service"
 )
 for unit in "${REQUIRED_UNITS[@]}"; do
     if [ ! -f "$unit" ]; then

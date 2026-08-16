@@ -1,5 +1,5 @@
 [Added Associations]
-inode/directory=thunar.desktop;
+inode/directory=nemo.desktop;
 text/html=app.zen_browser.zen.desktop;
 text/plain=kitty-open.desktop;
 image/jpeg=imv.desktop;
@@ -16,7 +16,7 @@ text/html=app.zen_browser.zen.desktop
 # x-scheme-handler/http=io.github.ungoogled_software.ungoogled_chromium.desktop
 
 # File Manager & Terminal
-inode/directory=thunar.desktop
+inode/directory=nemo.desktop
 text/plain=kitty-open.desktop
 application/x-shellscript=kitty-open.desktop
 

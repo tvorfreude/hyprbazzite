@@ -1,0 +1,21 @@
+[Unit]
+Description=HyprBazzite first-boot Flatpak provisioning
+Wants=network-online.target
+After=network-online.target
+# Skip once provisioning has fully succeeded.
+ConditionPathExists=!/var/lib/hyprbazzite/flatpak-setup.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/hyprbazzite-flatpak-setup
+RemainAfterExit=yes
+# Flathub can be slow on first boot; allow time but don't hang forever.
+TimeoutStartSec=1800
+# Low priority so it doesn't fight the desktop coming up.
+Nice=19
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
