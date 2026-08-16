@@ -14,7 +14,7 @@ readonly TRANSITION_FPS=30
 readonly TRANSITION_STEP=90
 readonly TRANSITION_DURATION=2
 readonly CYCLE_INTERVAL=900  # seconds (15 minutes)
-readonly FILTER="${WALLPAPER_FILTER:-Lanczos3}"  # Lanczos3 for smooth scaling, Nearest for pixel art
+readonly FILTER="${WALLPAPER_FILTER:-Nearest}"  # Nearest keeps GIFs crisp; set WALLPAPER_FILTER=Lanczos3 to smooth-scale photos
 
 # -- Helpers ------------------------------------------------------------------
 
