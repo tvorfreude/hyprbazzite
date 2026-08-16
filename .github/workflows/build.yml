@@ -61,13 +61,34 @@ jobs:
         with:
           dockerfile: Containerfile
           failure-threshold: warning
-          # DL3007 - FROM fedora:latest in assets stage is acceptable (not runtime)
+          # DL3007 - FROM :latest in assets stage is acceptable (build-only)
           # DL3015 - --no-install-recommends not applicable to dnf
+          # DL3018 - apk version pinning not practical for the assets tool base
           # DL3033 - dnf clean all is handled per-layer
           # DL3041 - dnf version pinning not practical for COPR packages
           # DL3059 - multiple consecutive RUN intentional for readability
           # SC2015 - A && B || C pattern is used safely in cleanup steps
-          ignore: DL3007,DL3015,DL3033,DL3041,DL3059,SC2015
+          ignore: DL3007,DL3015,DL3018,DL3033,DL3041,DL3059,SC2015
+
+  # Decide which image variants to build. PRs build only the default variant
+  # for fast feedback; push/schedule/dispatch build both default and -nvidia.
+  prepare_matrix:
+    name: Prepare build matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - name: Set matrix
+        id: set
+        run: |
+          nvidia='{"variant":"nvidia","base_image":"ghcr.io/ublue-os/bazzite-nvidia-open:stable","tag_suffix":"-nvidia","primary_tag":"latest-nvidia"}'
+          main='{"variant":"main","base_image":"ghcr.io/ublue-os/bazzite:stable","tag_suffix":"","primary_tag":"latest"}'
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "matrix={\"include\":[${main}]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"include\":[${main},${nvidia}]}" >> "$GITHUB_OUTPUT"
+          fi
 
   check_base_image:
     name: Check for base image updates
@@ -82,37 +103,44 @@ jobs:
           if ! command -v skopeo &> /dev/null; then
             sudo apt-get update && sudo apt-get install -y skopeo
           fi
-      - name: Check bazzite:stable for updates
+      - name: Check both base images for updates
         id: check
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
         run: |
-          BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
-          if [ -z "$BASE_DIGEST" ] || [ "$BASE_DIGEST" = "null" ]; then
-            echo "Failed to fetch base image digest, skipping"
-            echo "updated=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          echo "Base image digest: $BASE_DIGEST"
-          
-          if skopeo inspect docker://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest 2>/dev/null | jq -e '.Labels."org.opencontainers.image.base.digest"' > /dev/null; then
-            CURRENT_BASE=$(skopeo inspect docker://ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest | jq -r '.Labels."org.opencontainers.image.base.digest"')
-            echo "Current base digest: $CURRENT_BASE"
-            
-            if [ "$BASE_DIGEST" != "$CURRENT_BASE" ]; then
-              echo "Base image has been updated!"
-              echo "updated=true" >> $GITHUB_OUTPUT
-            else
-              echo "Base image unchanged"
-              echo "updated=false" >> $GITHUB_OUTPUT
+          updated=false
+          # "base image = published tag whose base.digest label we compare against"
+          for pair in \
+            "ghcr.io/ublue-os/bazzite:stable=latest" \
+            "ghcr.io/ublue-os/bazzite-nvidia-open:stable=latest-nvidia"; do
+            base="${pair%=*}"; tag="${pair#*=}"
+            BASE_DIGEST=$(skopeo inspect "docker://${base}" | jq -r '.Digest')
+            if [ -z "$BASE_DIGEST" ] || [ "$BASE_DIGEST" = "null" ]; then
+              echo "Could not fetch digest for ${base}; skipping this variant."
+              continue
             fi
-          else
-            echo "Image doesn't exist yet or no base digest label"
-            echo "updated=true" >> $GITHUB_OUTPUT
-          fi
-          echo "### Base image check: $(cat $GITHUB_OUTPUT | grep updated | cut -d= -f2)" >> $GITHUB_STEP_SUMMARY
+            if skopeo inspect "docker://ghcr.io/${OWNER}/${REPO}:${tag}" 2>/dev/null \
+                 | jq -e '.Labels."org.opencontainers.image.base.digest"' > /dev/null; then
+              CURRENT=$(skopeo inspect "docker://ghcr.io/${OWNER}/${REPO}:${tag}" \
+                 | jq -r '.Labels."org.opencontainers.image.base.digest"')
+              if [ "$BASE_DIGEST" != "$CURRENT" ]; then
+                echo "${base}: updated ($CURRENT -> $BASE_DIGEST)"
+                updated=true
+              else
+                echo "${base}: unchanged"
+              fi
+            else
+              echo "${tag} not published yet — will build."
+              updated=true
+            fi
+          done
+          echo "updated=${updated}" >> "$GITHUB_OUTPUT"
+          echo "### Base image check: ${updated}" >> "$GITHUB_STEP_SUMMARY"
 
   build_push:
-    name: Build and push image
-    needs: [lint, check_base_image]
+    name: Build and push (${{ matrix.variant }})
+    needs: [lint, check_base_image, prepare_matrix]
     # Fail fast: only build if lint passed (skips a ~40-60 min build when a
     # cheap shellcheck/hadolint error would fail it anyway).
     #
@@ -122,12 +150,20 @@ jobs:
     if: |
       always() &&
       needs.lint.result == 'success' &&
+      needs.prepare_matrix.result == 'success' &&
       (github.event_name == 'workflow_dispatch' ||
        github.event_name == 'push' ||
        (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
        (github.event_name == 'schedule' && needs.check_base_image.outputs.base-updated == 'true'))
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # 120 min headroom: the -nvidia variant uses a larger base
+    # (bazzite-nvidia-open) whose first, uncached build does a big cold pull.
+    # Matrix legs run in parallel so this is per-variant, not additive.
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.matrix) }}
 
     permissions:
       contents: read
@@ -153,9 +189,9 @@ jobs:
       - name: Get base image digest
         id: base_digest
         run: |
-          BASE_DIGEST=$(skopeo inspect docker://ghcr.io/ublue-os/bazzite:stable | jq -r '.Digest')
+          BASE_DIGEST=$(skopeo inspect "docker://${{ matrix.base_image }}" | jq -r '.Digest')
           echo "digest=${BASE_DIGEST}" >> $GITHUB_OUTPUT
-          echo "Base image digest: ${BASE_DIGEST}"
+          echo "Base image (${{ matrix.base_image }}) digest: ${BASE_DIGEST}"
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
@@ -169,11 +205,11 @@ jobs:
         id: metadata
         with:
           tags: |
-            type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-            type=raw,value=stable.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
-            type=raw,value=testing,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/testing' }}
-            type=raw,value=testing.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/testing' }}
-            type=raw,value=pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=latest${{ matrix.tag_suffix }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+            type=raw,value=stable${{ matrix.tag_suffix }}.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+            type=raw,value=testing${{ matrix.tag_suffix }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/testing' }}
+            type=raw,value=testing${{ matrix.tag_suffix }}.{{date 'YYYYMMDD'}}-${{ steps.vars.outputs.sha_short }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/testing' }}
+            type=raw,value=pr-${{ github.event.pull_request.number }}${{ matrix.tag_suffix }},enable=${{ github.event_name == 'pull_request' }}
           labels: |
             io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md
             org.opencontainers.image.created=${{ steps.date.outputs.date }}
@@ -184,7 +220,7 @@ jobs:
             org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
             org.opencontainers.image.vendor=${{ github.repository_owner }}
             org.opencontainers.image.version=${{ env.DEFAULT_TAG }}.{{date 'YYYYMMDD'}}
-            org.opencontainers.image.base.name=ghcr.io/ublue-os/bazzite:stable
+            org.opencontainers.image.base.name=${{ matrix.base_image }}
             org.opencontainers.image.base.digest=${{ steps.base_digest.outputs.digest }}
             io.artifacthub.package.deprecated=false
             io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}
@@ -208,6 +244,7 @@ jobs:
           extra-args: |
             --layers=false
           build-args: |
+            BASE_IMAGE=${{ matrix.base_image }}
             SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
             BUILD_STAMP=${{ steps.metadata.outputs.version }}
 
@@ -252,6 +289,11 @@ jobs:
           path: "${{ runner.temp }}/sbomroot"
           format: spdx-json
           output-file: sbom.spdx.json
+          # Don't upload as a workflow artifact — both matrix variants would use
+          # the same artifact name and collide. The SBOM is attested to the image
+          # (below), which is the durable copy.
+          upload-artifact: false
+          upload-release-assets: false
 
       # Push on every build EXCEPT fork PRs (their token is read-only).
       # Same-repo PRs publish a `pr-N` tag so reviewers can `bootc switch` to the

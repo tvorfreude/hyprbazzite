@@ -2,17 +2,26 @@
 # HyprBazzite - Custom bootc image based on Bazzite with Hyprland
 # ===========================================================================
 
+# BASE_IMAGE selects which Bazzite variant to build on. CI overrides it per
+# build variant:
+#   - default  -> ghcr.io/ublue-os/bazzite:stable            (tags: latest, stable.*)
+#   - nvidia   -> ghcr.io/ublue-os/bazzite-nvidia-open:stable (tags: latest-nvidia, stable-nvidia.*)
+# Declared before the first FROM so it can be referenced in the final FROM.
+ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable
+
 # ---------------------------------------------------------------------------
 # Stage 1: Download external assets (fonts, themes)
 # ---------------------------------------------------------------------------
-# renovate: datasource=docker depName=fedora versioning=docker
-FROM fedora:42 AS assets
+# Tiny build-only stage: just needs curl + unzip to fetch fonts/themes, which
+# are plain data files COPY'd into the final image (no musl/glibc concern).
+# Alpine (~7MB) instead of Fedora (~150MB) makes this stage pull faster.
+# Renovate manages this tag (tag-only, no digest pin) — see .github/renovate.json5.
+FROM alpine:3.21 AS assets
 
 ARG NERD_FONTS_VERSION=v3.5.0
 
 # Install download utilities
-RUN dnf5 -y install curl unzip && \
-    dnf5 -y clean all
+RUN apk add --no-cache curl unzip
 
 RUN curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o /tmp/jb-mono.zip \
     "https://github.com/ryanoasis/nerd-fonts/releases/download/${NERD_FONTS_VERSION}/JetBrainsMono.zip" && \
@@ -32,11 +41,11 @@ RUN mkdir -p /qt5ct/colors && \
 # ===========================================================================
 # Stage 3: Final Image
 # ===========================================================================
-# Base image tracks the floating :stable tag intentionally — this is a rolling
-# bootc image that rebuilds on a schedule to follow upstream Bazzite. Do NOT
-# pin this to a digest (Renovate is configured to leave it alone): a digest pin
-# forces a full ~8GB re-pull on every build and stops us tracking upstream.
-FROM ghcr.io/ublue-os/bazzite:stable
+# Base tracks a floating :stable tag intentionally (rolling image, rebuilt on a
+# schedule to follow upstream Bazzite). Do NOT pin to a digest — that forces a
+# full ~8GB re-pull every build and stops us tracking upstream. Renovate is
+# configured to leave BASE_IMAGE alone.
+FROM ${BASE_IMAGE}
 
 # Build arguments for versioning
 ARG SHA_HEAD_SHORT=unknown
