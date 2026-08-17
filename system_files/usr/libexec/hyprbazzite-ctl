@@ -760,23 +760,26 @@ lid_handle() {
 
 keybinds_switch() {
     local action="${1:-}"
-    local profile_file="/etc/hypr/keybind-profile"
+    # Profiles are pure Hyprland binds — no keyd, no external remapper. bindings.lua
+    # picks macOS when this marker exists, else Linux. The marker lives in the
+    # per-user runtime dir, so toggling is user-writable and needs no root.
+    local marker="${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-keybinds-macos"
     local current="linux"
+    [[ -e "$marker" ]] && current="macos"
 
-    [[ -f "$profile_file" ]] && current=$(cat "$profile_file" 2>/dev/null | tr -d '[:space:]')
-
-    # Profiles are pure Hyprland binds (bindings.lua reads this file) — no keyd,
-    # no external remapper, so switching is just: write profile + reload.
-    _set_profile() {
-        echo "$1" > "$profile_file"
+    _apply() {
+        case "$1" in
+            macos) : > "$marker" ;;
+            linux) rm -f "$marker" ;;
+        esac
         notify "Keybinds" "Switched to ${1} profile. Reloading..."
         hyprctl reload
     }
 
     case "$action" in
-        macos|linux) _set_profile "$action" ;;
+        macos|linux) _apply "$action" ;;
         toggle)
-            if [[ "$current" == "macos" ]]; then _set_profile linux; else _set_profile macos; fi
+            if [[ "$current" == "macos" ]]; then _apply linux; else _apply macos; fi
             ;;
         status|"")   echo "Current keybind profile: $current" ;;
         *)
