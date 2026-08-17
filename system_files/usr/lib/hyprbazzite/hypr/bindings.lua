@@ -1,130 +1,114 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
--- HyprBazzite Keybind Profiles
+-- HyprBazzite Keybinds
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Two profiles designed for identical muscle memory across macOS + Linux:
+-- One shared set of bindings drives both layouts; only the genuine differences
+-- live in the per-profile branch below.
 --
---   "macos"  - Mirrors AeroSpace 1:1. ALT (the physical Option key on a Mac
---              keyboard) is the WM modifier — exactly like AeroSpace on macOS.
---              Every bind fires on the real physical key (no external key
---              remapper), so behaviour is self-contained within Hyprland.
---              System shortcuts follow macOS conventions (screenshots, lock).
---              Includes "resize" and "service" submaps that mirror AeroSpace's
---              resize-mode and service-mode.
+--   Linux (default) - Standard Hyprland. SUPER drives everything.
+--   macOS (marker)  - AeroSpace-style. SUPER still drives window management, but
+--                     app/system shortcuts move to ALT (the Option key), and
+--                     vim focus/move, monitor binds and the resize/service
+--                     submaps are added on top of the shared set.
 --
---   "linux"  - Standard Hyprland. Super is WM modifier, Ctrl for app shortcuts.
---
--- Switch: hyprbazzite-ctl keybinds [macos|linux|toggle]
+-- macOS is active while a marker file exists; toggle it live with
+-- `hyprbazzite-ctl keybinds [macos|linux|toggle]`. The marker lives in the
+-- per-user runtime dir, so switching needs no root and clears on logout.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
--- Read active profile
-local profile_file = "/etc/hypr/keybind-profile"
-local profile = "linux"
-local f = io.open(profile_file, "r")
-if f then
-    local content = f:read("*l")
-    f:close()
-    if content and content:match("macos") then
-        profile = "macos"
-    end
+local f = io.open((os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprbazzite-keybinds-macos", "r")
+local macos = f ~= nil
+if f then f:close() end
+
+local mod    = "SUPER"                     -- primary window-management modifier (both layouts)
+local appmod = macos and "ALT" or "SUPER"  -- app/system shortcuts (macOS uses the Option key)
+
+local terminal    = "kitty"
+local browser     = "/usr/libexec/hyprbazzite-ctl open browser"
+local filemanager = 'xdg-open "$HOME"'
+local launcher    = "wofi -wass"
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- SHARED — identical in both layouts
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- ─── Launch / app shortcuts ──────────────────────────────────────────────────
+hl.bind(mod .. " + return",    hl.dsp.exec_cmd(terminal))
+hl.bind(appmod .. " + SPACE",  hl.dsp.exec_cmd(launcher))
+hl.bind(appmod .. " + W",      hl.dsp.window.close())
+
+-- ─── Window ──────────────────────────────────────────────────────────────────
+hl.bind(mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
+
+-- ─── Focus (arrows) ──────────────────────────────────────────────────────────
+hl.bind(mod .. " + left",  hl.dsp.focus({ direction = "left" }))
+hl.bind(mod .. " + down",  hl.dsp.focus({ direction = "down" }))
+hl.bind(mod .. " + up",    hl.dsp.focus({ direction = "up" }))
+hl.bind(mod .. " + right", hl.dsp.focus({ direction = "right" }))
+
+-- ─── Move window (arrows) ────────────────────────────────────────────────────
+hl.bind(mod .. " + SHIFT + left",  hl.dsp.window.move({ direction = "left" }))
+hl.bind(mod .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
+hl.bind(mod .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
+hl.bind(mod .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
+
+-- ─── Workspaces ──────────────────────────────────────────────────────────────
+for i = 1, 10 do
+    local key = i % 10
+    hl.bind(mod .. " + " .. key,         hl.dsp.focus({ workspace = i }))
+    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
--- ═══════════════════════════════════════════════════════════════════════════════
--- VARIABLES
--- ═══════════════════════════════════════════════════════════════════════════════
-local terminal = "kitty"
-local browser = "/usr/libexec/hyprbazzite-ctl open browser"
-local filemanager = 'xdg-open "$HOME"'
-local launcher = "wofi -wass"
+-- ─── System ──────────────────────────────────────────────────────────────────
+hl.bind(mod .. " + N",            hl.dsp.exec_cmd("swaync-client -t -sw"))
+hl.bind(mod .. " + O",            hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
+hl.bind(appmod .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
+
+-- ─── Mouse ───────────────────────────────────────────────────────────────────
+hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- MACOS PROFILE
+-- PROFILE-SPECIFIC
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Modifier: ALT — the physical Option key on a Mac keyboard, exactly like
---                 AeroSpace on macOS. Works directly on the real key.
--- App shortcuts: NOT remapped. Cmd = Super remains free for you to wire up
---                separately if desired.
--- System shortcuts: match macOS conventions (screenshots, lock).
--- ═══════════════════════════════════════════════════════════════════════════════
-if profile == "macos" then
+if macos then
 
-    local m = "SUPER"
-    local m2 = "ALT"
+    -- ─── Window actions ──────────────────────────────────────────────────────
+    hl.bind(mod .. " + F",         hl.dsp.window.fullscreen(0))                             -- alt-f = fullscreen
+    hl.bind(mod .. " + E",         hl.dsp.exec_cmd("hyprctl dispatch splitratio exact 0.5")) -- alt-e = balance (50/50)
+    hl.bind(mod .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
 
-    -- ─── Launch ──────────────────────────────────────────────────────────────
-    -- AeroSpace: alt-enter -> new terminal window
-    hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
-    -- Spotlight equivalent (Cmd+Space / Super+Space)
-    hl.bind(m2 .. " + SPACE", hl.dsp.exec_cmd(launcher))
+    -- ─── Focus / move (vim keys, on top of the shared arrows) ────────────────
+    hl.bind(mod .. " + H", hl.dsp.focus({ direction = "left" }))
+    hl.bind(mod .. " + J", hl.dsp.focus({ direction = "down" }))
+    hl.bind(mod .. " + K", hl.dsp.focus({ direction = "up" }))
+    hl.bind(mod .. " + L", hl.dsp.focus({ direction = "right" }))
+    hl.bind(mod .. " + SHIFT + H", hl.dsp.window.move({ direction = "left" }))
+    hl.bind(mod .. " + SHIFT + J", hl.dsp.window.move({ direction = "down" }))
+    hl.bind(mod .. " + SHIFT + K", hl.dsp.window.move({ direction = "up" }))
+    hl.bind(mod .. " + SHIFT + L", hl.dsp.window.move({ direction = "right" }))
 
-    -- ─── Window Actions ──────────────────────────────────────────────────────
-    hl.bind(m2 .. " + W", hl.dsp.window.close())            -- cmd-w  = close
-    hl.bind(m .. " + F", hl.dsp.window.fullscreen(0))      -- alt-f  = fullscreen
-    hl.bind(m .. " + V", hl.dsp.window.float({ action = "toggle" })) -- alt-v = layout floating tiling
-    -- alt-e = balance-sizes. Hyprland/dwindle has no true balance; reset the
-    -- current split to 50/50 as the closest equivalent.
-    hl.bind(m .. " + E", hl.dsp.exec_cmd("hyprctl dispatch splitratio exact 0.5"))
-    hl.bind(m .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" })) -- alt-shift-f = layout floating tiling
-
-    -- ─── Focus (vim + arrows) ────────────────────────────────────────────────
-    hl.bind(m .. " + H",     hl.dsp.focus({ direction = "left" }))
-    hl.bind(m .. " + J",     hl.dsp.focus({ direction = "down" }))
-    hl.bind(m .. " + K",     hl.dsp.focus({ direction = "up" }))
-    hl.bind(m .. " + L",     hl.dsp.focus({ direction = "right" }))
-    hl.bind(m .. " + left",  hl.dsp.focus({ direction = "left" }))
-    hl.bind(m .. " + down",  hl.dsp.focus({ direction = "down" }))
-    hl.bind(m .. " + up",    hl.dsp.focus({ direction = "up" }))
-    hl.bind(m .. " + right", hl.dsp.focus({ direction = "right" }))
-
-    -- ─── Move Windows (vim + arrows) ────────────────────────────────────────
-    hl.bind(m .. " + SHIFT + H",     hl.dsp.window.move({ direction = "left" }))
-    hl.bind(m .. " + SHIFT + J",     hl.dsp.window.move({ direction = "down" }))
-    hl.bind(m .. " + SHIFT + K",     hl.dsp.window.move({ direction = "up" }))
-    hl.bind(m .. " + SHIFT + L",     hl.dsp.window.move({ direction = "right" }))
-    hl.bind(m .. " + SHIFT + left",  hl.dsp.window.move({ direction = "left" }))
-    hl.bind(m .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
-    hl.bind(m .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
-    hl.bind(m .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
-
-    -- ─── Resize ──────────────────────────────────────────────────────────────
-    -- AeroSpace: alt-minus / alt-equal = resize smart -/+50 (both dimensions)
-    hl.bind(m .. " + minus", hl.dsp.window.resize({ x = -50, y = -50 }))
-    hl.bind(m .. " + equal", hl.dsp.window.resize({ x = 50, y = 50 }))
+    -- ─── Resize (smart, both dimensions) ─────────────────────────────────────
+    hl.bind(mod .. " + minus", hl.dsp.window.resize({ x = -50, y = -50 }))
+    hl.bind(mod .. " + equal", hl.dsp.window.resize({ x = 50, y = 50 }))
 
     -- ─── Layout ──────────────────────────────────────────────────────────────
-    -- AeroSpace has tiles/accordion layouts; the closest dwindle equivalents:
-    -- alt-slash    = "layout tiles h/v"     -> toggle the split orientation
-    hl.bind(m .. " + slash", hl.dsp.exec_cmd("hyprctl dispatch togglesplit"))
-    -- alt-comma    = "layout accordion h/v" -> stack windows into a group (tabs)
-    hl.bind(m .. " + comma", hl.dsp.exec_cmd("hyprctl dispatch togglegroup"))
-    -- alt-shift-a  = "layout accordion tiles" -> cycle through the grouped windows
-    hl.bind(m .. " + SHIFT + A", hl.dsp.exec_cmd("hyprctl dispatch changegroupactive f"))
+    hl.bind(mod .. " + slash",     hl.dsp.exec_cmd("hyprctl dispatch togglesplit"))          -- tiles h/v
+    hl.bind(mod .. " + comma",     hl.dsp.exec_cmd("hyprctl dispatch togglegroup"))          -- accordion (tabs)
+    hl.bind(mod .. " + SHIFT + A", hl.dsp.exec_cmd("hyprctl dispatch changegroupactive f"))  -- cycle group
 
-    -- ─── Focus Monitor ───────────────────────────────────────────────────────
-    -- alt-period = focus next monitor, alt-semicolon = focus prev monitor
-    hl.bind(m .. " + period",    hl.dsp.focus({ monitor = "+1" }))
-    hl.bind(m .. " + semicolon", hl.dsp.focus({ monitor = "-1" }))
+    -- ─── Monitors ────────────────────────────────────────────────────────────
+    hl.bind(mod .. " + period",           hl.dsp.focus({ monitor = "+1" }))
+    hl.bind(mod .. " + semicolon",        hl.dsp.focus({ monitor = "-1" }))
+    hl.bind(mod .. " + SHIFT + period",    hl.dsp.exec_cmd("hyprctl dispatch movewindow mon:+1"))
+    hl.bind(mod .. " + SHIFT + semicolon", hl.dsp.exec_cmd("hyprctl dispatch movewindow mon:-1"))
 
-    -- ─── Move Window to Monitor (focus follows) ──────────────────────────────
-    -- alt-shift-period/semicolon = move window to next/prev monitor + follow it
-    hl.bind(m .. " + SHIFT + period",    hl.dsp.exec_cmd("hyprctl dispatch movewindow mon:+1"))
-    hl.bind(m .. " + SHIFT + semicolon", hl.dsp.exec_cmd("hyprctl dispatch movewindow mon:-1"))
+    -- ─── Workspace navigation ────────────────────────────────────────────────
+    hl.bind(mod .. " + Tab",         hl.dsp.exec_cmd("hyprctl dispatch workspace previous"))
+    hl.bind(mod .. " + SHIFT + Tab", hl.dsp.exec_cmd("hyprctl dispatch moveworkspacetomonitor +1"))
 
-    -- ─── Workspaces ──────────────────────────────────────────────────────────
-    for i = 1, 10 do
-        local key = i % 10
-        hl.bind("SUPER + " .. key,         hl.dsp.focus({ workspace = i }))
-        hl.bind("SUPER + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
-    end
-
-    -- ─── Workspace Navigation ────────────────────────────────────────────────
-    -- alt-tab       = workspace-back-and-forth (jump to last-used workspace)
-    hl.bind(m .. " + Tab",         hl.dsp.exec_cmd("hyprctl dispatch workspace previous"))
-    -- alt-shift-tab = move-workspace-to-monitor next (whole workspace hops screen)
-    hl.bind(m .. " + SHIFT + Tab", hl.dsp.exec_cmd("hyprctl dispatch moveworkspacetomonitor +1"))
-
-    -- ─── Special Workspaces (Scratchpads) ────────────────────────────────────
-    hl.bind("SUPER + S", hl.dsp.workspace.toggle_special())
-    hl.bind("SUPER + SHIFT + S", function()
+    -- ─── Special workspaces (scratchpads) ────────────────────────────────────
+    hl.bind(mod .. " + S", hl.dsp.workspace.toggle_special())
+    hl.bind(mod .. " + SHIFT + S", function()
         local window = hl.get_active_window()
         if window and window.workspace.name:find("^special") then
             hl.dispatch(hl.dsp.window.move({ workspace = "e+0" }))
@@ -132,9 +116,8 @@ if profile == "macos" then
             hl.dispatch(hl.dsp.window.move({ workspace = "special" }))
         end
     end)
-
-    hl.bind("SUPER + Q", hl.dsp.workspace.toggle_special("scratchpad"))
-    hl.bind("SUPER + SHIFT + Q", function()
+    hl.bind(mod .. " + Q", hl.dsp.workspace.toggle_special("scratchpad"))
+    hl.bind(mod .. " + SHIFT + Q", function()
         local window = hl.get_active_window()
         if window and window.workspace.name:find("^special:scratchpad") then
             hl.dispatch(hl.dsp.window.move({ workspace = "e+0" }))
@@ -143,35 +126,15 @@ if profile == "macos" then
         end
     end)
 
-    -- ─── Modes / Submaps ─────────────────────────────────────────────────────
-    -- alt-r           = enter resize mode  (AeroSpace: mode resize)
-    -- alt-shift-slash = enter service mode (AeroSpace: mode service)
-    hl.bind(m .. " + R",           hl.dsp.submap("resize"))
-    hl.bind(m .. " + SHIFT + slash", hl.dsp.submap("service"))
+    -- ─── Modes / submaps ─────────────────────────────────────────────────────
+    hl.bind(mod .. " + R",             hl.dsp.submap("resize"))
+    hl.bind(mod .. " + SHIFT + slash", hl.dsp.submap("service"))
 
-    -- ─── System (matching macOS conventions) ─────────────────────────────────
-    -- Cmd+Shift+3/4/5 = screenshot. Bound to physical SUPER (the Cmd key), which
-    -- is free since nothing remaps it.
-    hl.bind(m2 .. " + SHIFT + 3", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
-    hl.bind(m2 .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
-    hl.bind(m2 .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
-
-    -- Cmd+Ctrl+Q = lock screen (macOS)
-    hl.bind(m2 .. " + CTRL + Q", hl.dsp.exec_cmd("hyprlock"))
-
-    -- Notification center (macOS-style). AeroSpace leaves this to macOS; alt-n here.
-    hl.bind(m .. " + N", hl.dsp.exec_cmd("swaync-client -t -sw"))
-
-    -- Transparency toggle (HyprBazzite extra)
-    hl.bind(m .. " + O", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
-
-    -- Clipboard history (Cmd+Shift+V equivalent)
-    hl.bind(m2 .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
-
-    -- ─── Mouse Bindings ──────────────────────────────────────────────────────
-    -- AeroSpace: alt + left-drag = move, alt + right-drag = resize
-    hl.bind(m .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
-    hl.bind(m .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+    -- ─── macOS-convention system shortcuts (Option key) ──────────────────────
+    hl.bind(appmod .. " + SHIFT + 3", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
+    hl.bind(appmod .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+    hl.bind(appmod .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+    hl.bind(appmod .. " + CTRL + Q",  hl.dsp.exec_cmd("hyprlock"))
 
     -- ═══════════════════════════════════════════════════════════════════════════
     -- RESIZE SUBMAP — mirrors AeroSpace [mode.resize.binding]
@@ -248,60 +211,32 @@ if profile == "macos" then
         hl.bind("ALT + L", function() hl.exec_cmd("hyprctl dispatch moveintogroup right"); hl.dispatch(hl.dsp.submap("reset")) end)
     end)
 
--- ═══════════════════════════════════════════════════════════════════════════════
--- LINUX PROFILE (standard Hyprland)
--- ═══════════════════════════════════════════════════════════════════════════════
 else
 
-    local m = "SUPER"
-
     -- ─── Launch ──────────────────────────────────────────────────────────────
-    hl.bind(m .. " + return", hl.dsp.exec_cmd(terminal))
-    hl.bind(m .. " + B",      hl.dsp.exec_cmd(browser))
-    hl.bind(m .. " + F",      hl.dsp.exec_cmd(filemanager))
-    hl.bind(m .. " + SPACE",  hl.dsp.exec_cmd(launcher))
+    hl.bind(mod .. " + B", hl.dsp.exec_cmd(browser))
+    hl.bind(mod .. " + F", hl.dsp.exec_cmd(filemanager))
 
-    -- ─── Window Management ───────────────────────────────────────────────────
-    hl.bind(m .. " + W",         hl.dsp.window.close())
-    hl.bind(m .. " + V",         hl.dsp.window.float({ action = "toggle" }))
-    hl.bind(m .. " + J",         hl.dsp.window.cycle_next())
-    hl.bind(m .. " + P",         hl.dsp.window.pseudo())
-    hl.bind(m .. " + SHIFT + F", hl.dsp.window.fullscreen(0))
-    hl.bind(m .. " + ALT + F",   hl.dsp.window.fullscreen(1))
+    -- ─── Window management ───────────────────────────────────────────────────
+    hl.bind(mod .. " + J",         hl.dsp.window.cycle_next())
+    hl.bind(mod .. " + P",         hl.dsp.window.pseudo())
+    hl.bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen(0))
+    hl.bind(mod .. " + ALT + F",   hl.dsp.window.fullscreen(1))
+    hl.bind("ALT + Tab",           hl.dsp.window.cycle_next())
 
-    -- ─── Focus Movement ──────────────────────────────────────────────────────
-    hl.bind(m .. " + left",  hl.dsp.focus({ direction = "left" }))
-    hl.bind(m .. " + right", hl.dsp.focus({ direction = "right" }))
-    hl.bind(m .. " + up",    hl.dsp.focus({ direction = "up" }))
-    hl.bind(m .. " + down",  hl.dsp.focus({ direction = "down" }))
-    hl.bind("ALT + Tab",     hl.dsp.window.cycle_next())
+    -- ─── Mouse workspace scrolling ───────────────────────────────────────────
+    hl.bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
+    hl.bind(mod .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
-    -- ─── Workspaces ──────────────────────────────────────────────────────────
-    for i = 1, 10 do
-        local key = i % 10
-        hl.bind(m .. " + " .. key,           hl.dsp.focus({ workspace = i }))
-        hl.bind(m .. " + SHIFT + " .. key,   hl.dsp.window.move({ workspace = i }))
-    end
-
-    -- ─── Mouse Workspace Scrolling ───────────────────────────────────────────
-    hl.bind(m .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-    hl.bind(m .. " + mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
-
-    -- ─── Window Moving ───────────────────────────────────────────────────────
-    hl.bind(m .. " + SHIFT + left",  hl.dsp.window.move({ direction = "left" }))
-    hl.bind(m .. " + SHIFT + right", hl.dsp.window.move({ direction = "right" }))
-    hl.bind(m .. " + SHIFT + up",    hl.dsp.window.move({ direction = "up" }))
-    hl.bind(m .. " + SHIFT + down",  hl.dsp.window.move({ direction = "down" }))
-
-    -- ─── Window Resizing ─────────────────────────────────────────────────────
-    hl.bind(m .. " + minus", hl.dsp.window.resize({ x = -100, y = 0 }))
-    hl.bind(m .. " + equal", hl.dsp.window.resize({ x = 100, y = 0 }))
-    hl.bind(m .. " + SHIFT + minus", hl.dsp.window.resize({ x = 0, y = -100 }))
-    hl.bind(m .. " + SHIFT + equal", hl.dsp.window.resize({ x = 0, y = 100 }))
+    -- ─── Window resizing ─────────────────────────────────────────────────────
+    hl.bind(mod .. " + minus",         hl.dsp.window.resize({ x = -100, y = 0 }))
+    hl.bind(mod .. " + equal",         hl.dsp.window.resize({ x = 100, y = 0 }))
+    hl.bind(mod .. " + SHIFT + minus", hl.dsp.window.resize({ x = 0, y = -100 }))
+    hl.bind(mod .. " + SHIFT + equal", hl.dsp.window.resize({ x = 0, y = 100 }))
 
     -- ─── Scratchpads ─────────────────────────────────────────────────────────
-    hl.bind(m .. " + Q",         hl.dsp.workspace.toggle_special())
-    hl.bind(m .. " + SHIFT + Q", function()
+    hl.bind(mod .. " + Q",         hl.dsp.workspace.toggle_special())
+    hl.bind(mod .. " + SHIFT + Q", function()
         local window = hl.get_active_window()
         if window and window.workspace.name:find("^special") then
             hl.dispatch(hl.dsp.window.move({ workspace = "e+0" }))
@@ -309,28 +244,21 @@ else
             hl.dispatch(hl.dsp.window.move({ workspace = "special" }))
         end
     end)
-    hl.bind(m .. " + ALT + Q", hl.dsp.workspace.toggle_special("scratchpad"))
+    hl.bind(mod .. " + ALT + Q", hl.dsp.workspace.toggle_special("scratchpad"))
 
     -- ─── Screenshots ─────────────────────────────────────────────────────────
-    hl.bind(m .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
-    hl.bind(m .. " + CTRL + S",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
+    hl.bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+    hl.bind(mod .. " + CTRL + S",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
 
     -- ─── System ──────────────────────────────────────────────────────────────
-    hl.bind(m .. " + N",         hl.dsp.exec_cmd("swaync-client -t -sw"))
-    hl.bind(m .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
-    hl.bind(m .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
-    hl.bind(m .. " + SHIFT + K", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk swap-anchor"))
-    hl.bind(m .. " + O",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
-    hl.bind(m .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
-
-    -- ─── Mouse Bindings ──────────────────────────────────────────────────────
-    hl.bind(m .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
-    hl.bind(m .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+    hl.bind(mod .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
+    hl.bind(mod .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
+    hl.bind(mod .. " + SHIFT + K", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk swap-anchor"))
 
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- SHARED (both profiles)
+-- SHARED (hardware + input, both profiles)
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 -- ─── Multimedia (hardware keys) ──────────────────────────────────────────────
