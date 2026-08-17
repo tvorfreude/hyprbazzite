@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# hyprbazzite-install-apps - manual post-install app setup (run: ujust install-apps)
+# hyprbazzite-install-apps - optional developer tooling setup (run: ujust install-apps)
 #
-# Flatpaks are normally provisioned automatically on first boot by
-# hyprbazzite-flatpak-setup.service. This command lets you (re-)run that
-# provisioning on demand and then sets up the user-scoped extras — Homebrew and
-# VSCode — which deliberately are NOT automated because Homebrew must run as the
-# unprivileged user, not root.
+# This image does not preinstall Flatpak apps — install those yourself from
+# Flathub (theming/integration is already set up by hyprbazzite-flatpak-overrides).
+# This command just sets up the optional user-scoped dev extras: Homebrew and
+# VSCode. It must run as your normal user (Homebrew refuses to run as root).
 set -euo pipefail
 
 log() { echo "[install-apps] $*"; }
@@ -14,27 +13,9 @@ notify() {
     command -v notify-send >/dev/null 2>&1 && notify-send -u "$urgency" "$title" "$msg" || true
 }
 
-# --- Root guard: Homebrew refuses to run as root, and must not. ---
 if [[ "${EUID}" -eq 0 ]]; then
     log "ERROR: run this as your normal user (not root / not via sudo)."
-    log "Homebrew must be installed as an unprivileged user."
     exit 1
-fi
-
-# --- Internet check ---
-if ! curl -s --head --connect-timeout 5 https://flathub.org >/dev/null 2>&1; then
-    log "No internet connection. Please connect and retry."
-    notify "Install Apps" "No internet connection. Please connect and retry." "critical"
-    exit 1
-fi
-
-# --- Flatpaks (system): reuse the same routine as the first-boot service. ---
-# This needs root, so it's the one part we elevate.
-log "Provisioning Flatpaks (may prompt for authentication)..."
-if sudo /usr/libexec/hyprbazzite-flatpak-setup; then
-    log "Flatpak provisioning complete."
-else
-    log "Flatpak provisioning reported issues; continuing with the rest."
 fi
 
 # --- Homebrew (as the current user) ---
@@ -54,7 +35,6 @@ if command -v brew >/dev/null 2>&1 || [[ -x /home/linuxbrew/.linuxbrew/bin/brew 
     eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" 2>/dev/null || true
     brew tap ublue-os/brew >/dev/null 2>&1 && log "  Added ublue-os/brew tap." || true
 
-    # --- VSCode via Homebrew cask ---
     if command -v code >/dev/null 2>&1 || brew list --cask 2>/dev/null | grep -q visual-studio-code; then
         log "  VSCode already installed, skipping..."
     else
@@ -63,5 +43,5 @@ if command -v brew >/dev/null 2>&1 || [[ -x /home/linuxbrew/.linuxbrew/bin/brew 
     fi
 fi
 
-log "Installation complete!"
-notify "Install Apps" "Application setup finished." "normal"
+log "Done."
+notify "Install Apps" "Developer tooling setup finished." "normal"

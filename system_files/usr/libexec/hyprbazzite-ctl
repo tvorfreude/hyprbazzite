@@ -761,43 +761,123 @@ lid_handle() {
 keybinds_switch() {
     local action="${1:-}"
     local profile_file="/etc/hypr/keybind-profile"
-    local keyd_dst="/etc/keyd/default.conf"
     local current="linux"
 
     [[ -f "$profile_file" ]] && current=$(cat "$profile_file" 2>/dev/null | tr -d '[:space:]')
 
-    _apply_keyd() {
-        if [[ -f "$keyd_dst" ]]; then
-            sudo rm -f "$keyd_dst"
-            sudo systemctl restart keyd 2>/dev/null || sudo keyd reload 2>/dev/null || true
-        fi
+    # Profiles are pure Hyprland binds (bindings.lua reads this file) — no keyd,
+    # no external remapper, so switching is just: write profile + reload.
+    _set_profile() {
+        echo "$1" > "$profile_file"
+        notify "Keybinds" "Switched to ${1} profile. Reloading..."
+        hyprctl reload
     }
 
     case "$action" in
-        macos|linux)
-            echo "$action" > "$profile_file"
-            _apply_keyd
-            notify "Keybinds" "Switched to ${action} profile. Reloading..."
-            hyprctl reload
-            ;;
+        macos|linux) _set_profile "$action" ;;
         toggle)
-            if [[ "$current" == "macos" ]]; then
-                echo "linux" > "$profile_file"; _apply_keyd
-                notify "Keybinds" "Switched to linux profile. Reloading..."
-            else
-                echo "macos" > "$profile_file"; _apply_keyd
-                notify "Keybinds" "Switched to macos profile. Reloading..."
-            fi
-            hyprctl reload
+            if [[ "$current" == "macos" ]]; then _set_profile linux; else _set_profile macos; fi
             ;;
-        status|"")
-            echo "Current keybind profile: $current"
-            ;;
+        status|"")   echo "Current keybind profile: $current" ;;
         *)
             echo "Usage: hyprbazzite-ctl keybinds [macos|linux|toggle|status]"
             return 1
             ;;
     esac
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# OPEN MODULE — native XDG launcher for common app classes
+#
+# Common apps are launched purely through XDG resolution so they always point at
+# whatever the user installed/chose — nothing is hardcoded.
+#   * Targets (files/dirs/urls) go straight through `xdg-open`, which honours the
+#     mimeapps.list defaults, then falls back to the mimeinfo.cache registry that
+#     `update-desktop-database` builds from each installed app's `MimeType=`.
+#   * "Launch browser" has no target, so we resolve the handler for
+#     x-scheme-handler/https. If no default is configured we autodetect the first
+#     installed registrant, persist it as the default (so GUI settings agree), then
+#     launch it. We only set a default when none was configured, so we never
+#     override an explicit user choice.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Every applications dir where .desktop files / mimeinfo caches live
+# (system, per-user, and flatpak exports).
+_xdg_app_dirs() {
+    local d _dd=()
+    IFS=: read -ra _dd <<< "${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+    for d in "${XDG_DATA_HOME:-$HOME/.local/share}" "${_dd[@]}" \
+             /var/lib/flatpak/exports/share \
+             "$HOME/.local/share/flatpak/exports/share"; do
+        [[ -d "$d/applications" ]] && printf '%s\n' "$d/applications"
+    done
+}
+
+# True if a desktop id (e.g. firefox.desktop) resolves to an installed file.
+_desktop_installed() {
+    local id="$1" dir
+    [[ -z "$id" ]] && return 1
+    while IFS= read -r dir; do
+        [[ -f "$dir/$id" ]] && return 0
+    done < <(_xdg_app_dirs)
+    return 1
+}
+
+# First *installed* app registered as a handler for a mimetype/scheme, read from
+# the native mimeinfo.cache registry.
+_first_registrant() {
+    local mimetype="$1" dir ids id _ids=()
+    while IFS= read -r dir; do
+        [[ -f "$dir/mimeinfo.cache" ]] || continue
+        ids=$(grep -m1 "^${mimetype}=" "$dir/mimeinfo.cache" 2>/dev/null | cut -d= -f2-) || ids=""
+        [[ -z "$ids" ]] && continue
+        IFS=';' read -ra _ids <<< "$ids"
+        for id in "${_ids[@]}"; do
+            [[ -n "$id" ]] && _desktop_installed "$id" && { printf '%s\n' "$id"; return 0; }
+        done
+    done < <(_xdg_app_dirs)
+    return 1
+}
+
+# Launch an installed desktop id, preferring gtk-launch, falling back to gio.
+_launch_desktop() {
+    local id="$1" dir
+    if command -v gtk-launch >/dev/null 2>&1; then
+        exec gtk-launch "${id%.desktop}"
+    elif command -v gio >/dev/null 2>&1; then
+        while IFS= read -r dir; do
+            [[ -f "$dir/$id" ]] && exec gio launch "$dir/$id"
+        done < <(_xdg_app_dirs)
+    fi
+    return 1
+}
+
+open_browser() {
+    local id
+    # 1) explicit default (user or system) — only if it's actually installed.
+    id=$(xdg-settings get default-web-browser 2>/dev/null | head -n1) || id=""
+    _desktop_installed "$id" || id=""
+    # 2) otherwise autodetect the first installed https handler and remember it.
+    if [[ -z "$id" ]]; then
+        id=$(_first_registrant x-scheme-handler/https) || id=""
+        [[ -n "$id" ]] && { xdg-settings set default-web-browser "$id" 2>/dev/null || true; }
+    fi
+    if [[ -z "$id" ]]; then
+        notify "Browser" "No web browser installed yet — install one and it becomes the default automatically." "critical"
+        return 1
+    fi
+    _launch_desktop "$id" || {
+        notify "Browser" "Could not launch $id" "critical"; return 1
+    }
+}
+
+open_target() {
+    local target="${1:-$HOME}"
+    if command -v xdg-open >/dev/null 2>&1; then
+        exec xdg-open "$target"
+    fi
+    notify "Open" "xdg-open is not available" "critical"
+    return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -825,6 +905,7 @@ Modules:
   waybar [power-status|headset-battery]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
   lid [close|open]              Lid switch handling
+  open [browser|files [path]|<target>]  Launch common apps via XDG defaults
 USAGE
         return 0
     fi
@@ -884,6 +965,15 @@ USAGE
             ;;
         keybinds) keybinds_switch "${1:-}" ;;
         lid) lid_handle "${1:-}" ;;
+        open)
+            local what="${1:-}"; shift || true
+            case "$what" in
+                browser)                          open_browser ;;
+                files|filemanager|file-manager)   open_target "${1:-$HOME}" ;;
+                "") echo "Usage: hyprbazzite-ctl open [browser|files [path]|<target>]"; return 1 ;;
+                *)  open_target "$what" ;;
+            esac
+            ;;
         *)
             echo "Unknown module: $module" >&2
             echo "Run 'hyprbazzite-ctl' for usage." >&2

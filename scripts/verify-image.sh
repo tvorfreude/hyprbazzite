@@ -39,7 +39,7 @@ echo "Essential configuration files are in place."
 declare -a REQUIRED_SCRIPTS=(
     "/usr/libexec/hyprbazzite-ctl"
     "/usr/libexec/hyprbazzite-install-apps"
-    "/usr/libexec/hyprbazzite-flatpak-setup"
+    "/usr/libexec/hyprbazzite-flatpak-overrides"
     "/usr/libexec/hyprbazzite-user-firstboot"
     "/usr/libexec/tblue-secureboot-firstboot"
     "/usr/libexec/tblue-hibernate-setup"
@@ -61,7 +61,7 @@ declare -a REQUIRED_UNITS=(
     "/usr/lib/systemd/system/tblue-hibernate-setup.service"
     "/usr/lib/systemd/system/tblue-hhd-enable-user.service"
     "/usr/lib/systemd/system/tblue-disable-nonpower-wakeup.service"
-    "/usr/lib/systemd/system/hyprbazzite-flatpak-setup.service"
+    "/usr/lib/systemd/system/hyprbazzite-flatpak-overrides.service"
     "/usr/lib/systemd/user/hyprbazzite-user-firstboot.service"
 )
 for unit in "${REQUIRED_UNITS[@]}"; do

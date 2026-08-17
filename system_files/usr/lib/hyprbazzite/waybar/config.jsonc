@@ -550,7 +550,7 @@
   },
   "custom/browser": {
     "format": "󰖟",
-    "on-click": "flatpak run io.github.zen_browser.zen",
+    "on-click": "/usr/libexec/hyprbazzite-ctl open browser",
     "tooltip": true,
     "tooltip-format": "Launch Browser"
   },
@@ -562,7 +562,7 @@
   },
   "custom/file_manager": {
     "format": "󰉋",
-    "on-click": "nemo",
+    "on-click": "xdg-open \"$HOME\"",
     "tooltip": true,
     "tooltip-format": "File Manager"
   },
