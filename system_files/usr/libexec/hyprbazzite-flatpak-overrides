@@ -1,0 +1,56 @@
+#!/usr/bin/bash
+# hyprbazzite-flatpak-overrides - apply HyprBazzite's Flatpak theming/integration.
+#
+# This image intentionally does NOT install any Flatpak apps for you — install
+# whatever you want yourself. All this does is make sure Flatpaks you install
+# pick up the system Dracula GTK/Qt theme + fonts and run correctly under
+# Wayland, and that Flathub is enabled so installing is easy.
+#
+# Versioned + idempotent (same pattern as bazzite-flatpak-manager): runs on
+# boot, does work only when this script's version hasn't been applied yet, and
+# re-applies automatically when the script changes. No network required — these
+# are local override settings, which is why they can't just be baked in at
+# build time on a bootc image (/var/lib/flatpak is machine-local state).
+#
+# Force a re-apply with:  hyprbazzite-flatpak-overrides --force
+set -euo pipefail
+
+log() { echo "[flatpak-overrides] $*"; }
+
+VER=1
+SCRIPT_HASH=$(tr -d '[:space:]' < "$0" | sha256sum | cut -d' ' -f1)
+VER="$VER-$SCRIPT_HASH"
+VER_FILE="/etc/hyprbazzite/flatpak_overrides_version"
+
+force=0
+[[ "${1:-}" == "--force" ]] && force=1
+
+mkdir -p /etc/hyprbazzite
+VER_RAN=$(cat "$VER_FILE" 2>/dev/null || echo "")
+if [[ $force -eq 0 && "$VER" == "$VER_RAN" ]]; then
+    log "v$VER already applied. Exiting."
+    exit 0
+fi
+
+# Ensure Flathub is available/enabled so users can install their own apps
+# (Bazzite normally handles this; harmless if already done).
+flatpak remote-add --if-not-exists --system flathub /etc/flatpak/remotes.d/flathub.flatpakrepo 2>/dev/null \
+    || flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo || :
+flatpak remote-modify --system --enable flathub || :
+
+# System-wide theming + font + Wayland integration for ALL Flatpaks.
+flatpak override --system \
+    --socket=wayland \
+    --filesystem=xdg-config/fontconfig:ro \
+    --filesystem=/usr/share/fonts:ro \
+    --filesystem=xdg-config/gtk-3.0:ro \
+    --filesystem=xdg-config/gtk-4.0:ro \
+    --filesystem=xdg-config/kdeglobals:ro \
+    --filesystem=/usr/share/themes:ro \
+    --filesystem=/usr/share/icons:ro \
+    --env=GTK_THEME=Dracula \
+    --env=QT_QPA_PLATFORMTHEME=gtk3 \
+    --env=QT_STYLE_OVERRIDE=Fusion || :
+
+echo "$VER" > "$VER_FILE"
+log "v$VER applied."

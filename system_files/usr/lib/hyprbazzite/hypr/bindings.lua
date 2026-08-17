@@ -5,8 +5,8 @@
 --
 --   "macos"  - Mirrors AeroSpace 1:1. ALT (the physical Option key on a Mac
 --              keyboard) is the WM modifier — exactly like AeroSpace on macOS.
---              NO keyd remapping is used: every bind fires on the real physical
---              key, so behaviour is identical whether or not keyd is installed.
+--              Every bind fires on the real physical key (no external key
+--              remapper), so behaviour is self-contained within Hyprland.
 --              System shortcuts follow macOS conventions (screenshots, lock).
 --              Includes "resize" and "service" submaps that mirror AeroSpace's
 --              resize-mode and service-mode.
@@ -32,17 +32,17 @@ end
 -- VARIABLES
 -- ═══════════════════════════════════════════════════════════════════════════════
 local terminal = "kitty"
-local browser = "flatpak run io.github.zen_browser.zen"
-local filemanager = "nemo"
+local browser = "/usr/libexec/hyprbazzite-ctl open browser"
+local filemanager = 'xdg-open "$HOME"'
 local launcher = "wofi -wass"
 
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- MACOS PROFILE
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- Modifier: ALT — the physical Option key on a Mac keyboard, exactly like
---                 AeroSpace on macOS. Works directly on the real key; no keyd.
--- App shortcuts: NOT remapped here (moved away from keyd). Cmd = Super remains
---                free for you to wire up separately if desired.
+--                 AeroSpace on macOS. Works directly on the real key.
+-- App shortcuts: NOT remapped. Cmd = Super remains free for you to wire up
+--                separately if desired.
 -- System shortcuts: match macOS conventions (screenshots, lock).
 -- ═══════════════════════════════════════════════════════════════════════════════
 if profile == "macos" then
@@ -151,7 +151,7 @@ if profile == "macos" then
 
     -- ─── System (matching macOS conventions) ─────────────────────────────────
     -- Cmd+Shift+3/4/5 = screenshot. Bound to physical SUPER (the Cmd key), which
-    -- is now free since we no longer remap it via keyd.
+    -- is free since nothing remaps it.
     hl.bind(m2 .. " + SHIFT + 3", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
     hl.bind(m2 .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
     hl.bind(m2 .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))

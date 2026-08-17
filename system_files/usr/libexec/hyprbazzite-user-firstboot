@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# hyprbazzite-user-firstboot - one-time per-user first-login setup.
+# hyprbazzite-user-firstboot - per-user first-login setup (runs once).
 #
 # Ensures the image's system Hyprland config (/etc/hypr) is authoritative by
 # removing stale/default Hyprland dotfiles that may have been left behind (e.g.
-# by a previous image, a rebase, or Hyprland's own first-run generation).
+# by a previous image, a rebase, or Hyprland's own first-run generation) —
+# UNLESS the user provides their own ~/.config/hypr/hyprland.lua (dotfiles /
+# chezmoi), which is left untouched so the session launcher uses it.
 #
-# It will NOT touch a config the user intentionally provides: if
-# ~/.config/hypr/hyprland.lua exists (dotfiles / chezmoi), it is left alone and
-# the session launcher (hyprbazzite-session) will use it.
+# Flatpak theming/integration is handled system-wide by hyprbazzite-flatpak-overrides;
+# no Flatpak apps are installed by the image (users install their own).
 set -euo pipefail
 
 log() { echo "[user-firstboot] $*" >&2; }
@@ -17,7 +18,6 @@ marker="$state_dir/user-firstboot.done"
 config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
 hypr_dir="$config_dir/hypr"
 
-# Already provisioned for this user.
 [[ -f "$marker" ]] && exit 0
 
 if [[ -d "$hypr_dir" ]]; then

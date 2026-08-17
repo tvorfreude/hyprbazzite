@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply HyprBazzite Flatpak theming/integration overrides
+After=bazzite-flatpak-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/hyprbazzite-flatpak-overrides
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
