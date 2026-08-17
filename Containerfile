@@ -133,13 +133,8 @@ RUN mkdir -p /usr/share/hyprbazzite/config && \
 # ---------------------------------------------------------------------------
 # Step 8: Set permissions on scripts and executables
 # ---------------------------------------------------------------------------
-RUN chmod +x /usr/bin/wallpaper-cycle && \
-    # Ensure all libexec scripts are executable
-    find /usr/libexec/ -type f -exec chmod +x {} + && \
-    # Ensure remaining Hyprland helper scripts are executable
 RUN chmod +x /usr/bin/wallpaper-cycle /usr/bin/hyprbazzite-session && \
-    # Ensure all libexec scripts are executable
-    find /usr/libexec/ -type f -exec chmod +x {} + && \mmon.sh
+    find /usr/libexec/ -type f -exec chmod +x {} +
 
 # ---------------------------------------------------------------------------
 # Step 9: Configure user defaults, environment, and systemd presets
