@@ -18,7 +18,7 @@ ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable
 # Renovate manages this tag (tag-only, no digest pin) — see .github/renovate.json5.
 FROM alpine:3.24 AS assets
 
-ARG NERD_FONTS_VERSION=v3.5.0
+ARG NERD_FONTS_VERSION=v3.5.1
 
 # Install download utilities
 RUN apk add --no-cache curl unzip
