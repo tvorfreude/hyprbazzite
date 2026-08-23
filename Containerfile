@@ -3,11 +3,13 @@
 # ===========================================================================
 
 # BASE_IMAGE selects which Bazzite variant to build on. CI overrides it per
-# build variant:
-#   - default  -> ghcr.io/ublue-os/bazzite:stable            (tags: latest, stable.*)
-#   - nvidia   -> ghcr.io/ublue-os/bazzite-nvidia-open:stable (tags: latest-nvidia, stable-nvidia.*)
+# build variant (see the matrix in .github/workflows/build.yml):
+#   - default -> ghcr.io/ublue-os/bazzite:stable-<fedora>.<date>
+#   - nvidia  -> ghcr.io/ublue-os/bazzite-nvidia-open:stable-<fedora>.<date>
+# The tag is PINNED (not floating :stable) so Renovate can open PRs bumping the
+# date-stamped tag — that's what makes upstream base updates visible/reviewable.
 # Declared before the first FROM so it can be referenced in the final FROM.
-ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable
+ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable-44.20260820
 
 # ---------------------------------------------------------------------------
 # Stage 1: Download external assets (fonts, themes)
@@ -41,10 +43,10 @@ RUN mkdir -p /qt5ct/colors && \
 # ===========================================================================
 # Stage 3: Final Image
 # ===========================================================================
-# Base tracks a floating :stable tag intentionally (rolling image, rebuilt on a
-# schedule to follow upstream Bazzite). Do NOT pin to a digest — that forces a
-# full ~8GB re-pull every build and stops us tracking upstream. Renovate is
-# configured to leave BASE_IMAGE alone.
+# Base is pinned to a date-stamped stable tag (stable-<fedora>.<date>) and bumped
+# by Renovate. We pin the TAG, not a digest: a digest pin forces a full ~8GB
+# re-pull every build, whereas the date-stamped tag updates cleanly through a
+# Renovate PR while staying reproducible for any given commit.
 FROM ${BASE_IMAGE}
 
 # Build arguments for versioning
@@ -168,6 +170,8 @@ RUN usermod -s /bin/zsh root && \
     mkdir -p /usr/lib/systemd/user/default.target.wants && \
     ln -sf ../hyprbazzite-user-firstboot.service \
         /usr/lib/systemd/user/default.target.wants/hyprbazzite-user-firstboot.service && \
+    mkdir -p /etc/systemd/user && \
+    ln -sf /dev/null /etc/systemd/user/swaync.service && \
     # Copy dconf theme settings
     mkdir -p /etc/dconf/db/distro.d/ && \
     cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme /etc/dconf/db/distro.d/

@@ -4,6 +4,15 @@
     'config:best-practices',
   ],
   rebaseWhen: 'auto',
+  // Pull upstream release notes into PRs when Renovate can map a dep to its
+  // source repo (e.g. the Bazzite base via its image source label).
+  fetchChangeLogs: 'branch',
+  // Auto-merge everything by default so the image stays current hands-off. This
+  // is safe because merges wait on CI (a bump that fails to build won't land) —
+  // set the image build as a required status check in branch protection so only
+  // green builds auto-merge. The single carve-out is the Fedora *major* base
+  // jump below, which a build-only CI can't vet for runtime breakage.
+  automerge: true,
   dockerfile: {
     managerFilePatterns: [
       '/(^|/)Containerfile$/',
@@ -33,47 +42,25 @@
       ],
       datasourceTemplate: 'docker',
     },
+    {
+      // The base image is chosen per build variant in the workflow matrix, so
+      // Renovate needs a custom manager to see/bump those pinned tags. Matches
+      // both the default and -nvidia-open bases (date-stamped stable tags).
+      customType: 'regex',
+      managerFilePatterns: [
+        '/\\.github/workflows/build\\.yml$/',
+      ],
+      matchStrings: [
+        'base_image":"(?<depName>ghcr\\.io/ublue-os/bazzite(?:-nvidia-open)?):(?<currentValue>stable-\\d+\\.\\d+)"',
+      ],
+      datasourceTemplate: 'docker',
+    },
   ],
   packageRules: [
     {
-      automerge: true,
-      matchUpdateTypes: [
-        'pin',
-        'pinDigest',
-        'digest',
-      ],
-    },
-    {
-      automerge: true,
+      // Group all GitHub Actions bumps into a single PR and pin them to digests
+      // (supply-chain best practice). Auto-merge is inherited from the default.
       groupName: 'github-actions',
-      matchManagers: [
-        'github-actions',
-      ],
-      matchUpdateTypes: [
-        'minor',
-        'patch',
-        'digest',
-        'pin',
-        'pinDigest',
-      ],
-    },
-    {
-      automerge: true,
-      matchUpdateTypes: [
-        'patch',
-      ],
-    },
-    {
-      automerge: true,
-      matchDatasources: [
-        'github-releases',
-      ],
-      matchUpdateTypes: [
-        'minor',
-        'patch',
-      ],
-    },
-    {
       matchManagers: [
         'github-actions',
       ],
@@ -91,18 +78,47 @@
       pinDigests: false,
     },
     {
-      // Keep the Bazzite bases (both the default and the -nvidia-open variant)
-      // tracking the floating :stable tag. Do NOT pin their digests — this is a
-      // rolling image that rebuilds daily to follow upstream, and a digest pin
-      // forces a full ~8GB re-pull each build. The glob covers any future
-      // bazzite-* variant we add to the matrix.
+      // Bazzite bases (default + -nvidia-open) are pinned to a date-stamped
+      // stable tag (stable-<fedora>.<date>) in the Containerfile ARG and the
+      // build.yml matrix. The custom `regex` versioning parses that tag so a new
+      // date is a "minor" bump and a Fedora rev is a "major" bump. Both variants
+      // are grouped into one PR since they must move together. Do NOT pin digests
+      // — a digest pin forces a full ~8GB re-pull each build.
+      matchDatasources: [
+        'docker',
+      ],
       matchPackageNames: [
         'ghcr.io/ublue-os/bazzite',
         'ghcr.io/ublue-os/bazzite-nvidia-open',
-        '/^ghcr\\.io/ublue-os/bazzite/',
       ],
+      versioning: 'regex:^stable-(?<major>\\d+)\\.(?<minor>\\d+)$',
+      groupName: 'bazzite base image',
       pinDigests: false,
-      enabled: false,
+      // Bazzite's GitHub release tag drops the `stable-` prefix (container tag
+      // `stable-44.20260820` -> release tag `44.20260820`), which is exactly what
+      // our regex versioning produces as {{newVersion}}. Link straight to that
+      // release so the PR always carries the full package diff + commit list,
+      // even if Renovate's native changelog fetch can't match the custom tag.
+      prBodyNotes: [
+        '📦 **Bazzite base changelog:** [`{{newVersion}}` release notes](https://github.com/ublue-os/bazzite/releases/tag/{{newVersion}}) — full package diff (kernel, Mesa, KDE/GNOME, Nvidia, …) and commits.',
+      ],
+    },
+    {
+      // The ONE carve-out from blanket auto-merge: a Fedora *major* base jump
+      // (e.g. 44 -> 45) is a full OS upgrade. COPRs (Hyprland, etc.) may not have
+      // F<next> builds yet, and a build-only CI can't catch runtime breakage, so
+      // this opens a PR and waits for a human to review + merge.
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'ghcr.io/ublue-os/bazzite',
+        'ghcr.io/ublue-os/bazzite-nvidia-open',
+      ],
+      matchUpdateTypes: [
+        'major',
+      ],
+      automerge: false,
     },
   ],
 }

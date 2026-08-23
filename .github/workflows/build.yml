@@ -1,7 +1,5 @@
 name: Build container image
 on:
-  schedule:
-    - cron: '0 2 * * *'
   push:
     branches:
       - main
@@ -82,65 +80,17 @@ jobs:
       - name: Set matrix
         id: set
         run: |
-          nvidia='{"variant":"nvidia","base_image":"ghcr.io/ublue-os/bazzite-nvidia-open:stable","tag_suffix":"-nvidia","primary_tag":"latest-nvidia"}'
-          main='{"variant":"main","base_image":"ghcr.io/ublue-os/bazzite:stable","tag_suffix":"","primary_tag":"latest"}'
+          nvidia='{"variant":"nvidia","base_image":"ghcr.io/ublue-os/bazzite-nvidia-open:stable-44.20260820","tag_suffix":"-nvidia","primary_tag":"latest-nvidia"}'
+          main='{"variant":"main","base_image":"ghcr.io/ublue-os/bazzite:stable-44.20260820","tag_suffix":"","primary_tag":"latest"}'
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "matrix={\"include\":[${main}]}" >> "$GITHUB_OUTPUT"
           else
             echo "matrix={\"include\":[${main},${nvidia}]}" >> "$GITHUB_OUTPUT"
           fi
 
-  check_base_image:
-    name: Check for base image updates
-    if: github.event_name == 'schedule'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    outputs:
-      base-updated: ${{ steps.check.outputs.updated }}
-    steps:
-      - name: Install skopeo
-        run: |
-          if ! command -v skopeo &> /dev/null; then
-            sudo apt-get update && sudo apt-get install -y skopeo
-          fi
-      - name: Check both base images for updates
-        id: check
-        env:
-          OWNER: ${{ github.repository_owner }}
-          REPO: ${{ github.event.repository.name }}
-        run: |
-          updated=false
-          # "base image = published tag whose base.digest label we compare against"
-          for pair in \
-            "ghcr.io/ublue-os/bazzite:stable=latest" \
-            "ghcr.io/ublue-os/bazzite-nvidia-open:stable=latest-nvidia"; do
-            base="${pair%=*}"; tag="${pair#*=}"
-            BASE_DIGEST=$(skopeo inspect "docker://${base}" | jq -r '.Digest')
-            if [ -z "$BASE_DIGEST" ] || [ "$BASE_DIGEST" = "null" ]; then
-              echo "Could not fetch digest for ${base}; skipping this variant."
-              continue
-            fi
-            if skopeo inspect "docker://ghcr.io/${OWNER}/${REPO}:${tag}" 2>/dev/null \
-                 | jq -e '.Labels."org.opencontainers.image.base.digest"' > /dev/null; then
-              CURRENT=$(skopeo inspect "docker://ghcr.io/${OWNER}/${REPO}:${tag}" \
-                 | jq -r '.Labels."org.opencontainers.image.base.digest"')
-              if [ "$BASE_DIGEST" != "$CURRENT" ]; then
-                echo "${base}: updated ($CURRENT -> $BASE_DIGEST)"
-                updated=true
-              else
-                echo "${base}: unchanged"
-              fi
-            else
-              echo "${tag} not published yet — will build."
-              updated=true
-            fi
-          done
-          echo "updated=${updated}" >> "$GITHUB_OUTPUT"
-          echo "### Base image check: ${updated}" >> "$GITHUB_STEP_SUMMARY"
-
   build_push:
     name: Build and push (${{ matrix.variant }})
-    needs: [lint, check_base_image, prepare_matrix]
+    needs: [lint, prepare_matrix]
     # Fail fast: only build if lint passed (skips a ~40-60 min build when a
     # cheap shellcheck/hadolint error would fail it anyway).
     #
@@ -153,8 +103,7 @@ jobs:
       needs.prepare_matrix.result == 'success' &&
       (github.event_name == 'workflow_dispatch' ||
        github.event_name == 'push' ||
-       (github.event_name == 'pull_request' && github.event.pull_request.draft == false) ||
-       (github.event_name == 'schedule' && needs.check_base_image.outputs.base-updated == 'true'))
+       (github.event_name == 'pull_request' && github.event.pull_request.draft == false))
     runs-on: ubuntu-24.04
     # 120 min headroom: the -nvidia variant uses a larger base
     # (bazzite-nvidia-open) whose first, uncached build does a big cold pull.
