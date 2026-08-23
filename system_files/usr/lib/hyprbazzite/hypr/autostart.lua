@@ -18,7 +18,7 @@ hl.on("hyprland.start", function()
 
     -- UI ELEMENTS
     exec_once("waybar --config /etc/waybar/config.jsonc --style /etc/waybar/style.css", "waybar")
-    exec_once("swaync -c /etc/swaync/config.json -s /etc/swaync/style.css", "swaync")
+    exec_once("swaync -c /etc/xdg/swaync/config.json -s /etc/xdg/swaync/style.css", "swaync")
     exec_once("hypridle -c /etc/hypr/hypridle.conf", "hypridle")
     exec_once("fcitx5", "fcitx5")
 
