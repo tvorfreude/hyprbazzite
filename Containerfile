@@ -93,7 +93,7 @@ RUN --mount=type=cache,dst=/var/cache \
     hhd adjustor hhd-ui lact \
     rom-properties lutris steam-devices \
     brightnessctl gparted systemd-devel btop \
-    nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 \
+    nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
     network-manager-applet pavucontrol \
     gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
     blueman breeze-icon-theme qt5ct qt6ct \
