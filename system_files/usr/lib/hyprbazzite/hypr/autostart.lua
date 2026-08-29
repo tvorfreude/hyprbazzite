@@ -14,7 +14,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
     hl.exec_cmd("systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
     exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit")
-    exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
+    hl.exec_cmd("systemctl --user start oo7-portal.service")
 
     -- UI ELEMENTS
     exec_once("waybar --config /etc/waybar/config.jsonc --style /etc/waybar/style.css", "waybar")
