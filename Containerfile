@@ -65,7 +65,7 @@ RUN build_id="${BUILD_STAMP:-stable.$(date -u +%Y%m%d)-${SHA_HEAD_SHORT:-unknown
 # Step 2: Enable COPR repositories
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,dst=/var/cache \
-    for repo in lionheartp/Hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship; do \
+    for repo in lionheartp/Hyprland erikreider/SwayNotificationCenter fed500/wvkbd hhd-dev/hhd atim/starship tvorfreude/tvorfreude-only; do \
       dnf5 -y copr enable "$repo"; \
     done && \
     dnf5 -y clean all
@@ -94,8 +94,8 @@ RUN --mount=type=cache,dst=/var/cache \
     rom-properties lutris steam-devices \
     brightnessctl gparted systemd-devel btop \
     nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
-    network-manager-applet pavucontrol \
-    gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
+    network-manager-applet pavucontrol oo7-cli \
+    seahorse oo7-cli oo7 \
     blueman breeze-icon-theme qt5ct qt6ct \
     jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist && \
