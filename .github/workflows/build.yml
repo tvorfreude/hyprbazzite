@@ -221,7 +221,7 @@ jobs:
           set -euo pipefail
           dest="${RUNNER_TEMP}/sbomroot"
           mkdir -p "${dest}/usr/lib/sysimage"
-          cid=$(podman create "localhost/${IMAGE_NAME}:${first_tag}")
+          cid=$(podman create "localhost/${IMAGE_NAME}:${first_tag}" true)
           # Fedora bootc keeps the rpmdb at /usr/lib/sysimage/rpm
           # (/var/lib/rpm is a symlink to it). Fall back just in case.
           if ! podman cp "${cid}:/usr/lib/sysimage/rpm" "${dest}/usr/lib/sysimage/rpm" 2>/dev/null; then
