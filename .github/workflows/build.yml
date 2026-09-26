@@ -39,7 +39,7 @@ concurrency:
 jobs:
   lint:
     name: Lint scripts and Containerfile
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     steps:
       - name: Checkout
@@ -72,7 +72,7 @@ jobs:
   # for fast feedback; push/schedule/dispatch build both default and -nvidia.
   prepare_matrix:
     name: Prepare build matrix
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.set.outputs.matrix }}
@@ -104,7 +104,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' ||
        github.event_name == 'push' ||
        (github.event_name == 'pull_request' && github.event.pull_request.draft == false))
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # 120 min headroom: the -nvidia variant uses a larger base
     # (bazzite-nvidia-open) whose first, uncached build does a big cold pull.
     # Matrix legs run in parallel so this is per-variant, not additive.
@@ -290,7 +290,7 @@ jobs:
     name: Cleanup old package versions
     needs: build_push
     if: always() && needs.build_push.result == 'success' && github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       packages: write
@@ -329,7 +329,7 @@ jobs:
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
       github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
