@@ -42,7 +42,6 @@
     "group/audio",
     "custom/headset-battery",
     "custom/separator#dot-line",
-    "mpris",
     "group/notify",
     "group/status"
   ],
