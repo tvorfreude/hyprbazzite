@@ -76,6 +76,7 @@ window#waybar.empty #window {
 #power-profiles-daemon,
 #custom-power-profiles-daemon,
 #pulseaudio,
+#pulseaudio-microphone,
 #custom-headset-battery,
 #pulseaudio-slider,
 #taskbar,
@@ -207,6 +208,8 @@ window#waybar.empty #window {
 
 #pulseaudio.bluetooth  { color: @pink; }
 #pulseaudio.muted      { color: @red; }
+#pulseaudio-microphone         { color: @cyan; }
+#pulseaudio-microphone.muted   { color: @red; }
 
 /* ── Missing module colours ─────────────────────────────────── */
 #idle_inhibitor       { color: @green; }
@@ -297,7 +300,6 @@ window#waybar.empty #window {
 }
 
 /* ── Indicators ─────────────────────────────────────────────── */
-#custom-hypridle.notactive,
 #idle_inhibitor.activated  { color: @green; }
 #custom-dunst.paused       { color: @comment; }
 
