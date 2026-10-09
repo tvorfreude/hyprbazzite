@@ -162,6 +162,8 @@ RUN usermod -s /bin/zsh root && \
     echo "enable tblue-hibernate-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable tblue-disable-nonpower-wakeup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable hyprbazzite-flatpak-overrides.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    echo "enable tblue-secureboot-firstboot.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    echo "enable tblue-hhd-enable-user.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     # Enable the per-user first-login service for all users (global user preset
     # + an explicit default.target.wants symlink so it activates without relying
     # on preset timing for freshly-created users)
