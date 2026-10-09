@@ -98,7 +98,8 @@ RUN --mount=type=cache,dst=/var/cache \
     gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
     blueman breeze-icon-theme qt5ct qt6ct \
     jetbrains-mono jetbrains-mono-fonts \
-    wl-clipboard grim slurp playerctl imv swappy mpv cliphist && \
+    wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
+    ImageMagick fcitx5 && \
     dnf5 -y autoremove && \
     dnf5 -y clean all
 
