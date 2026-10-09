@@ -762,14 +762,16 @@ keybinds_switch() {
     local action="${1:-}"
     # Profiles are pure Hyprland binds — no keyd, no external remapper. bindings.lua
     # picks macOS when this marker exists, else Linux. The marker lives in the
-    # per-user runtime dir, so toggling is user-writable and needs no root.
-    local marker="${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-keybinds-macos"
+    # per-user state dir, so toggling is user-writable, needs no root, and
+    # survives reboot/logout.
+    local state_dir="${XDG_STATE_HOME:-$HOME/.local/state}"
+    local marker="$state_dir/hyprbazzite-keybinds-macos"
     local current="linux"
     [[ -e "$marker" ]] && current="macos"
 
     _apply() {
         case "$1" in
-            macos) : > "$marker" ;;
+            macos) mkdir -p "$state_dir" && : > "$marker" ;;
             linux) rm -f "$marker" ;;
         esac
         notify "Keybinds" "Switched to ${1} profile. Reloading..."
