@@ -8,8 +8,7 @@ polkit.addRule(function(action, subject) {
             "/usr/bin/ryzenadj",
             "/usr/sbin/ryzenadj",
             "/usr/bin/amdctl",
-            "/usr/sbin/amdctl",
-            "/usr/libexec/hyprbazzite-ctl"
+            "/usr/sbin/amdctl"
         ];
         var program = action.lookup("program");
         if (program) {
