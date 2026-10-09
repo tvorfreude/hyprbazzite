@@ -564,6 +564,14 @@ automation_dnd() {
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
+            monitorremoved\>\>*)
+                # Unplugging the last external display while the lid is
+                # closed should sleep the machine, same as closing the lid
+                # undocked (mirrors macOS clamshell behavior). lid_handle
+                # recomputes external_count itself, so this is a no-op if
+                # another external display is still connected.
+                _lid_is_closed && lid_handle close
+                ;;
         esac
     done
 }
@@ -731,12 +739,22 @@ waybar_headset_battery() {
 # LID MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+_lid_is_closed() {
+    local state_file
+    state_file=$(find /proc/acpi/button/lid -maxdepth 1 -name state 2>/dev/null | head -n1)
+    [[ -n "$state_file" ]] && grep -q closed "$state_file" 2>/dev/null
+}
+
 lid_handle() {
     local action="$1"
+    # "all" is required here, not just the default active-monitor list: once
+    # close() disables the internal panel it drops out of the default list,
+    # so a later re-evaluation (e.g. unplugging an external while clamshelled)
+    # would see no internal output at all and suspend even while still docked.
     local internal_output
-    internal_output=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1)
+    internal_output=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1)
     local external_count
-    external_count=$(hyprctl -j monitors 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
+    external_count=$(hyprctl -j monitors all 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
 
     case "$action" in
         close)
