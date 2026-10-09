@@ -12,10 +12,10 @@
 --
 -- macOS is active while a marker file exists; toggle it live with
 -- `hyprbazzite-ctl keybinds [macos|linux|toggle]`. The marker lives in the
--- per-user runtime dir, so switching needs no root and clears on logout.
+-- per-user state dir, so switching needs no root and survives reboot/logout.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
-local f = io.open((os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprbazzite-keybinds-macos", "r")
+local f = io.open((os.getenv("XDG_STATE_HOME") or (os.getenv("HOME") .. "/.local/state")) .. "/hyprbazzite-keybinds-macos", "r")
 local macos = f ~= nil
 if f then f:close() end
 
