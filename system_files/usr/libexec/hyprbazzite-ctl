@@ -771,16 +771,21 @@ _sleep_best_effort() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _lid_is_closed() {
-    # maxdepth 2, not 1: the real path is .../lid/LID0/state - LID0 itself
-    # is depth 1, state is depth 2. This was wrong since before today's
-    # session even started; confirmed live it made find find nothing at all,
-    # so this always silently returned "not closed" regardless of the
-    # lid's actual physical state - every close-the-lid scenario this
-    # entire session was tested against a detector that could never report
-    # closed in the first place.
-    local state_file
-    state_file=$(find /proc/acpi/button/lid -maxdepth 2 -name state 2>/dev/null | head -n1)
-    [[ -n "$state_file" ]] && grep -q closed "$state_file" 2>/dev/null
+    # Defer to logind's own LidClosed property instead of parsing
+    # /proc/acpi/button/lid ourselves - logind already has to get this
+    # exactly right for its own HandleLidSwitch sleep decision to work (it
+    # has been correct the whole time), so asking it directly is one fewer
+    # place to parse raw ACPI state wrong, not two. This is the exact same
+    # property hyprbazzite-lid.service already keys its trigger off of, so
+    # the trigger and the decision now read from a single authoritative
+    # source instead of two separate, independently-maintained parsers -
+    # which is exactly the class of bug that made this not work at all
+    # until today (a one-character maxdepth mistake in the old hand-rolled
+    # ACPI parser). No root needed for this property read - confirmed live.
+    local closed
+    closed=$(busctl --system get-property org.freedesktop.login1 /org/freedesktop/login1 \
+        org.freedesktop.login1.Manager LidClosed 2>/dev/null)
+    [[ "$closed" == "b true" ]]
 }
 
 lid_sync() {
