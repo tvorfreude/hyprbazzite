@@ -30,7 +30,7 @@ main() {
     # Find the first regular (non-root) user
     local target_user
     target_user=$(getent passwd \
-        | awk -F: '\$3 >= 1000 && \$1 != "nobody" && \$7 !~ /(nologin|false)$/ {print \$1; exit}')
+        | awk -F: '$3 >= 1000 && $1 != "nobody" && $7 !~ /(nologin|false)$/ {print $1; exit}')
 
     if [[ -z "${target_user:-}" ]]; then
         log "No regular user found yet; will retry on next boot."
