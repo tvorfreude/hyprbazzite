@@ -127,24 +127,12 @@ main() {
 
     log "Hybrid sleep setup complete."
 
-    # 5. Disable all wakeup sources except the power button
-    log "Disabling all wakeup sources except the power button."
-    if [[ -f /proc/acpi/wakeup ]]; then
-        # Get the power button device (usually PBTN or PWRB)
-        local power_btns
-        power_btns=$(awk '/PBTN|PWRB/ {print $1}' /proc/acpi/wakeup)
-        # Disable all other wakeup devices
-        grep enabled /proc/acpi/wakeup | awk '{print $1}' | while read -r dev; do
-            if ! echo "$power_btns" | grep -q "$dev"; then
-                echo "$dev" > /proc/acpi/wakeup
-                log "Disabled wakeup for $dev"
-            fi
-        done
-        log "Wakeup sources after filtering:"
-        cat /proc/acpi/wakeup >&2
-    else
-        log "/proc/acpi/wakeup not found; skipping wakeup source filtering."
-    fi
+    # 5. Disable non-power/lid wakeup sources. This duplicated the logic that
+    # tblue-disable-nonpower-wakeup.service (and its underlying script) also
+    # runs on every boot; now just delegate to it instead of keeping two
+    # copies of the same allow-list in sync.
+    log "Disabling non-power/lid wakeup sources."
+    /usr/lib/hyprbazzite/hypr/scripts/disable-nonpower-wakeup.sh
 }
 
 main "$@"
