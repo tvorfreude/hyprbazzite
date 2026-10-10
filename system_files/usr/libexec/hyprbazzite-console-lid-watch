@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Covers the one gap hyprbazzite-lid.service (a --user service) can't
+# reach at all: the SDDM greeter and the bare console, before any Hyprland
+# session - and its own hl.monitor-based handling - exists. Runs as root
+# (needed to write DRM sysfs), and backs off completely the moment a real
+# user session exists, handing control to hyprbazzite-lid.service's
+# already-proven mechanism instead of fighting it over the same output.
+#
+# Unlike hl.monitor's compositor-level disable, this forces the connector
+# off at the kernel/DRM level (/sys/class/drm/.../status) - the only
+# layer the console framebuffer and SDDM's weston greeter both actually
+# consult, since neither one is a full desktop compositor with any
+# clamshell-mode concept of its own.
+#
+# sddm.service itself can't be used to scope this (confirmed live: it
+# stays active continuously even long after login, it does not stop when
+# a user session starts) - the session's Class is the real signal instead:
+# Class=user only exists once someone has actually logged in.
+
+_internal_connector() {
+    local c
+    for c in /sys/class/drm/card*-eDP-* /sys/class/drm/card*-LVDS-*; do
+        [[ -e "$c/status" ]] && { echo "$c"; return 0; }
+    done
+    return 1
+}
+
+_external_connected() {
+    local c
+    for c in /sys/class/drm/card*-*; do
+        [[ "$c" == *-eDP-* || "$c" == *-LVDS-* ]] && continue
+        [[ "$(cat "$c/status" 2>/dev/null)" == "connected" ]] && return 0
+    done
+    return 1
+}
+
+_user_session_active() {
+    local sid
+    for sid in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
+        [[ "$(loginctl show-session "$sid" -p Class --value 2>/dev/null)" == "user" ]] && return 0
+    done
+    return 1
+}
+
+_lid_closed() {
+    local closed
+    closed=$(busctl --system get-property org.freedesktop.login1 /org/freedesktop/login1 \
+        org.freedesktop.login1.Manager LidClosed 2>/dev/null)
+    [[ "$closed" == "b true" ]]
+}
+
+sync() {
+    local connector
+    connector=$(_internal_connector) || return 0  # desktop, no lid panel
+
+    # "connected" is the normal auto-detect state for a present, open lid -
+    # if that's already current, there's nothing to restore, so skip the
+    # write entirely. Without this, busctl monitor fires on *any* login1
+    # chatter (not just lid events), which would otherwise mean a redundant
+    # DRM re-probe on basically every property change while logged in.
+    local current
+    current=$(cat "${connector}/status" 2>/dev/null || echo "")
+
+    # A real user session already exists - that's hyprbazzite-lid.service's
+    # job now, not ours. Restore normal auto-detection in case we'd left it
+    # forced off, then get out of the way.
+    if _user_session_active; then
+        [[ "$current" != "connected" ]] && { echo detect > "${connector}/status" 2>/dev/null || true; }
+        return 0
+    fi
+
+    if _lid_closed && _external_connected; then
+        [[ "$current" == "connected" ]] && { echo off > "${connector}/status" 2>/dev/null || true; }
+    else
+        [[ "$current" != "connected" ]] && { echo detect > "${connector}/status" 2>/dev/null || true; }
+    fi
+}
+
+sync
+
+busctl --system monitor org.freedesktop.login1 2>/dev/null | \
+while IFS= read -r _; do
+    sync
+done
