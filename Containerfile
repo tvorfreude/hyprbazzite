@@ -95,7 +95,7 @@ RUN --mount=type=cache,dst=/var/cache \
     brightnessctl gparted systemd-devel btop \
     nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
     network-manager-applet pavucontrol \
-    gnome-keyring seahorse libsecret libsecret-devel gcr gcr-devel \
+    gnome-keyring gnome-keyring-pam seahorse libsecret libsecret-devel gcr gcr-devel \
     blueman breeze-icon-theme qt5ct qt6ct \
     jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
