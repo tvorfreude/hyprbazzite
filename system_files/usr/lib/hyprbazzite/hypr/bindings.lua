@@ -272,11 +272,11 @@ hl.bind("XF86AudioNext",  hl.dsp.exec_cmd("playerctl next"),                    
 hl.bind("XF86AudioPrev",  hl.dsp.exec_cmd("playerctl previous"),                         { locked = true })
 
 -- ─── Lid Switch ──────────────────────────────────────────────────────────────
--- Both directions run the same command: lid_sync reads the actual switch
--- state itself rather than trusting which bind fired, so it's one idempotent
--- function instead of two asymmetric ones (see hyprbazzite-ctl's lid module).
-hl.bind("switch:on:Lid Switch",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl lid"), { locked = true })
-hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl lid"), { locked = true })
+-- No bind here anymore - hyprbazzite-lid.service reacts to logind's
+-- LidClosed property directly instead (same source logind itself uses for
+-- HandleLidSwitch/HandleLidSwitchDocked), so the cosmetic panel action can
+-- never disagree with logind's own suspend decision. See
+-- system_files/usr/libexec/hyprbazzite-lid-watch.
 
 -- ─── Gestures ────────────────────────────────────────────────────────────────
 hl.gesture({

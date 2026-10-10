@@ -1,0 +1,13 @@
+[Unit]
+Description=HyprBazzite lid-driven clamshell/suspend sync
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/hyprbazzite-lid-watch
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

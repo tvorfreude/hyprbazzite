@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Drives hyprbazzite-ctl's lid sync off logind's LidClosed property directly
+# - the exact same signal logind itself uses to decide HandleLidSwitch /
+# HandleLidSwitchDocked - instead of Hyprland's own separate evdev
+# lid-switch bind. The cosmetic panel action can now never disagree with
+# logind's own suspend decision, since both read the same source, and this
+# is one persistent system-level service rather than a compositor
+# keybinding - closer to how a MacBook's clamshell handling is one coherent
+# system policy, not an app hotkey.
+#
+# gdbus monitor, not `busctl --system monitor`: busctl's monitor mode uses
+# the BecomeMonitor/eavesdrop API, which this system's D-Bus policy
+# restricts to root - confirmed live, it silently produces no output at all
+# as a regular user. gdbus subscribes via ordinary AddMatch instead, the
+# same unprivileged mechanism any client uses to receive a broadcast signal
+# it opted into.
+
+sync() {
+    /usr/libexec/hyprbazzite-ctl lid
+}
+
+# Catch whatever state the lid is already in the moment this starts -
+# session launch, or this service itself restarting.
+sync
+
+gdbus monitor -y -d org.freedesktop.login1 -o /org/freedesktop/login1 2>/dev/null | \
+while IFS= read -r line; do
+    case "$line" in
+        *LidClosed*) sync ;;
+        *PrepareForSleep\ \(false*) sync ;;  # post-resume
+    esac
+done
