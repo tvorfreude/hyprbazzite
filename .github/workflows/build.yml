@@ -112,11 +112,10 @@ jobs:
        github.event_name == 'push' ||
        (github.event_name == 'pull_request' && github.event.pull_request.draft == false))
     runs-on: ubuntu-24.04
-    # 140 min headroom: the -nvidia variant uses a larger base
-    # (bazzite-nvidia-open) whose first, uncached build does a big cold pull,
-    # plus rechunking adds ~6-10 min on top of that. Matrix legs run in
-    # parallel so this is per-variant, not additive.
-    timeout-minutes: 140
+    # 120 min headroom: the -nvidia variant uses a larger base
+    # (bazzite-nvidia-open) whose first, uncached build does a big cold pull.
+    # Matrix legs run in parallel so this is per-variant, not additive.
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -215,65 +214,6 @@ jobs:
           podman run --rm --pull=never \
             -v "${{ github.workspace }}/scripts/verify-image.sh:/tmp/verify-image.sh:ro" \
             "localhost/${{ env.IMAGE_NAME }}:$FIRST_TAG" \
-            bash /tmp/verify-image.sh
-
-      # The rechunk action's own steps all run as `sudo podman` (root
-      # storage), but redhat-actions/buildah-build above builds rootlessly
-      # into this runner user's own storage - two separate, mutually
-      # invisible namespaces. Without this, `sudo podman create
-      # localhost/...` can't see what was just built, and (confirmed live)
-      # podman instead tries to resolve "localhost" as an actual registry
-      # hostname and fails to connect. save|load bridges the two storages
-      # without needing to know either one's exact driver/path.
-      - name: Make image available to root podman
-        if: github.event_name != 'pull_request'
-        run: |
-          podman save "localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}" | sudo podman load
-
-      # Rechunking re-slices the image into many content-addressed layers
-      # instead of the few big ones buildah produces, so a later one-line fix
-      # only invalidates (and re-downloads) the small layer that file actually
-      # lives in on `bootc upgrade`, rather than whatever large layer happened
-      # to contain it. This is the same tool Bazzite itself (our base image)
-      # uses in production - see https://github.com/hhd-dev/rechunk. Skipped
-      # on PRs: adds ~6-10 min per variant for a benefit (smaller future
-      # updates) that only matters for images people actually rebase onto.
-      #
-      # Needs root podman (not rootless) and the ubuntu-24.04 runner
-      # specifically, both already true here. `prev-ref` lets it diff against
-      # what's currently live to keep stable layer boundaries between builds -
-      # left non-fatal (no prev-ref-fail) since the very first run after
-      # adding this has nothing to diff against yet.
-      - name: Rechunk Image
-        if: github.event_name != 'pull_request'
-        id: rechunk
-        uses: hhd-dev/rechunk@5fbe1d3a639615d2548d83bc888360de6267b1a2 # v1.2.4
-        with:
-          ref: localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}
-          prev-ref: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:latest${{ matrix.tag_suffix }}
-          labels: ${{ steps.metadata.outputs.labels }}
-
-      # The action discards its `ref` input after rechunking (to save disk),
-      # so every tag that pointed at the pre-rechunk build is now dangling -
-      # re-tag the rechunked output under those exact same names so every
-      # step below (SBOM extraction, push, sign, attest) needs zero changes
-      # and just operates on the rechunked content instead.
-      - name: Load rechunked image
-        if: github.event_name != 'pull_request'
-        run: |
-          set -euo pipefail
-          RECHUNKED_ID=$(podman pull "${{ steps.rechunk.outputs.ref }}")
-          for tag in ${{ steps.metadata.outputs.tags }}; do
-            podman tag "${RECHUNKED_ID}" "localhost/${{ env.IMAGE_NAME }}:${tag}"
-          done
-          rm -rf "${{ steps.rechunk.outputs.location }}"
-
-      - name: Verify rechunked image
-        if: github.event_name != 'pull_request'
-        run: |
-          podman run --rm --pull=never \
-            -v "${{ github.workspace }}/scripts/verify-image.sh:/tmp/verify-image.sh:ro" \
-            "localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}" \
             bash /tmp/verify-image.sh
 
       # SBOM generation + attestation is the only prod-only supply-chain step
