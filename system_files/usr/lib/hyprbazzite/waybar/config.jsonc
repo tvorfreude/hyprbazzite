@@ -155,8 +155,8 @@
     "sort-by-number": true,
     "show-special": false,
     "on-click": "activate",
-    "on-scroll-up":   "hyprctl dispatch workspace e-1",
-    "on-scroll-down": "hyprctl dispatch workspace e+1",
+    "on-scroll-up":   "hyprctl eval 'hl.dispatch(hl.dsp.focus({workspace = \"e-1\"}))'",
+    "on-scroll-down": "hyprctl eval 'hl.dispatch(hl.dsp.focus({workspace = \"e+1\"}))'",
     "persistent-workspaces": {
       "*": 5
     },
@@ -585,7 +585,7 @@
   },
   "custom/quit": {
     "format": "󰗼",
-    "on-click": "hyprctl dispatch exit",
+    "on-click": "hyprctl eval 'hl.dispatch(hl.dsp.exit())'",
     "tooltip": true,
     "tooltip-format": "Exit Hyprland"
   },
