@@ -525,7 +525,7 @@ power_action() {
         shutdown) systemctl poweroff ;;
         reboot) systemctl reboot ;;
         suspend) systemctl suspend ;;
-        hybrid-sleep) systemctl suspend-then-hibernate ;;
+        hybrid-sleep) _sleep_best_effort ;;
         lock) hyprlock ;;
         logout) hyprctl eval 'hl.dispatch(hl.dsp.exit())' ;;
         *) echo "Unknown power action: $action"; return 1 ;;
@@ -742,6 +742,25 @@ waybar_headset_battery() {
     printf "%s\n" "${pct_signed#+}"
 }
 
+_sleep_best_effort() {
+    # `systemctl sleep`, not `systemctl suspend-then-hibernate` directly:
+    # the latter needs real kernel hibernation support, which varies a lot
+    # across hardware and isn't guaranteed - confirmed live on this very
+    # machine, CanSuspendThenHibernate/CanHibernate both report "na" (not
+    # "no" - genuinely unavailable, not just policy-disabled), because
+    # Secure Boot puts the kernel in lockdown=integrity mode, which disables
+    # hibernation outright (/sys/power/state has no "disk" entry at all
+    # here). `systemctl sleep` instead defers to logind's own
+    # SleepOperation= chain (logind.conf(5), systemd 256+ - this image ships
+    # 259): it tries suspend-then-hibernate, then suspend, then hibernate,
+    # using the first one the hardware actually supports - so this always
+    # actually sleeps instead of silently doing nothing, the single worst
+    # possible outcome for "closed lid in a bag", which is the entire point
+    # of this call existing. Shared by the lid module and the power menu's
+    # Hybrid Sleep.
+    systemctl sleep
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # LID MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -761,8 +780,8 @@ lid_sync() {
     # correct outcome, so it's safe and idempotent to call from anywhere,
     # any number of times, for any reason.
     #
-    # logind (HandleLidSwitch=suspend-then-hibernate undocked,
-    # HandleLidSwitchDocked=ignore docked - see the logind.conf.d drop-in)
+    # logind (HandleLidSwitch=sleep undocked, HandleLidSwitchDocked=ignore
+    # docked - see the logind.conf.d drop-in)
     # already decides suspend-vs-stay-awake for the *physical* lid switch in
     # parallel with this, independently. All this needs to do is the
     # cosmetic clamshell action logind has no concept of (blank/restore the
@@ -789,12 +808,14 @@ lid_sync() {
             hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
         else
             loginctl lock-session 2>/dev/null || true
-            # suspend-then-hibernate, not plain suspend: a laptop left
-            # closed long enough (packed in a bag for travel) eventually
+            # Prefers suspend-then-hibernate over plain suspend: a laptop
+            # left closed long enough (packed in a bag for travel) ideally
             # falls back to a real hibernate instead of slowly draining the
-            # battery in RAM-suspend the whole time. The sleep.conf.d
-            # drop-in already allows this.
-            systemctl suspend-then-hibernate
+            # battery in RAM-suspend the whole time - but only where the
+            # hardware actually supports it (_sleep_best_effort checks
+            # first and falls back to plain suspend otherwise, so this
+            # always actually sleeps either way).
+            _sleep_best_effort
         fi
     else
         hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false })"
