@@ -562,7 +562,9 @@ automation_dnd() {
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
+            monitoradded\>\>*) workspace_rebind ;;
             monitorremoved\>\>*)
+                workspace_rebind
                 # Unplugging the last external display while the lid is
                 # closed should sleep the machine, same as closing the lid
                 # undocked (mirrors macOS clamshell behavior). logind's own
@@ -789,6 +791,39 @@ lid_handle() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# WORKSPACE MODULE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+workspace_rebind() {
+    # i3/AeroSpace-style: workspaces 1-5 always live on the primary (laptop
+    # panel) monitor, 6-10 on whichever secondary display is connected -
+    # pressing e.g. SUPER+6 always lands on the secondary monitor, regardless
+    # of which monitor currently has focus. "all" (not just active monitors)
+    # so this doesn't lose track of the laptop panel while it's disabled for
+    # clamshell mode (see the lid module above - same class of pitfall).
+    local primary
+    primary=$(hyprctl -j monitors all 2>/dev/null | jq -r '[.[] | select(.name | test("^(eDP|LVDS)"))][0].name // empty')
+    if [[ -z "$primary" ]]; then
+        # Desktop-only setup, no laptop panel - just use whatever is first.
+        primary=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[0].name // empty')
+    fi
+    [[ -z "$primary" ]] && return 0
+
+    local secondary
+    secondary=$(hyprctl -j monitors all 2>/dev/null | jq -r --arg p "$primary" '[.[] | select(.name != $p)][0].name // empty')
+
+    local i
+    for i in 1 2 3 4 5; do
+        hyprctl eval "hl.workspace_rule({ workspace = '$i', monitor = '$primary' })" >/dev/null 2>&1
+    done
+    # No secondary connected: 6-10 fall back to primary too, so they stay
+    # reachable instead of being orphaned on a monitor that doesn't exist.
+    for i in 6 7 8 9 10; do
+        hyprctl eval "hl.workspace_rule({ workspace = '$i', monitor = '${secondary:-$primary}' })" >/dev/null 2>&1
+    done
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # KEYBINDS MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -944,6 +979,7 @@ Modules:
   waybar [power-status|headset-battery]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
   lid [close|open]              Lid switch handling
+  workspace rebind              Re-bind workspaces 1-5/6-10 to primary/secondary monitor
   open [browser|files [path]|<target>]  Launch common apps via XDG defaults
 USAGE
         return 0
@@ -1004,6 +1040,12 @@ USAGE
             ;;
         keybinds) keybinds_switch "${1:-}" ;;
         lid) lid_handle "${1:-}" ;;
+        workspace)
+            case "${1:-}" in
+                rebind) workspace_rebind ;;
+                *) echo "Usage: hyprbazzite-ctl workspace rebind"; return 1 ;;
+            esac
+            ;;
         open)
             local what="${1:-}"; shift || true
             case "$what" in

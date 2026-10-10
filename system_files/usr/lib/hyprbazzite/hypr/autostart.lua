@@ -27,6 +27,9 @@ hl.on("hyprland.start", function()
     exec_once("wallpaper-cycle", "wallpaper-cycle")
 
     -- AUTOMATION (hyprbazzite-ctl long-running services)
+    -- workspace rebind is a one-shot (not a daemon, so no exec_once guard);
+    -- automation_dnd's monitor add/remove listener keeps it up to date after this.
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl workspace rebind")
     exec_once("/usr/libexec/hyprbazzite-ctl automation dnd", "socat")
     exec_once("/usr/libexec/hyprbazzite-ctl automation osk", "udevadm")
 
