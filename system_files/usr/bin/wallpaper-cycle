@@ -58,6 +58,11 @@ cycle_now() {
         if command -v magick &>/dev/null; then
             mkdir -p "$WALLUST_DIR"
             magick "${wallpaper}[0]" "$WALLUST_DIR/current_wallpaper.png" 2>/dev/null || true
+
+            # Mirror to the shared, world-readable location the SDDM
+            # greeter theme reads from (see tmpfiles.d) - it can't reach
+            # into $HOME to read the copy above.
+            cp "$WALLUST_DIR/current_wallpaper.png" /var/lib/hyprbazzite/theme/current_wallpaper.png 2>/dev/null || true
         fi
     fi
 }
