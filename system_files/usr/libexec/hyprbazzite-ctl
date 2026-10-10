@@ -506,14 +506,19 @@ osk_swap_anchor() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 power_menu() {
-    local options="⏻ Shutdown\n Reboot\n Suspend\n⏾ Hybrid Sleep\n Lock\n Logout"
+    # "Sleep", not "Hybrid Sleep": this invokes _sleep_best_effort (systemd's
+    # SleepOperation= fallback chain), which isn't actually systemd's
+    # distinct "hybrid-sleep" mode (write the hibernation image immediately
+    # while also suspending) - that mismatch predates this menu's current
+    # behavior too, it was never literally hybrid-sleep under the hood.
+    local options="⏻ Shutdown\n Reboot\n Suspend\n⏾ Sleep\n Lock\n Logout"
     local choice
     choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Power") || return 0
     case "$choice" in
         *"Shutdown"*) power_action shutdown ;;
         *"Reboot"*) power_action reboot ;;
         *"Suspend"*) power_action suspend ;;
-        *"Hybrid"*"Sleep"*) power_action hybrid-sleep ;;
+        *"Sleep"*) power_action sleep ;;
         *"Lock"*) power_action lock ;;
         *"Logout"*) power_action logout ;;
     esac
@@ -525,7 +530,7 @@ power_action() {
         shutdown) systemctl poweroff ;;
         reboot) systemctl reboot ;;
         suspend) systemctl suspend ;;
-        hybrid-sleep) _sleep_best_effort ;;
+        sleep) _sleep_best_effort ;;
         lock) hyprlock ;;
         logout) hyprctl eval 'hl.dispatch(hl.dsp.exit())' ;;
         *) echo "Unknown power action: $action"; return 1 ;;
@@ -757,7 +762,7 @@ _sleep_best_effort() {
     # actually sleeps instead of silently doing nothing, the single worst
     # possible outcome for "closed lid in a bag", which is the entire point
     # of this call existing. Shared by the lid module and the power menu's
-    # Hybrid Sleep.
+    # Sleep action.
     systemctl sleep
 }
 
@@ -1006,7 +1011,7 @@ Modules:
   theme [update] [wallpaper]    Update color theme from wallpaper
   tdp [get|set <watts>|profile] TDP power management
   osk [toggle|swap-anchor]      On-screen keyboard control
-  power [profile|menu|shutdown|reboot|suspend|hybrid-sleep|lock|logout]
+  power [profile|menu|shutdown|reboot|suspend|sleep|lock|logout]
   automation [dnd|osk|temp]     Background services & waybar helpers
   waybar [power-status|headset-battery]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
