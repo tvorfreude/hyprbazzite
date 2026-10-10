@@ -78,16 +78,15 @@ gamemode_toggle() {
     enabled=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
 
     if [[ "$enabled" = "1" ]]; then
-        hyprctl keyword animations:enabled 0
-        hyprctl keyword decoration:shadow:enabled 0
-        hyprctl keyword decoration:blur:enabled 0
-        hyprctl keyword general:gaps_in 0
-        hyprctl keyword general:gaps_out 0
-        hyprctl keyword general:border_size 1
-        hyprctl keyword decoration:rounding 0
-        hyprctl keyword decoration:active_opacity 1.0
-        hyprctl keyword decoration:inactive_opacity 1.0
-        hyprctl keyword "windowrule opacity 1 override 1 override 1 override, ^(.*)$"
+        # This build's Hyprland config is a native Lua engine ("non-legacy
+        # parser"), so `hyprctl keyword` always errors - live changes have to
+        # go through `hyprctl eval` calling the same hl.* API the config uses.
+        hyprctl eval 'hl.config({
+            animations = { enabled = false },
+            decoration = { shadow = { enabled = false }, blur = { enabled = false }, rounding = 0, active_opacity = 1.0, inactive_opacity = 1.0 },
+            general = { gaps_in = 0, gaps_out = 0, border_size = 1 },
+        })
+        hl.window_rule({ match = { class = ".*" }, opacity = "1 override 1 override 1 override" })' >/dev/null
         if command -v awww &>/dev/null; then
             awww clear 000000 2>/dev/null || true
         else
@@ -95,16 +94,12 @@ gamemode_toggle() {
         fi
         notify-send -e -u low -i "$notif_icon" " Gamemode:" " enabled"
     else
-        hyprctl keyword animations:enabled 1
-        hyprctl keyword decoration:shadow:enabled 1
-        hyprctl keyword decoration:blur:enabled 1
-        hyprctl keyword general:gaps_in 5
-        hyprctl keyword general:gaps_out 20
-        hyprctl keyword general:border_size 3
-        hyprctl keyword decoration:rounding 10
-        hyprctl keyword decoration:active_opacity 1.0
-        hyprctl keyword decoration:inactive_opacity 1.0
-        hyprctl keyword "windowrule opacity 1 override, ^(.*)$"
+        hyprctl eval 'hl.config({
+            animations = { enabled = true },
+            decoration = { shadow = { enabled = true }, blur = { enabled = true }, rounding = 10, active_opacity = 1.0, inactive_opacity = 1.0 },
+            general = { gaps_in = 5, gaps_out = 20, border_size = 3 },
+        })
+        hl.window_rule({ match = { class = ".*" }, opacity = "1 override" })' >/dev/null
         if command -v awww &>/dev/null; then
             awww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" \
                 --transition-type wipe --transition-duration 2
@@ -113,7 +108,10 @@ gamemode_toggle() {
         fi
         sleep 0.5
         notify-send -e -u normal -i "$notif_icon" " Gamemode:" " disabled"
-        hyprctl reload
+        # No hyprctl reload here: the eval call above already restored the
+        # exact gamemode-off values (gaps_out=20, border_size=3, etc., which
+        # differ from the plain hyprland.lua defaults) - reloading would wipe
+        # them straight back to those defaults.
     fi
 }
 
@@ -485,9 +483,9 @@ osk_swap_anchor() {
 
     if command -v hyprctl >/dev/null 2>&1; then
         if [[ "$next" = "top" ]]; then
-            hyprctl keyword windowrule "move 0 0, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+            hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, move = {"0","0"} })' >/dev/null 2>&1 || true
         else
-            hyprctl keyword windowrule "move 0 50%, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+            hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, move = {"0","50%"} })' >/dev/null 2>&1 || true
         fi
     fi
 
@@ -610,11 +608,10 @@ automation_osk() {
     }
 
     _sync_state
-    hyprctl keyword windowrule "float on, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
     if [[ "$anchor" = "top" ]]; then
-        hyprctl keyword windowrule "move 0 0, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+        hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","0"} })' >/dev/null 2>&1 || true
     else
-        hyprctl keyword windowrule "move 0 50%, match:class ^(wvkbd|wvkbd-.*)$" >/dev/null 2>&1 || true
+        hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","50%"} })' >/dev/null 2>&1 || true
     fi
     udevadm monitor --udev --subsystem-match=input --property | while read -r line; do
         [[ "$line" =~ ACTION=(add|remove|change) ]] && _sync_state
@@ -759,7 +756,9 @@ lid_handle() {
     case "$action" in
         close)
             if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
-                hyprctl keyword monitor "$internal_output,disable"
+                # `hyprctl keyword` errors on this build (native Lua config
+                # engine, "non-legacy parser") - this is the working equivalent.
+                hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
             else
                 loginctl lock-session 2>/dev/null || true
                 systemctl suspend
