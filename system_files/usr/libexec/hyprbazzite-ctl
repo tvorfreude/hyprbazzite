@@ -523,7 +523,7 @@ power_action() {
         suspend) systemctl suspend ;;
         hybrid-sleep) systemctl suspend-then-hibernate ;;
         lock) hyprlock ;;
-        logout) hyprctl dispatch exit ;;
+        logout) hyprctl eval 'hl.dispatch(hl.dsp.exit())' ;;
         *) echo "Unknown power action: $action"; return 1 ;;
     esac
 }

@@ -74,7 +74,7 @@ if macos then
 
     -- ─── Window actions ──────────────────────────────────────────────────────
     hl.bind(mod .. " + F",         hl.dsp.window.fullscreen(0))                             -- alt-f = fullscreen
-    hl.bind(mod .. " + E",         hl.dsp.exec_cmd("hyprctl dispatch splitratio exact 0.5")) -- alt-e = balance (50/50)
+    hl.bind(mod .. " + E",         hl.dsp.layout("splitratio exact 0.5")) -- alt-e = balance (50/50)
     hl.bind(mod .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
 
     -- ─── Focus / move (vim keys, on top of the shared arrows) ────────────────
@@ -92,19 +92,19 @@ if macos then
     hl.bind(mod .. " + equal", hl.dsp.window.resize({ x = 50, y = 50 }))
 
     -- ─── Layout ──────────────────────────────────────────────────────────────
-    hl.bind(mod .. " + slash",     hl.dsp.exec_cmd("hyprctl dispatch togglesplit"))          -- tiles h/v
-    hl.bind(mod .. " + comma",     hl.dsp.exec_cmd("hyprctl dispatch togglegroup"))          -- accordion (tabs)
-    hl.bind(mod .. " + SHIFT + A", hl.dsp.exec_cmd("hyprctl dispatch changegroupactive f"))  -- cycle group
+    hl.bind(mod .. " + slash",     hl.dsp.layout("togglesplit"))      -- tiles h/v
+    hl.bind(mod .. " + comma",     hl.dsp.group.toggle())             -- accordion (tabs)
+    hl.bind(mod .. " + SHIFT + A", hl.dsp.group.next())                -- cycle group
 
     -- ─── Monitors ────────────────────────────────────────────────────────────
     hl.bind(mod .. " + period",           hl.dsp.focus({ monitor = "+1" }))
     hl.bind(mod .. " + semicolon",        hl.dsp.focus({ monitor = "-1" }))
-    hl.bind(mod .. " + SHIFT + period",    hl.dsp.exec_cmd("hyprctl dispatch movewindow mon:+1"))
-    hl.bind(mod .. " + SHIFT + semicolon", hl.dsp.exec_cmd("hyprctl dispatch movewindow mon:-1"))
+    hl.bind(mod .. " + SHIFT + period",    hl.dsp.window.move({ monitor = "+1" }))
+    hl.bind(mod .. " + SHIFT + semicolon", hl.dsp.window.move({ monitor = "-1" }))
 
     -- ─── Workspace navigation ────────────────────────────────────────────────
-    hl.bind(mod .. " + Tab",         hl.dsp.exec_cmd("hyprctl dispatch workspace previous"))
-    hl.bind(mod .. " + SHIFT + Tab", hl.dsp.exec_cmd("hyprctl dispatch moveworkspacetomonitor +1"))
+    hl.bind(mod .. " + Tab",         hl.dsp.focus({ workspace = "previous" }))
+    hl.bind(mod .. " + SHIFT + Tab", hl.dsp.workspace.move({ monitor = "+1" }))
 
     -- ─── Special workspaces (scratchpads) ────────────────────────────────────
     hl.bind(mod .. " + S", hl.dsp.workspace.toggle_special())
@@ -167,7 +167,7 @@ if macos then
 
         -- b = balance (reset split 50/50) then exit
         hl.bind("B", function()
-            hl.exec_cmd("hyprctl dispatch splitratio exact 0.5")
+            hl.dispatch(hl.dsp.layout("splitratio exact 0.5"))
             hl.dispatch(hl.dsp.submap("reset"))
         end)
 
@@ -201,14 +201,14 @@ if macos then
         end)
         -- backspace = close all windows on this workspace except the focused one + exit
         hl.bind("backspace", function()
-            hl.exec_cmd([[bash -c 'aw=$(hyprctl -j activewindow | jq -r .address); ws=$(hyprctl -j activewindow | jq -r .workspace.id); for a in $(hyprctl -j clients | jq -r --argjson ws "$ws" ".[] | select(.workspace.id==$ws) | .address"); do [ "$a" != "$aw" ] && hyprctl dispatch closewindow address:$a; done']])
+            hl.exec_cmd([=[bash -c 'aw=$(hyprctl -j activewindow | jq -r .address); ws=$(hyprctl -j activewindow | jq -r .workspace.id); for a in $(hyprctl -j clients | jq -r --argjson ws "$ws" ".[] | select(.workspace.id==$ws) | .address"); do [ "$a" != "$aw" ] && hyprctl eval "hl.dispatch(hl.dsp.window.close({address = [[$a]]}))"; done']=])
             hl.dispatch(hl.dsp.submap("reset"))
         end)
         -- alt-h/j/k/l = join-with direction (merge into a group) + exit
-        hl.bind("ALT + H", function() hl.exec_cmd("hyprctl dispatch moveintogroup left");  hl.dispatch(hl.dsp.submap("reset")) end)
-        hl.bind("ALT + J", function() hl.exec_cmd("hyprctl dispatch moveintogroup down");  hl.dispatch(hl.dsp.submap("reset")) end)
-        hl.bind("ALT + K", function() hl.exec_cmd("hyprctl dispatch moveintogroup up");    hl.dispatch(hl.dsp.submap("reset")) end)
-        hl.bind("ALT + L", function() hl.exec_cmd("hyprctl dispatch moveintogroup right"); hl.dispatch(hl.dsp.submap("reset")) end)
+        hl.bind("ALT + H", function() hl.dispatch(hl.dsp.group.move_window({ direction = "left" }));  hl.dispatch(hl.dsp.submap("reset")) end)
+        hl.bind("ALT + J", function() hl.dispatch(hl.dsp.group.move_window({ direction = "down" }));  hl.dispatch(hl.dsp.submap("reset")) end)
+        hl.bind("ALT + K", function() hl.dispatch(hl.dsp.group.move_window({ direction = "up" }));    hl.dispatch(hl.dsp.submap("reset")) end)
+        hl.bind("ALT + L", function() hl.dispatch(hl.dsp.group.move_window({ direction = "right" })); hl.dispatch(hl.dsp.submap("reset")) end)
     end)
 
 else
