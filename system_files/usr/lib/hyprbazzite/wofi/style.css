@@ -1,4 +1,11 @@
-@import url("colors.css");
+/* Absolute path, not relative: GTK resolves a relative @import against the
+   launching process's working directory, not style.css's own directory (confirmed
+   live - it fails whenever wofi isn't launched with CWD=/etc/wofi, which is
+   effectively always in real usage). A failed import silently drops every
+   @define-color below, which is why window/#input/etc. end up rendering with
+   GTK's own fallback background instead of the colors declared here - the
+   actual, long-standing cause of the "accidental" transparency. */
+@import url("/etc/wofi/colors.css");
 
 /* Deliberate frosted-glass look: the compositor already blurs behind wofi
    (see hl.layer_rule for namespace "wofi" in hypr/rules.lua), so `window`
