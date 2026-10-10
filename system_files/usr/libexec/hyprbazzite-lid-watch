@@ -17,8 +17,16 @@ set -euo pipefail
 # same unprivileged mechanism any client uses to receive a broadcast signal
 # it opted into.
 
+# Laptop-only feature. The .service's own ConditionPathExists already keeps
+# systemd from starting this at all on a machine with no lid switch - this
+# is just a second, cheap guard in case it's ever run by hand instead.
+[[ -d /proc/acpi/button/lid ]] || exit 0
+
 sync() {
-    /usr/libexec/hyprbazzite-ctl lid
+    # `|| true`: this is a persistent service - one transient failure (a
+    # momentarily busy hyprctl socket, anything) should wait for the next
+    # event and retry, not take the whole watcher down with it under set -e.
+    /usr/libexec/hyprbazzite-ctl lid || true
 }
 
 # Catch whatever state the lid is already in the moment this starts -

@@ -2,6 +2,12 @@
 Description=HyprBazzite lid-driven clamshell/suspend sync
 After=graphical-session.target
 PartOf=graphical-session.target
+# Laptop-only feature: /proc/acpi/button/lid only exists when the kernel's
+# ACPI button driver has registered an actual lid switch. On a desktop (or
+# any machine without one) this condition fails and systemd skips starting
+# the unit entirely - not even the "inert no-op" cost of an idle process
+# sitting on a D-Bus subscription that will never fire.
+ConditionPathExists=/proc/acpi/button/lid
 
 [Service]
 Type=simple
