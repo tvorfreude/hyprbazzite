@@ -46,10 +46,17 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Run ShellCheck
+        # action-shellcheck only auto-discovers an extensionless file inside
+        # scandir if it has the executable bit set (its find uses `-perm
+        # /111`); verify-image.sh lives outside scandir entirely, so that one
+        # genuinely needs additional_files. Every extensionless script under
+        # system_files/usr is executable in git now, so nothing else needs
+        # listing here - a lingering wallpaper-cycle entry used to paper over
+        # that script specifically missing its executable bit (now fixed).
         uses: ludeeus/action-shellcheck@00cae500b08a931fb5698e11e79bfbd38e612a38 # 2.0.0
         with:
           scandir: './system_files/usr'
-          additional_files: 'scripts/verify-image.sh system_files/usr/bin/wallpaper-cycle'
+          additional_files: 'scripts/verify-image.sh'
           severity: error
           ignore_paths: >-
             system_files/usr/lib/hyprbazzite/skel
@@ -303,23 +310,40 @@ jobs:
           min-versions-to-keep: 5
           delete-only-untagged-versions: true
 
-      - name: Delete old cosign signature tags
+      - name: Delete orphaned cosign signature tags
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           PACKAGE="${{ github.event.repository.name }}"
-          OWNER="${{ github.repository_owner }}"
 
-          # Get all versions, filter to sha256-* signature tags, keep only the latest 3
-          gh api --paginate \
-            "/user/packages/container/${PACKAGE}/versions" \
-            --jq '.[] | select(.metadata.container.tags | any(startswith("sha256-"))) | .id' \
-          | tail -n +4 \
-          | while read -r version_id; do
-              echo "Deleting old signature version: $version_id"
+          # A signature/attestation version (tagged sha256-<hex>.sig/.att) is only
+          # safe to delete once the image digest it protects has no "real" tag
+          # left at all (i.e. that build was already superseded and untagged by
+          # the step above). Keeping only the N most recent signatures regardless
+          # of which image tags are still alive would eventually orphan the
+          # signature for any dated/stable tag a user pinned to - breaking
+          # `cosign verify`/`bootc switch` for it even though the image itself is
+          # still present and pullable.
+          all_versions=$(gh api --paginate "/user/packages/container/${PACKAGE}/versions" \
+            --jq '[.[] | {id, digest: .name, tags: (.metadata.container.tags // [])}]')
+
+          orphaned_ids=$(echo "${all_versions}" | jq -r '
+            ([.[] | select([.tags[]? | startswith("sha256-") | not] | any) | .digest] | unique) as $live
+            | .[]
+            | select((.tags | length) > 0 and (.tags | all(startswith("sha256-"))))
+            | select([.tags[] | ("sha256:" + (. | sub("^sha256-";"") | sub("\\..*$";"")))] | any(. as $d | $live | index($d)) | not)
+            | .id
+          ')
+
+          if [ -z "${orphaned_ids}" ]; then
+            echo "No orphaned signature/attestation versions found."
+          else
+            echo "${orphaned_ids}" | while read -r version_id; do
+              echo "Deleting orphaned signature version: ${version_id}"
               gh api --method DELETE \
                 "/user/packages/container/${PACKAGE}/versions/${version_id}" || true
             done
+          fi
 
   pr_summary:
     name: PR change summary
