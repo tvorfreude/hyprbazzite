@@ -1,0 +1,19 @@
+[Unit]
+Description=HyprBazzite PCIe ASPM power tuning (first-boot provisioning)
+After=local-fs.target
+DefaultDependencies=no
+# Only run once - skip if the done-marker already exists
+ConditionPathExists=!/var/lib/hyprbazzite/power-tuning.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/hyprbazzite-power-tuning
+ExecStartPost=/bin/bash -c 'mkdir -p /var/lib/hyprbazzite && touch /var/lib/hyprbazzite/power-tuning.done'
+RemainAfterExit=yes
+Nice=19
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

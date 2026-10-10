@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# hyprbazzite-power-tuning - Force PCIe ASPM to its most power-saving policy
+#
+# Idle power draw during s2idle (Modern Standby) depends heavily on how
+# aggressively PCIe links drop into low-power L1/L1.1/L1.2 states. Left on
+# "default", that's up to whatever the firmware's own ACPI _OSC hands back
+# per device, which varies a lot and is often conservative. This is a karg,
+# not just a runtime sysfs write: some ASPM substates are negotiated once at
+# enumeration during early boot, before this could ever run, so setting it
+# only at runtime doesn't reliably catch everything a boot-time setting does.
+# Harmless on any hardware - it's a standard Linux kernel parameter.
+#
+# Runs once (see the .done marker in the matching .service) since it needs
+# an rpm-ostree transaction + reboot to take effect; steady-state boots skip
+# the (slow) transaction entirely once it's already applied.
+
+set -euo pipefail
+
+if ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^pcie_aspm\.policy='; then
+    echo "[hyprbazzite-power-tuning] Setting pcie_aspm.policy=powersupersave (reboot required)."
+    rpm-ostree kargs --append-if-missing="pcie_aspm.policy=powersupersave"
+else
+    echo "[hyprbazzite-power-tuning] pcie_aspm.policy already provisioned; leaving kargs unchanged."
+fi
