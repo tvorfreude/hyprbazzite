@@ -15,6 +15,7 @@ readonly TRANSITION_STEP=90
 readonly TRANSITION_DURATION=2
 readonly CYCLE_INTERVAL=900  # seconds (15 minutes)
 readonly FILTER="${WALLPAPER_FILTER:-Nearest}"  # Nearest keeps GIFs crisp; set WALLPAPER_FILTER=Lanczos3 to smooth-scale photos
+readonly WALLUST_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/wallust"
 
 # -- Helpers ------------------------------------------------------------------
 
@@ -47,6 +48,17 @@ cycle_now() {
             --resize crop \
             --filter "$FILTER" \
             "$wallpaper"
+
+        # hyprlock.conf's background.path reads a static frame from here - it
+        # has no idea awww or GIF cycling exist, so without this it's stuck
+        # showing whatever the wallpaper picker last set (or nothing at all,
+        # rendering black, if that picker was never used). Keep it in sync
+        # with whatever's actually on screen; "[0]" grabs the GIF's first
+        # frame since a lock screen can't animate.
+        if command -v magick &>/dev/null; then
+            mkdir -p "$WALLUST_DIR"
+            magick "${wallpaper}[0]" "$WALLUST_DIR/current_wallpaper.png" 2>/dev/null || true
+        fi
     fi
 }
 
