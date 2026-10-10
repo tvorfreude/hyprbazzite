@@ -37,6 +37,14 @@ hl.on("hyprland.start", function()
     exec_once("wl-paste --watch cliphist store", "wl-paste")
     exec_once("blueman-applet", "blueman-applet")
     exec_once("nm-applet --indicator", "nm-applet")
+    -- Bitwarden's own "Start automatically on login" setting can't work on
+    -- this image: it requires the xdg-desktop-portal Background interface,
+    -- which neither installed portal backend (gtk, hyprland) implements
+    -- here (confirmed: org.freedesktop.portal.Background isn't registered
+    -- at all on the session bus). Autostarting it directly instead, with a
+    -- short delay so the flatpak sandbox doesn't race gnome-keyring-daemon's
+    -- startup above it - this also provides its SSH agent for the terminal.
+    exec_once("sh -c 'sleep 3 && flatpak run com.bitwarden.desktop'", "bitwarden-app")
 
     -- OPTIONAL (only start if binary exists)
     if os.execute("command -v cursor-clip >/dev/null 2>&1") == 0 then
