@@ -1,0 +1,16 @@
+[Unit]
+Description=HyprBazzite console/greeter lid-driven internal display force
+After=systemd-logind.service
+Requires=systemd-logind.service
+# Laptop-only feature, same reasoning as hyprbazzite-lid.service: this path
+# only exists when the kernel has actually registered a lid switch.
+ConditionPathExists=/proc/acpi/button/lid
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/hyprbazzite-console-lid-watch
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
