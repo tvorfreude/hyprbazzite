@@ -154,11 +154,6 @@ window#waybar.empty #window {
   border-radius: 0;
 }
 
-#workspaces button.persistent {
-  color: alpha(@current_line, 0.8);
-  border-radius: 8px;
-}
-
 /* ── Taskbar ────────────────────────────────────────────────── */
 #taskbar button {
   color: @comment;

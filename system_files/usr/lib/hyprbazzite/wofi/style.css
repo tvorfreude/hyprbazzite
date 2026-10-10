@@ -1,36 +1,49 @@
 @import url("colors.css");
 
+/* Deliberate frosted-glass look: the compositor already blurs behind wofi
+   (see hl.layer_rule for namespace "wofi" in hypr/rules.lua), so `window`
+   carries the only alpha in this file - inner-box/outer-box stay transparent
+   pass-throughs so the blur shows through evenly across the whole surface,
+   not just at the edges. `opacity: 1` pins out anything the GTK theme might
+   otherwise stack on top, so this alpha is the only source of transparency. */
 window {
   margin: 0px;
   border: 2px solid @accent;
-  background-color: @bg;
+  background-color: alpha(@bg, 0.88);
   border-radius: 10px;
+  opacity: 1;
+  font-family: "JetBrainsMono Nerd Font", "Liberation Mono", monospace;
 }
 
 #input {
-  margin: 5px;
+  margin: 8px;
+  padding: 6px 10px;
   border: none;
   color: @fg;
-  background-color: @bg_alt;
-  border-radius: 5px;
+  background-color: alpha(@bg_alt, 0.9);
+  border-radius: 6px;
 }
 
 #inner-box {
-  margin: 5px;
+  margin: 6px;
   border: none;
-  background-color: @bg;
+  background-color: transparent;
   color: @fg;
 }
 
 #outer-box {
-  margin: 5px;
+  margin: 6px;
   border: none;
-  background-color: @bg;
+  background-color: transparent;
 }
 
 #scroll {
   margin: 0px;
   border: none;
+}
+
+#entry {
+  padding: 4px 6px;
 }
 
 #text {
@@ -40,8 +53,8 @@ window {
 }
 
 #entry:selected {
-  background-color: @bg_alt;
-  border-radius: 5px;
+  background-color: alpha(@bg_alt, 0.95);
+  border-radius: 6px;
   border: none;
 }
 
