@@ -780,7 +780,13 @@ lid_handle() {
                 hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
             else
                 loginctl lock-session 2>/dev/null || true
-                systemctl suspend
+                # suspend-then-hibernate, not plain suspend: this is the
+                # undocked-lid-closed path (e.g. packed in a bag for travel)
+                # - if it stays closed long enough, it falls back to a real
+                # hibernate instead of slowly draining the battery over a
+                # multi-day trip. The sleep.conf.d drop-in already allows
+                # this; nothing was actually using it before now.
+                systemctl suspend-then-hibernate
             fi
             ;;
         open)
