@@ -217,6 +217,19 @@ jobs:
             "localhost/${{ env.IMAGE_NAME }}:$FIRST_TAG" \
             bash /tmp/verify-image.sh
 
+      # The rechunk action's own steps all run as `sudo podman` (root
+      # storage), but redhat-actions/buildah-build above builds rootlessly
+      # into this runner user's own storage - two separate, mutually
+      # invisible namespaces. Without this, `sudo podman create
+      # localhost/...` can't see what was just built, and (confirmed live)
+      # podman instead tries to resolve "localhost" as an actual registry
+      # hostname and fails to connect. save|load bridges the two storages
+      # without needing to know either one's exact driver/path.
+      - name: Make image available to root podman
+        if: github.event_name != 'pull_request'
+        run: |
+          podman save "localhost/${{ env.IMAGE_NAME }}:${{ env.first_tag }}" | sudo podman load
+
       # Rechunking re-slices the image into many content-addressed layers
       # instead of the few big ones buildah produces, so a later one-line fix
       # only invalidates (and re-downloads) the small layer that file actually
