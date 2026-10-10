@@ -213,6 +213,10 @@ wallpaper_pick() {
         cp "$wall_path" "$wallust_current"
         touch "${XDG_RUNTIME_DIR:-/tmp}/wallpaper-pinned"
 
+        # Mirror to the shared, world-readable location the SDDM greeter
+        # theme reads from (see tmpfiles.d) - it can't reach into $HOME.
+        cp "$wallust_dir/current_wallpaper.png" /var/lib/hyprbazzite/theme/current_wallpaper.png 2>/dev/null || true
+
         if command -v wallust &>/dev/null; then
             wallust run "$wallust_current" -s
             hyprctl reload
