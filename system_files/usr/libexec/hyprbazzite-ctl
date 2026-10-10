@@ -565,10 +565,13 @@ automation_dnd() {
             monitorremoved\>\>*)
                 # Unplugging the last external display while the lid is
                 # closed should sleep the machine, same as closing the lid
-                # undocked (mirrors macOS clamshell behavior). lid_handle
-                # recomputes external_count itself, so this is a no-op if
-                # another external display is still connected.
-                _lid_is_closed && lid_handle close
+                # undocked (mirrors macOS clamshell behavior). logind's own
+                # HandleLidSwitchDocked=ignore only gets evaluated at the
+                # physical switch event, so it won't react to this on its
+                # own - "recheck" (unlike "close") still suspends itself.
+                # lid_handle recomputes external_count itself, so this is a
+                # no-op if another external display is still connected.
+                _lid_is_closed && lid_handle recheck
                 ;;
         esac
     done
@@ -755,9 +758,23 @@ lid_handle() {
 
     case "$action" in
         close)
+            # logind (HandleLidSwitch=suspend / HandleLidSwitchDocked=ignore,
+            # see the logind.conf.d drop-in) already decides suspend-vs-ignore
+            # for the physical lid-close event in parallel with this bind -
+            # both react to the same hardware switch independently. All this
+            # needs to do is the cosmetic clamshell action logind can't do.
             if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
                 # `hyprctl keyword` errors on this build (native Lua config
                 # engine, "non-legacy parser") - this is the working equivalent.
+                hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
+            fi
+            ;;
+        recheck)
+            # Called when something OTHER than the physical lid switch
+            # changes docked status while the lid is already closed (see
+            # automation_dnd's monitorremoved case) - logind has no reason to
+            # act on its own here, so this still suspends when undocked.
+            if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
                 hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
             else
                 loginctl lock-session 2>/dev/null || true
@@ -767,7 +784,7 @@ lid_handle() {
         open)
             [[ -n "$internal_output" ]] && hyprctl reload
             ;;
-        *) echo "Usage: hyprbazzite-ctl lid [close|open]"; return 1 ;;
+        *) echo "Usage: hyprbazzite-ctl lid [close|open|recheck]"; return 1 ;;
     esac
 }
 
