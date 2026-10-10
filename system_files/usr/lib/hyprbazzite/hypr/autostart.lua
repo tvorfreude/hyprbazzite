@@ -27,9 +27,13 @@ hl.on("hyprland.start", function()
     exec_once("wallpaper-cycle", "wallpaper-cycle")
 
     -- AUTOMATION (hyprbazzite-ctl long-running services)
-    -- workspace rebind is a one-shot (not a daemon, so no exec_once guard);
-    -- automation_dnd's monitor add/remove listener keeps it up to date after this.
+    -- workspace rebind and lid sync are one-shots (not daemons, so no
+    -- exec_once guard); automation_dnd's monitor add/remove listener keeps
+    -- both up to date after this. lid sync here covers starting a session
+    -- with the lid already closed (e.g. docked, auto-login) - otherwise
+    -- nothing would blank the internal panel until the next physical toggle.
     hl.exec_cmd("/usr/libexec/hyprbazzite-ctl workspace rebind")
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl lid")
     exec_once("/usr/libexec/hyprbazzite-ctl automation dnd", "socat")
     exec_once("/usr/libexec/hyprbazzite-ctl automation osk", "udevadm")
 

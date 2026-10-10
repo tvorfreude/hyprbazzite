@@ -574,10 +574,11 @@ automation_dnd() {
                 # undocked (mirrors macOS clamshell behavior). logind's own
                 # HandleLidSwitchDocked=ignore only gets evaluated at the
                 # physical switch event, so it won't react to this on its
-                # own - "recheck" (unlike "close") still suspends itself.
-                # lid_handle recomputes external_count itself, so this is a
-                # no-op if another external display is still connected.
-                _lid_is_closed && lid_handle recheck
+                # own. lid_sync recomputes external_count itself, so this is
+                # a no-op if another external display is still connected;
+                # the _lid_is_closed guard just skips the hyprctl/jq work
+                # entirely while the lid's open.
+                _lid_is_closed && lid_sync
                 ;;
         esac
     done
@@ -751,53 +752,53 @@ _lid_is_closed() {
     [[ -n "$state_file" ]] && grep -q closed "$state_file" 2>/dev/null
 }
 
-lid_handle() {
-    local action="$1"
+lid_sync() {
+    # Single source of truth for lid-driven state - called from every
+    # trigger point (physical switch close/open, a dock/undock while already
+    # closed, session startup, post-resume) instead of three separate
+    # actions that each hardcoded assumptions about *why* they were called.
+    # This just looks at the real physical state and converges to the
+    # correct outcome, so it's safe and idempotent to call from anywhere,
+    # any number of times, for any reason.
+    #
+    # logind (HandleLidSwitch=suspend-then-hibernate undocked,
+    # HandleLidSwitchDocked=ignore docked - see the logind.conf.d drop-in)
+    # already decides suspend-vs-stay-awake for the *physical* lid switch in
+    # parallel with this, independently. All this needs to do is the
+    # cosmetic clamshell action logind has no concept of (blank/restore the
+    # internal panel), plus catch the cases logind's own docked check never
+    # gets evaluated for at all: a dock/undock, a resume, or a session start
+    # that all happen while the lid is already closed.
+    #
     # "all" is required here, not just the default active-monitor list: once
-    # close() disables the internal panel it drops out of the default list,
-    # so a later re-evaluation (e.g. unplugging an external while clamshelled)
-    # would see no internal output at all and suspend even while still docked.
+    # the internal panel is disabled it drops out of the default list, so a
+    # later call would see no internal output at all and misread a
+    # still-docked laptop as a desktop with no lid.
     local internal_output
     internal_output=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[] | select(.name | test("^(eDP|LVDS)")) | .name' | head -n1)
+    [[ -z "$internal_output" ]] && return 0  # desktop-only setup, nothing to do
+
     local external_count
     external_count=$(hyprctl -j monitors all 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
 
-    case "$action" in
-        close)
-            # logind (HandleLidSwitch=suspend / HandleLidSwitchDocked=ignore,
-            # see the logind.conf.d drop-in) already decides suspend-vs-ignore
-            # for the physical lid-close event in parallel with this bind -
-            # both react to the same hardware switch independently. All this
-            # needs to do is the cosmetic clamshell action logind can't do.
-            if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
-                # `hyprctl keyword` errors on this build (native Lua config
-                # engine, "non-legacy parser") - this is the working equivalent.
-                hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
-            fi
-            ;;
-        recheck)
-            # Called when something OTHER than the physical lid switch
-            # changes docked status while the lid is already closed (see
-            # automation_dnd's monitorremoved case) - logind has no reason to
-            # act on its own here, so this still suspends when undocked.
-            if [[ -n "$internal_output" && "$external_count" -gt 0 ]]; then
-                hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
-            else
-                loginctl lock-session 2>/dev/null || true
-                # suspend-then-hibernate, not plain suspend: this is the
-                # undocked-lid-closed path (e.g. packed in a bag for travel)
-                # - if it stays closed long enough, it falls back to a real
-                # hibernate instead of slowly draining the battery over a
-                # multi-day trip. The sleep.conf.d drop-in already allows
-                # this; nothing was actually using it before now.
-                systemctl suspend-then-hibernate
-            fi
-            ;;
-        open)
-            [[ -n "$internal_output" ]] && hyprctl reload
-            ;;
-        *) echo "Usage: hyprbazzite-ctl lid [close|open|recheck]"; return 1 ;;
-    esac
+    # `hyprctl keyword`/`hyprctl dispatch` error on this build (native Lua
+    # config engine, "non-legacy parser") - `hyprctl eval` is the working
+    # equivalent used throughout this script.
+    if _lid_is_closed; then
+        if [[ "$external_count" -gt 0 ]]; then
+            hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
+        else
+            loginctl lock-session 2>/dev/null || true
+            # suspend-then-hibernate, not plain suspend: a laptop left
+            # closed long enough (packed in a bag for travel) eventually
+            # falls back to a real hibernate instead of slowly draining the
+            # battery in RAM-suspend the whole time. The sleep.conf.d
+            # drop-in already allows this.
+            systemctl suspend-then-hibernate
+        fi
+    else
+        hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false })"
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -988,7 +989,7 @@ Modules:
   automation [dnd|osk|temp]     Background services & waybar helpers
   waybar [power-status|headset-battery]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
-  lid [close|open]              Lid switch handling
+  lid                            Re-sync clamshell/suspend state to the lid
   workspace rebind              Re-bind workspaces 1-5/6-10 to primary/secondary monitor
   open [browser|files [path]|<target>]  Launch common apps via XDG defaults
 USAGE
@@ -1049,7 +1050,7 @@ USAGE
             esac
             ;;
         keybinds) keybinds_switch "${1:-}" ;;
-        lid) lid_handle "${1:-}" ;;
+        lid) lid_sync ;;
         workspace)
             case "${1:-}" in
                 rebind) workspace_rebind ;;
