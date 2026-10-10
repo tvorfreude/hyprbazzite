@@ -102,9 +102,22 @@ main() {
     # 3. Set kernel arguments for resume.
     # Use --append-if-missing (not --replace): on a fresh install the resume
     # kargs don't exist yet, and --replace fails on a missing key.
-    # Also strip 'nohibernate', which Bazzite/uBlue ships by default -- while it
-    # is present the kernel reports /sys/power/disk as [disabled] and neither
-    # hibernate nor suspend-then-hibernate can run at all.
+    # Also strip 'nohibernate', which Bazzite/uBlue ships by default -- while
+    # it is present the kernel reports /sys/power/disk as [disabled] and
+    # neither hibernate nor suspend-then-hibernate can run at all. This karg
+    # is necessary but not always sufficient: Secure Boot puts the kernel in
+    # lockdown=integrity mode independently, which disables hibernation on
+    # its own regardless of kargs - confirmed live on real hardware: even
+    # with nohibernate successfully removed and resume kargs correctly set,
+    # /sys/power/state still had no "disk" entry and CanHibernate/
+    # CanSuspendThenHibernate both reported "na". There's no karg or sleep.conf
+    # setting that overrides that (it's intentional - an unsigned hibernation
+    # image could otherwise be used to tamper with a verified-boot kernel on
+    # resume), so hyprbazzite-ctl's _sleep_best_effort() and
+    # HandleLidSwitch=sleep (logind.conf.d) use logind's own SleepOperation=
+    # fallback chain instead of ever hardcoding suspend-then-hibernate
+    # directly, so actual sleep still works on hardware where hibernation
+    # just isn't available for this reason.
     # Guarded so steady-state boots skip the (slow) rpm-ostree transaction.
     # NOTE: applied kargs require a reboot to take effect.
     if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'nohibernate' \
@@ -120,9 +133,16 @@ main() {
         log "Hibernation kargs already provisioned; leaving kargs unchanged."
     fi
 
-    # 4. Configure systemd sleep settings
+    # 4. Configure systemd sleep settings. Values here match
+    # /usr/lib/hyprbazzite/systemd/sleep.conf.d/90-tblue-hibernate.conf and
+    # /usr/lib/systemd/sleep.conf.d/hibernate.conf on purpose - this writes
+    # straight to the base /etc/systemd/sleep.conf, and all three used to
+    # disagree on AllowHibernation (no/no/yes) with the drop-ins silently
+    # winning either way (they're layered on top of the base file). Keeping
+    # all three in agreement now instead of relying on load-order to settle
+    # a three-way argument no one could see without reading all three files.
     configure_sleep_setting "AllowSuspend" "yes"
-    configure_sleep_setting "AllowHibernation" "no"
+    configure_sleep_setting "AllowHibernation" "yes"
     configure_sleep_setting "AllowSuspendThenHibernate" "yes"
 
     log "Hybrid sleep setup complete."

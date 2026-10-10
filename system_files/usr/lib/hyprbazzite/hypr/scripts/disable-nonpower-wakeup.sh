@@ -20,9 +20,10 @@ cat /proc/acpi/wakeup >&2
 # the only two things that should be able to wake the machine: random USB/
 # PCIe/Thunderbolt bus noise from being jostled in a bag must not, but
 # deliberately opening the lid should - same as a real laptop. Keeping the
-# lid enabled also covers waking from hibernate (suspend-then-hibernate's
-# eventual fallback for long trips), since it's the state this hardware's
-# ACPI tables mark LID as wake-capable for.
+# lid enabled also covers waking from whatever sleep state the machine
+# actually ended up in - suspend, or hibernate on hardware where that's
+# available (see _sleep_best_effort() / HandleLidSwitch=sleep) - since it's
+# the state this hardware's ACPI tables mark LID as wake-capable for.
 allowed_wake=$(awk '/PBTN|PWRB|^LID/ {print $1}' /proc/acpi/wakeup)
 
 # Disable all other wakeup devices
