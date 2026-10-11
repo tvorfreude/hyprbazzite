@@ -835,7 +835,22 @@ lid_sync() {
             _sleep_best_effort
         fi
     else
-        hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false })"
+        # Chained, not left to hypridle's own after_sleep_cmd dpms(true):
+        # that fires from a completely independent trigger (its own native
+        # D-Bus handling vs. this script's gdbus-watched resume path), with
+        # no guaranteed ordering between the two. hypridle's call reliably
+        # wins the race (no bash/subprocess overhead on its side), so it
+        # fires while this output is still logically disabled - a no-op -
+        # and nothing re-asserts dpms once it's re-enabled a moment later.
+        # That's exactly "screen stays black on the first open after sleep,
+        # fixes itself on a second close/open" - confirmed by this being a
+        # regression from a previous version of this file that had the two
+        # correctly sequenced, before today's redesign dropped it reasoning
+        # (wrongly) that the two triggers were simply redundant. Keeping
+        # both enable and power-on together here, in order, in the one
+        # resume handler that actually knows this output was just
+        # re-enabled, removes the race instead of hoping to win it.
+        hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false }); hl.dispatch(hl.dsp.dpms(true))"
     fi
 }
 
