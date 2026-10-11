@@ -1,3 +1,11 @@
+/* Every other themed surface in this project (waybar, wofi, hyprlock,
+   SDDM) explicitly sets JetBrains Mono - this file never did, so
+   notifications silently fell back to GTK's default sans-serif and looked
+   visibly inconsistent with everything else on screen. */
+* {
+  font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+}
+
 .avatar-container {
   position: relative;
   display: inline-block;
@@ -52,7 +60,32 @@
   min-height: 24px;
 }
 
-.notification-default-action,
+/* .notification-default-action is NOT a small "default button" - per
+   swaync's own stylesheet, it's the clickable wrapper around the ENTIRE
+   notification body (.notification-content is its child). Giving it a
+   border + background + 8px margin, as if it were a pill-shaped button,
+   nested a second border and a block of dead space inside the outer
+   .notification border on every single notification, with or without any
+   real actions attached - confirmed live, that's exactly the "double
+   border with an empty strip underneath" look. It should be an invisible
+   passthrough instead; .notification already owns the one visible border
+   and radius. .notification-action (plural - Reply/Dismiss, the actual
+   per-action buttons an app can attach) is the one that should look like
+   a button. */
+.notification-default-action {
+  padding: 0;
+  margin: 0;
+  box-shadow: none;
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  color: #f8f8f2;
+}
+
+.notification-default-action:hover {
+  background: rgba(189, 147, 249, 0.08);
+}
+
 .notification-action {
   padding: 6px;
   margin: 0;
@@ -60,14 +93,6 @@
   background: rgba(189, 147, 249, 0.1);
   border: 1px solid #bd93f9;
   color: #bd93f9;
-}
-
-.notification-default-action {
-  border-radius: 12px;
-  margin: 8px;
-}
-
-.notification-action {
   border-radius: 0px;
   border-top: none;
   border-right: none;
