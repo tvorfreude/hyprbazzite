@@ -6,12 +6,21 @@
   font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
 }
 
-.avatar-container {
-  position: relative;
-  display: inline-block;
-  height: 90%;
-  width: auto;
-  vertical-align: middle;
+/* .avatar-container matched nothing - not a real swaync CSS class at all
+   (confirmed against upstream's own source and stylesheet), just dead
+   copy-pasted CSS. Removed rather than kept as misleading clutter. */
+
+/* The real, GTK-native way to size these - confirmed against swaync's own
+   upstream style.scss. GTK's CSS engine doesn't support plain web-CSS
+   width/height/max-width/max-height/object-fit/position/z-index at all
+   (every one of those on .image/.app-icon below was a silent no-op this
+   whole time, confirmed live via the Gtk-WARNING theme parser errors they
+   throw on every load); `-gtk-icon-size` is the GTK-specific property
+   that actually controls a GtkImage's rendered size, and these two
+   custom properties feed into it the same way upstream's own theme does. */
+:root {
+  --notification-icon-size: 64px;
+  --notification-app-icon-size: calc(var(--notification-icon-size) / 3);
 }
 
 @define-color cc-bg rgba(40, 42, 54, 0.8);
@@ -107,29 +116,32 @@
   border-right: 1px solid @noti-border-color;
 }
 
+/* The main avatar/profile picture (e.g. a Discord sender's avatar, or
+   the app's own icon when no avatar is supplied) - sized via
+   -gtk-icon-size, not width/height, see the :root block above. */
 .image {
-  height: 90%;
-  width: auto;
-  max-width: 90%;
-  max-height: 90%;
-  aspect-ratio: 1/1;
-  border-radius: 50%;
-  object-fit: cover;
-  margin-right: 18px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  display: inline-block;
-  vertical-align: middle;
-  align-self: center;
+  -gtk-icon-size: var(--notification-icon-size);
+  -gtk-icon-filter: none;
+  border-radius: 100px;
+  margin-right: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-.body-image {
+/* Larger images attached to the message body itself (not the sender's
+   avatar) - e.g. an image someone sent in the message, as opposed to
+   their profile picture. Sized via width_request/height_request in
+   swaync's own code (notification-body-image-width/height in
+   config.json), not CSS - this only controls decoration.
+   body_image never gets its own CSS class from swaync (confirmed against
+   its source - unlike .image/.app-icon, there's no add_css_class call for
+   it anywhere), so the old `.body-image` selector here matched nothing at
+   all; targeting the actual GTK picture node under .notification-content
+   is what actually reaches it. */
+.notification-content picture {
   margin-top: 6px;
   background-color: white;
   border-radius: 12px;
-  max-width: 220px;
-  max-height: 120px;
-  object-fit: contain;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .summary {
@@ -138,22 +150,22 @@
   background: transparent;
   color: #f8f8f2;
   text-shadow: none;
-  display: flex;
-  align-items: center;
 }
 
+/* The small app-icon badge overlaid on the avatar (e.g. Discord's own
+   logo, badging whose message this is) - swaync already anchors this to
+   the avatar's bottom-right corner itself (an Overlay with
+   halign/valign: end in its own UI template, not something CSS
+   controls), so this only needs to handle decoration and size, not
+   position: absolute/right/bottom/z-index, which were silent no-ops here
+   same as on .image above. */
 .app-icon {
-  width: 28px;
-  height: 28px;
+  -gtk-icon-size: var(--notification-app-icon-size);
+  -gtk-icon-filter: none;
+  -gtk-icon-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   border-radius: 6px;
-  object-fit: cover;
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
   background: #282a36;
   border: 2px solid #bd93f9;
-  z-index: 2;
 }
 
 .time {
