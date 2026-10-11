@@ -19,6 +19,13 @@ set -euo pipefail
 # a user session starts) - the session's Class is the real signal instead:
 # Class=user only exists once someone has actually logged in.
 
+# Known unverified edge case: on a hybrid-GPU laptop (e.g. Intel+NVIDIA)
+# the eDP panel could in principle be exposed as separate connector nodes
+# under more than one /sys/class/drm/cardN, and this takes the first match
+# regardless. Untested on any such hardware - this image's only confirmed
+# target so far is single-GPU AMD. The failure mode is self-limiting either
+# way: forcing the wrong/inactive node off just does nothing useful, it
+# doesn't break anything.
 _internal_connector() {
     local c
     for c in /sys/class/drm/card*-eDP-* /sys/class/drm/card*-LVDS-*; do
@@ -36,10 +43,18 @@ _external_connected() {
     return 1
 }
 
+# Zombie-session guard: existence alone isn't enough - a session that
+# crashed without logind fully reaping it yet can still show up in
+# list-sessions. Requiring State=active too (not just Class=user) means a
+# stale leftover session can't permanently convince this that a real
+# Hyprland session owns the display when the greeter is actually sitting
+# there empty.
 _user_session_active() {
     local sid
     for sid in $(loginctl list-sessions --no-legend 2>/dev/null | awk '{print $1}'); do
-        [[ "$(loginctl show-session "$sid" -p Class --value 2>/dev/null)" == "user" ]] && return 0
+        [[ "$(loginctl show-session "$sid" -p Class --value 2>/dev/null)" == "user" ]] \
+            && [[ "$(loginctl show-session "$sid" -p State --value 2>/dev/null)" == "active" ]] \
+            && return 0
     done
     return 1
 }
@@ -49,6 +64,23 @@ _lid_closed() {
     closed=$(busctl --system get-property org.freedesktop.login1 /org/freedesktop/login1 \
         org.freedesktop.login1.Manager LidClosed 2>/dev/null)
     [[ "$closed" == "b true" ]]
+}
+
+log() {
+    echo "[hyprbazzite-console-lid-watch] $*" >&2
+}
+
+# Logged, not just `|| true`-swallowed: this write has never been verified
+# against real hardware (no interactive root to test it with as of writing),
+# so if it ever does fail in the field, journalctl should say so plainly
+# instead of silently doing nothing.
+_write_status() {
+    local connector="$1" value="$2"
+    if echo "$value" > "${connector}/status" 2>/dev/null; then
+        log "set ${connector} status=${value}"
+    else
+        log "FAILED to write status=${value} to ${connector}"
+    fi
 }
 
 sync() {
@@ -67,20 +99,46 @@ sync() {
     # job now, not ours. Restore normal auto-detection in case we'd left it
     # forced off, then get out of the way.
     if _user_session_active; then
-        [[ "$current" != "connected" ]] && { echo detect > "${connector}/status" 2>/dev/null || true; }
+        [[ "$current" != "connected" ]] && _write_status "$connector" detect
         return 0
     fi
 
     if _lid_closed && _external_connected; then
-        [[ "$current" == "connected" ]] && { echo off > "${connector}/status" 2>/dev/null || true; }
+        [[ "$current" == "connected" ]] && _write_status "$connector" off
     else
-        [[ "$current" != "connected" ]] && { echo detect > "${connector}/status" 2>/dev/null || true; }
+        [[ "$current" != "connected" ]] && _write_status "$connector" detect
     fi
 }
 
-sync
+# First sync only: on a cold boot, this service can start before the GPU
+# driver has finished probing *external* connectors - a too-early check
+# could read "nothing plugged in" even though a monitor genuinely is there,
+# and never retry since the next sync only fires on the next login1 event.
+# Retrying a few times here (cheap, and harmless if genuinely undocked)
+# absorbs that race without needing to guess a fixed boot-order dependency
+# that can't exist anyway (systemd has no target for "DRM connector
+# enumeration is done" - that's inherently hardware/driver-timing-dependent).
+startup_sync() {
+    local tries=0
+    while (( tries < 5 )); do
+        _external_connected && break
+        sleep 1
+        (( tries++ ))
+    done
+    sync
+}
 
+startup_sync
+
+# Debounced, not instant: logind's own session bookkeeping (what
+# _user_session_active reads) has a brief settling window right at login/
+# logout, before and after which this and hyprbazzite-lid.service could
+# both react to the same event a beat apart. A short delay here means we
+# read session state just after it's finished settling instead of right in
+# the middle of it, on every single trigger, not just this race's exact
+# window - cheap enough not to matter for lid-close responsiveness.
 busctl --system monitor org.freedesktop.login1 2>/dev/null | \
 while IFS= read -r _; do
+    sleep 1
     sync
 done
