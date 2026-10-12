@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Low-battery notifier. Sends a notification at 10% (normal) and another at
+# 5% (critical) while discharging. Each threshold fires once per discharge
+# cycle and re-arms as soon as the battery is no longer discharging (plugged
+# in) or has climbed back above the threshold.
+#
+# Sounds are NOT played here: swaync plays them via its "scripts" section
+# (/etc/xdg/swaync/config.json), keyed on app-name "Battery" + urgency, so
+# the sound is tied to the notification itself. Keep the app name and
+# urgencies below in sync with that file.
+#
+# Polls sysfs rather than subscribing to UPower: a 30s poll is negligible
+# and has no D-Bus/daemon dependency to go quietly wrong.
+#
+# Overridable for testing:
+#   HYPRBAZZITE_BATTERY_DIR      power_supply dir (default /sys/class/power_supply)
+#   HYPRBAZZITE_BATTERY_INTERVAL poll seconds (default 30)
+
+PS_DIR="${HYPRBAZZITE_BATTERY_DIR:-/sys/class/power_supply}"
+INTERVAL="${HYPRBAZZITE_BATTERY_INTERVAL:-30}"
+
+# First real system battery. BAT* only: peripherals (mice, controllers) show
+# up in power_supply too but under other names (hid-*, ps-controller-*, ...)
+# and must not trigger a "your laptop is dying" alert.
+find_battery() {
+    local d
+    for d in "$PS_DIR"/BAT*; do
+        [[ -r "$d/capacity" && -r "$d/status" ]] && { printf '%s' "$d"; return 0; }
+    done
+    return 1
+}
+
+alert() {
+    local capacity="$1" urgency="$2" title="$3"
+    command -v notify-send >/dev/null 2>&1 || return 0
+    notify-send -u "$urgency" -i battery-caution -a "Battery" \
+        -h "string:x-canonical-private-synchronous:battery-low" \
+        "$title" "Battery at ${capacity}%. Plug in soon." || true
+}
+
+# Laptop/handheld-only. The .service's ConditionPathExistsGlob covers systemd
+# starts; this covers running by hand.
+BAT="$(find_battery)" || exit 0
+
+notified_10=0
+notified_5=0
+
+while true; do
+    capacity="$(<"$BAT/capacity")"
+    status="$(<"$BAT/status")"
+
+    if [[ "$status" == "Discharging" ]]; then
+        if (( capacity <= 5 )); then
+            if (( notified_5 == 0 )); then
+                alert "$capacity" critical "Battery critically low"
+                notified_5=1
+                notified_10=1   # don't also fire the 10% alert afterwards
+            fi
+        elif (( capacity <= 10 )); then
+            if (( notified_10 == 0 )); then
+                alert "$capacity" normal "Battery low"
+                notified_10=1
+            fi
+        fi
+        # Re-arm any threshold the battery has climbed back above (e.g. a
+        # fluctuating reading or a slow charger that's out-paced by load).
+        (( capacity > 10 )) && notified_10=0
+        (( capacity > 5 ))  && notified_5=0
+    else
+        notified_10=0
+        notified_5=0
+    fi
+
+    sleep "$INTERVAL"
+done

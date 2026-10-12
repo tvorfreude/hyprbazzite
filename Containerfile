@@ -99,7 +99,7 @@ RUN --mount=type=cache,dst=/var/cache \
     blueman breeze-icon-theme gdk-pixbuf2-modules qt5ct qt6ct \
     jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
-    ImageMagick fcitx5 && \
+    ImageMagick fcitx5 ocean-sound-theme && \
     dnf5 -y autoremove && \
     dnf5 -y clean all
 
@@ -179,7 +179,9 @@ RUN usermod -s /bin/zsh root && \
     ln -sf /dev/null /etc/systemd/user/swaync.service && \
     # Copy dconf theme settings
     mkdir -p /etc/dconf/db/distro.d/ && \
-    cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme /etc/dconf/db/distro.d/
+    cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme \
+       /usr/lib/hyprbazzite/dconf/db/distro.d/10-sound-theme \
+       /etc/dconf/db/distro.d/
 
 # ---------------------------------------------------------------------------
 # Step 10: Cleanup - remove build artifacts from /var

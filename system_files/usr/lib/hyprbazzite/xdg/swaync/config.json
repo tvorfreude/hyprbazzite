@@ -18,7 +18,20 @@
     "script-fail-notify": true,
     "scripts": {
         "sound": {
-            "exec": "canberra-gtk-play -i message",
+            "exec": "canberra-gtk-play -i message-new-instant",
+            "app-name": "^(?!Battery$)",
+            "run-on": "receive"
+        },
+        "battery-low": {
+            "exec": "canberra-gtk-play -i battery-caution",
+            "app-name": "^Battery$",
+            "urgency": "Normal",
+            "run-on": "receive"
+        },
+        "battery-critical": {
+            "exec": "canberra-gtk-play -i battery-low",
+            "app-name": "^Battery$",
+            "urgency": "Critical",
             "run-on": "receive"
         }
     },

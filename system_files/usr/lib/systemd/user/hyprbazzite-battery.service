@@ -1,0 +1,15 @@
+[Unit]
+Description=HyprBazzite low-battery notifications (10% / 5%)
+After=graphical-session.target
+PartOf=graphical-session.target
+# Only meaningful where a system battery exists; skipped entirely on desktops.
+ConditionPathExistsGlob=/sys/class/power_supply/BAT*
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/hyprbazzite-battery-watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
