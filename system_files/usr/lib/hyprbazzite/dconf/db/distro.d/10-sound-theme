@@ -1,0 +1,3 @@
+[org/gnome/desktop/sound]
+theme-name='ocean'
+event-sounds=true
