@@ -1,24 +1,39 @@
 #!/usr/bin/env bash
-# hyprbazzite-power-tuning - Force PCIe ASPM to its most power-saving policy
+# hyprbazzite-power-tuning - Enable PCIe ASPM power saving at runtime
 #
-# Idle power draw during s2idle (Modern Standby) depends heavily on how
-# aggressively PCIe links drop into low-power L1/L1.1/L1.2 states. Left on
-# "default", that's up to whatever the firmware's own ACPI _OSC hands back
-# per device, which varies a lot and is often conservative. This is a karg,
-# not just a runtime sysfs write: some ASPM substates are negotiated once at
-# enumeration during early boot, before this could ever run, so setting it
-# only at runtime doesn't reliably catch everything a boot-time setting does.
-# Harmless on any hardware - it's a standard Linux kernel parameter.
+# PCIe link power states (L1/L1.1/L1.2) are the biggest idle-power lever on
+# most boards. The aggressive "powersupersave" policy used to be forced via
+# a kernel argument, but a karg applies before the root disk is even
+# unlocked, and on some boards (seen on one desktop: no LUKS prompt at all)
+# it breaks early-boot devices. So this now writes the policy at runtime,
+# after the system is already up and the disk is unlocked: a bad link just
+# costs a flaky device, never an unbootable machine.
 #
-# Runs once (see the .done marker in the matching .service) since it needs
-# an rpm-ostree transaction + reboot to take effect; steady-state boots skip
-# the (slow) transaction entirely once it's already applied.
+# "powersave" (L0s/L1) is the broadly-compatible choice; set
+# HYPRBAZZITE_ASPM_POLICY=powersupersave in /etc/default/hyprbazzite-power
+# to opt into the deeper L1 substates on hardware that's known to handle them.
+#
+# Runs every boot (the sysfs setting does not persist).
 
 set -euo pipefail
 
-if ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^pcie_aspm\.policy='; then
-    echo "[hyprbazzite-power-tuning] Setting pcie_aspm.policy=powersupersave (reboot required)."
-    rpm-ostree kargs --append-if-missing="pcie_aspm.policy=powersupersave"
-else
-    echo "[hyprbazzite-power-tuning] pcie_aspm.policy already provisioned; leaving kargs unchanged."
+POLICY_FILE=/sys/module/pcie_aspm/parameters/policy
+HYPRBAZZITE_ASPM_POLICY=powersave
+[[ -r /etc/default/hyprbazzite-power ]] && . /etc/default/hyprbazzite-power
+
+# Older versions of this script forced the policy on the kernel command
+# line. Remove it once so those machines can't hit the early-boot hang.
+if tr ' ' '\n' < /proc/cmdline | grep -q '^pcie_aspm\.policy='; then
+    echo "[hyprbazzite-power-tuning] Removing legacy pcie_aspm.policy karg (reboot required)."
+    rpm-ostree kargs --delete-if-present="pcie_aspm.policy=powersupersave" \
+                     --delete-if-present="pcie_aspm.policy=powersave" || true
 fi
+
+if [[ ! -w "$POLICY_FILE" ]]; then
+    echo "[hyprbazzite-power-tuning] $POLICY_FILE not available; nothing to do."
+    exit 0
+fi
+
+echo "[hyprbazzite-power-tuning] Setting PCIe ASPM policy to $HYPRBAZZITE_ASPM_POLICY."
+echo "$HYPRBAZZITE_ASPM_POLICY" > "$POLICY_FILE" || \
+    echo "[hyprbazzite-power-tuning] firmware refused the ASPM policy change; leaving default."
