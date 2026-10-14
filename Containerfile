@@ -210,7 +210,17 @@ RUN usermod -s /bin/zsh root && \
     mkdir -p /etc/dconf/db/distro.d/ && \
     cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme \
        /usr/lib/hyprbazzite/dconf/db/distro.d/10-sound-theme \
-       /etc/dconf/db/distro.d/
+       /etc/dconf/db/distro.d/ && \
+    # dconf clients never read these source .d/*.conf files directly - only
+    # the compiled binary db at /etc/dconf/db/distro (no .d/ suffix), which
+    # only `dconf update` produces. Without this, every setting above was a
+    # silent no-op on every install, not just existing ones: there was no
+    # compiled db at all for dconf to find. This is a normal /etc file
+    # shipped at build time, not runtime-computed state - since nothing
+    # ever locally modifies it, ostree's regular /etc 3-way merge already
+    # delivers a rebuilt version to existing systems on every upgrade like
+    # any other file, with no extra oneshot service needed.
+    dconf update
 
 # ---------------------------------------------------------------------------
 # Step 10: Cleanup - remove build artifacts from /var
