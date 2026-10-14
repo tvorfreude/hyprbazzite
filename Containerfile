@@ -96,7 +96,8 @@ RUN --mount=type=cache,dst=/var/cache \
     nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
     network-manager-applet pavucontrol \
     gnome-keyring gnome-keyring-pam seahorse libsecret libsecret-devel gcr gcr-devel \
-    blueman breeze-icon-theme gdk-pixbuf2-modules qt5ct qt6ct \
+    blueman breeze-icon-theme papirus-icon-theme papirus-icon-theme-dark \
+    gdk-pixbuf2-modules qt5ct qt6ct \
     jetbrains-mono jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
     ImageMagick fcitx5 ocean-sound-theme && \
@@ -177,6 +178,17 @@ RUN usermod -s /bin/zsh root && \
         /usr/lib/systemd/user/default.target.wants/hyprbazzite-user-firstboot.service && \
     mkdir -p /etc/systemd/user && \
     ln -sf /dev/null /etc/systemd/user/swaync.service && \
+    # Same conflict as swaync above: the waybar RPM ships its own generic
+    # systemd user unit (XDG-autostart-converted), enabled by default, that
+    # runs bare `waybar` with no args - it only ever looks in the default
+    # config search paths, never the custom /etc/waybar/config.jsonc +
+    # style.css location our own Hyprland-side autostart passes explicitly.
+    # Confirmed live on a real machine: it fails immediately ("Missing
+    # required resource files"), retries 5x in under a second, then gives
+    # up permanently for the rest of the session ("Start request repeated
+    # too quickly") - a failed unit for the entire session over something
+    # that was never going to work differently on retry.
+    ln -sf /dev/null /etc/systemd/user/waybar.service && \
     # Copy dconf theme settings
     mkdir -p /etc/dconf/db/distro.d/ && \
     cp /usr/lib/hyprbazzite/dconf/db/distro.d/00-dracula-theme \
