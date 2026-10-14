@@ -168,6 +168,22 @@ RUN usermod -s /bin/zsh root && \
     echo "enable tblue-hhd-enable-user.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable hyprbazzite-power-tuning.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable hyprbazzite-console-lid.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    # A preset FILE alone is just a policy declaration - it does nothing
+    # until something actually applies it, and nothing ever did. Confirmed
+    # live by booting this image in a fresh QEMU VM: every single service
+    # in the preset list above showed disabled despite "preset: enabled",
+    # except sddm.service - which works for a completely different reason
+    # (the sddm RPM's own install scriptlet calls systemctl preset on
+    # itself immediately during package install, not deferred to this
+    # file at all). Every one of our own custom services enabled only
+    # through this preset file - hhd, tblue-hibernate-setup,
+    # hyprbazzite-power-tuning, hyprbazzite-console-lid, etc. - has never
+    # actually been enabled, on any machine, for this project's entire
+    # history. systemctl preset-all materializes the real .wants/ symlinks
+    # at build time instead of leaving them as an inert declaration;
+    # verified live in the same VM that this one command alone fixes every
+    # affected unit.
+    systemctl preset-all && \
     # Enable the per-user first-login service for all users (global user preset
     # + an explicit default.target.wants symlink so it activates without relying
     # on preset timing for freshly-created users)
