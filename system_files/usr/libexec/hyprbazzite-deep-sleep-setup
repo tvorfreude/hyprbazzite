@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# hyprbazzite-deep-sleep-setup - Force real S3 suspend on desktops, with an
+# automatic fallback if that turns out to be wrong for this particular board
+#
+# Many desktop boards default to mem_sleep=s2idle ("Modern Standby") even
+# though they also support the older, deeper S3 state. s2idle only idles
+# the CPU/platform - it was designed for laptops with OEM-tuned firmware -
+# so motherboard SuperIO fan headers and ARGB/RGB header controllers, which
+# only actually lose power once the board drops to the S3 state's 5V-
+# standby-only rail, keep running right through it: fans at full speed,
+# RGB lit, as if nothing suspended at all. Real S3 ("deep") cuts those
+# rails like it always has, which is why this never shows up on laptops
+# (this project's existing hyprbazzite-battery.service battery-presence
+# check is reused here as the same signal for "has a battery, leave its
+# sleep mode alone" - see the matching ConditionPathExistsGlob in the
+# .service file).
+#
+# Unlike every other sleep/power fix in this project, a bad resume here
+# can't be caught and retried in software - if S3 hangs on the way back
+# up, nothing is running to undo the setting that caused it, and the user
+# has to hold the power button. So this runs on EVERY boot (no done-marker
+# short-circuit, unlike this project's other first-boot karg scripts) to
+# check the marker hyprbazzite-deep-sleep-watchdog leaves behind: if the
+# machine went to sleep and never cleanly woke back up, that's a failed
+# resume. Two in a row and this reverts to s2idle permanently for this
+# machine - no manual intervention needed in either direction.
+
+set -euo pipefail
+
+FAIL_MARKER=/var/lib/hyprbazzite/sleep-pending
+FAIL_COUNT_FILE=/var/lib/hyprbazzite/deep-sleep-failures
+BLACKLIST_FILE=/var/lib/hyprbazzite/deep-sleep-blacklisted
+MAX_FAILURES=2
+
+log() { echo "[hyprbazzite-deep-sleep-setup] $*"; }
+
+mkdir -p /var/lib/hyprbazzite
+
+if [[ -f "$FAIL_MARKER" ]]; then
+    rm -f "$FAIL_MARKER"
+    count=$(( $(cat "$FAIL_COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
+    echo "$count" > "$FAIL_COUNT_FILE"
+    log "Last sleep never cleanly resumed (failure $count/$MAX_FAILURES)."
+    if (( count >= MAX_FAILURES )); then
+        log "Reverting mem_sleep_default=deep after repeated failed resumes - falling back to s2idle."
+        rpm-ostree kargs --delete-if-present="mem_sleep_default=deep"
+        rm -f "$FAIL_COUNT_FILE"
+        touch "$BLACKLIST_FILE"
+        exit 0
+    fi
+fi
+
+if [[ -f "$BLACKLIST_FILE" ]]; then
+    log "deep sleep previously failed to resume on this machine; leaving s2idle in place."
+    exit 0
+fi
+
+if ! grep -qw deep /sys/power/mem_sleep 2>/dev/null; then
+    log "'deep' sleep not offered by firmware; nothing to do."
+    exit 0
+fi
+
+if grep -q '\[deep\]' /sys/power/mem_sleep; then
+    log "'deep' is already the default; nothing to do."
+    exit 0
+fi
+
+if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'mem_sleep_default=deep'; then
+    log "mem_sleep_default=deep already provisioned; leaving kargs unchanged."
+    exit 0
+fi
+
+log "Setting mem_sleep_default=deep (reboot required)."
+rpm-ostree kargs --append-if-missing="mem_sleep_default=deep"

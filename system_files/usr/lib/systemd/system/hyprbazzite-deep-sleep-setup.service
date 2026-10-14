@@ -1,0 +1,26 @@
+[Unit]
+Description=HyprBazzite deep (S3) sleep provisioning for desktops, with resume-failure watchdog
+After=local-fs.target
+DefaultDependencies=no
+# Desktops only - a battery means this is a laptop, which this project
+# already treats as suspending correctly on its own (see
+# hyprbazzite-battery.service for the same presence check).
+ConditionPathExistsGlob=!/sys/class/power_supply/BAT*
+
+[Service]
+# No done-marker gate, unlike this project's other first-boot karg
+# scripts (hyprbazzite-power-tuning, tblue-hibernate-setup) - this one
+# needs to run on every boot to check the failed-resume marker that
+# hyprbazzite-deep-sleep-watchdog leaves behind and revert automatically
+# if deep sleep turns out not to work on this board. The script itself
+# stays cheap once settled (a couple of file checks before it bails out).
+Type=oneshot
+ExecStart=/usr/libexec/hyprbazzite-deep-sleep-setup
+RemainAfterExit=yes
+Nice=19
+IOSchedulingClass=idle
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

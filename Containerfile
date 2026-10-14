@@ -167,6 +167,7 @@ RUN usermod -s /bin/zsh root && \
     echo "enable tblue-secureboot-firstboot.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable tblue-hhd-enable-user.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable hyprbazzite-power-tuning.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    echo "enable hyprbazzite-deep-sleep-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     echo "enable hyprbazzite-console-lid.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     # A preset FILE alone is just a policy declaration - it does nothing
     # until something actually applies it, and nothing ever did. Confirmed

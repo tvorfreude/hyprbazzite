@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# hyprbazzite-deep-sleep-watchdog - detect a resume that never came back
+#
+# hyprbazzite-deep-sleep-setup forces mem_sleep_default=deep on desktops
+# whose firmware advertises S3 but defaults to s2idle (see that script for
+# why - desktop fan/RGB headers staying on through s2idle). Real S3 is
+# mature but not universal: a small minority of boards hang on resume
+# instead of waking, and once that happens there's no code left running to
+# fix it - this hook can only ever detect a failure after the fact, on the
+# next boot, never prevent one.
+#
+# systemd calls every /usr/lib/systemd/system-sleep/ script with "pre"
+# right before suspend/hibernate/suspend-then-hibernate, and "post" right
+# after - but "post" only runs if the machine actually woke back up. So: a
+# marker written on "pre" and still present at the next boot means the
+# last attempt never made it back and the user had to hard power-cycle.
+# hyprbazzite-deep-sleep-setup checks for that marker on every boot and
+# backs the karg out automatically after repeated failures, so a bad board
+# self-heals back to "s2idle, less efficient but it actually wakes up"
+# with zero manual steps either way.
+
+set -euo pipefail
+
+MARKER=/var/lib/hyprbazzite/sleep-pending
+
+case "$1" in
+    pre)
+        mkdir -p /var/lib/hyprbazzite
+        touch "$MARKER"
+        ;;
+    post)
+        rm -f "$MARKER" /var/lib/hyprbazzite/deep-sleep-failures
+        ;;
+esac
