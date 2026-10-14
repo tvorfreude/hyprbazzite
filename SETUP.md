@@ -1,126 +1,85 @@
-# Hyprland Custom Bazzite Image - Setup Guide
+# HyprBazzite - Setup Guide
 
 ## What's Included
 
-- **Hyprland** - Modern Wayland compositor from `sdegler/hyprland` COPR
-- **LightDM** - Lightweight login manager
+- **Hyprland** - Wayland compositor, started via SDDM's `hyprland` session
+- **SDDM** - Login manager, themed with the bundled `hyprlockish` theme
 - **Zen Browser** - Privacy-focused browser from `sneexy/zen-browser` COPR
 - **Bitwarden** - Password manager (Flatpak from Flathub)
 - **Full keyring support** - System keyring with GNOME Keyring daemon
-- **Chezmoi provisioning** - Automatic dotfiles deployment on first login
+- **Chezmoi integration** - optional, manual dotfiles push/pull from your own repo
 
-## First Login Setup
+## Dotfiles (Chezmoi)
 
-### Automatic Provisioning (Recommended)
+HyprBazzite does not clone or provision any dotfiles automatically. Chezmoi
+support is a thin, manual convenience wrapper: `hyprbazzite-ctl` (bound in the
+app menu as "Chezmoi Push" / "Chezmoi Pull") just runs `chezmoi git -- push`
+or `chezmoi git -- pull --rebase --autostash && chezmoi apply` against
+whatever chezmoi source directory you've already set up yourself. If you
+don't use chezmoi, these menu entries will simply report it's not installed/
+not initialized - that's expected, not an error.
 
-When you log in for the first time, a systemd user service will automatically:
-1. Clone your dotfiles from `https://github.com/tristanbollard/dotfiles.git`
-2. Apply them using Chezmoi
-3. Handle device-specific configs (laptop vs desktop)
-
-**No action needed** - just log in and wait. You should see logs in the systemd journal:
+To use it, initialize chezmoi against your own dotfiles repo the normal way:
 ```bash
-journalctl --user -u chezmoi-provision -f
-```
-
-### Manual Provisioning
-
-If the automatic provisioning doesn't run, you can manually trigger it:
-
-```bash
-chezmoi-provision
-```
-
-Or manually use chezmoi:
-```bash
-chezmoi init https://github.com/tristanbollard/dotfiles.git
+chezmoi init <your-dotfiles-repo-url>
 chezmoi apply
 ```
+Then `hyprbazzite-ctl chezmoi push` / `hyprbazzite-ctl chezmoi pull` (or the
+menu entries) manage it going forward.
 
-## Device Detection
+## Default Configuration (No Dotfiles)
 
-Your dotfiles repo includes device-specific configs. Chezmoi will prompt you during initialization to select your device configuration (laptop vs desktop).
-
-## Fallback Configuration
-
-If chezmoi hasn't been provisioned yet, Hyprland will use a minimal default configuration located at:
-- `/etc/skel/.config/hypr/hyprland.conf` (applied to new users)
-- `~/.config/hypr/hyprland.conf` (in your home directory)
-
-Once chezmoi applies your dotfiles, your custom configurations will override this.
-
-## Services & Daemons
-
-The following services are enabled by default:
-- `lightdm.service` - Display/login manager
-- `dbus.service` - System message bus (required for Wayland/Hyprland)
-- `podman.socket` - Container daemon
-
-## Keybindings (Default/Fallback)
-
-- `Super + Q` - Open terminal (Kitty)
-- `Super + C` - Close window
-- `Super + M` - Exit Hyprland
-- `Super + [1-0]` - Switch workspaces
-- `Super + Shift + [1-0]` - Move window to workspace
-- `Super + Arrow Keys` - Move focus
-- `Super + Mouse Scroll` - Switch workspaces
-
-See your dotfiles for full custom keybindings.
-
-## Updating Your Dotfiles
-
-To pull the latest changes from your dotfiles repo after provisioning:
-
-```bash
-chezmoi update
-```
+Without chezmoi, you get this image's shipped defaults, seeded into new home
+directories via `/etc/skel/.config/` (Hyprland, Waybar, wofi, GTK/Qt theming,
+etc.) at the time each user account is created.
 
 ## Important: Configuration Updates for Existing Users
 
-On an immutable (bootc) image, system defaults in `/etc/skel/` are only applied when
-a new user account is created. **Existing users do not automatically receive configuration
-updates** shipped in newer image builds.
-
-This means if you rebase to a newer HyprBazzite image that ships updated Hyprland configs,
-Waybar layouts, or other dotfiles, your existing `~/.config/` will remain unchanged.
+On an immutable (bootc) image, `/etc/skel/` is only applied when a user
+account is *created*. If you rebase to a newer HyprBazzite build that changes
+one of these shipped configs, an **already-existing** user's `~/.config/`
+does not get updated automatically - the new default only applies to brand
+new accounts. (System-owned files this project needs to always keep
+authoritative - like the swaync/XDG defaults - are instead delivered through
+a tmpfiles rule that re-applies on every boot; the skel-seeded per-user
+config files below are intentionally NOT handled that way, since they are
+meant to be freely user-customizable from that point on - forcibly
+overwriting them on every update would destroy your own changes.)
 
 ### How to stay up to date
 
-1. **Chezmoi (recommended)**: If you use chezmoi to manage your dotfiles, run
-   `chezmoi update` after rebasing. Your dotfiles repo is the source of truth.
-
-2. **Manual sync**: Compare your local config against the shipped defaults:
+1. **If you use chezmoi**: your own dotfiles repo is the source of truth for
+   whatever you've put under chezmoi's management; `chezmoi apply` after any
+   upstream changes to your own repo. This has no relationship to
+   HyprBazzite's own shipped skel defaults - it only manages the files you've
+   explicitly added to your chezmoi source directory.
+2. **Manual diff**: compare your local config against the shipped default and
+   selectively copy over what you want:
    ```bash
    diff -r ~/.config/hypr /usr/share/hyprbazzite/config/hypr
    ```
-   Then selectively copy any changes you want.
-
-3. **Nuclear option**: Remove your local config and let the skel defaults re-apply
-   on next login (you'll lose any personal customizations):
+3. **Nuclear option**: remove your local config and let the skel default
+   re-apply on next login (you lose any personal customizations to that
+   directory):
    ```bash
    rm -rf ~/.config/hypr ~/.config/waybar ~/.config/wofi
-   # Log out and back in — symlinks from /etc/skel will be recreated
+   # Log out and back in - symlinks from /etc/skel will be recreated
    ```
 
 ### Why this happens
 
-Bootc images are immutable — the system partition is read-only and atomically
+Bootc images are immutable - the system partition is read-only and atomically
 swapped on updates. User home directories persist across updates by design.
 This is a feature (your customizations survive reboots and updates), but it
-means you must actively pull in new defaults when desired.
+means a config file you've never touched still won't pick up a new shipped
+default without one of the steps above.
 
 ## Troubleshooting
 
 ### Hyprland won't start
-1. Check `lightdm` logs: `journalctl -u lightdm`
+1. Check SDDM logs: `journalctl -u sddm`
 2. Verify Wayland support: `echo $WAYLAND_DISPLAY`
 3. Check D-Bus: `systemctl --user status dbus`
-
-### Chezmoi didn't provision
-1. Check the service: `systemctl --user status chezmoi-provision`
-2. View logs: `journalctl --user -u chezmoi-provision`
-3. Manually run: `chezmoi-provision`
 
 ### Portal/Auth issues
 1. Restart the portal: `systemctl --user restart xdg-desktop-portal-hyprland`
@@ -128,8 +87,8 @@ means you must actively pull in new defaults when desired.
 
 ## Next Steps
 
-1. Log in and let chezmoi provision your dotfiles
-2. Verify your Hyprland config was applied
-3. Customize further by editing `~/.local/share/chezmoi/` and running `chezmoi apply`
+1. Log in - Hyprland starts with this image's shipped defaults
+2. If you have your own dotfiles, `chezmoi init` them and `chezmoi apply`
+3. Customize freely - your home directory is yours and survives updates
 
 Enjoy your Hyprland setup!
