@@ -70,5 +70,13 @@ if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'mem_sleep_default=deep'; then
     exit 0
 fi
 
+# The base image / installer may already carry mem_sleep_default=s2idle.
+# Appending a second mem_sleep_default would leave two conflicting copies
+# on the command line (and in the BLS entry), so replace the existing one
+# in place when there is one.
 log "Setting mem_sleep_default=deep (reboot required)."
-rpm-ostree kargs --append-if-missing="mem_sleep_default=deep"
+if rpm-ostree kargs | tr ' ' '\n' | grep -q '^mem_sleep_default='; then
+    rpm-ostree kargs --replace="mem_sleep_default=deep"
+else
+    rpm-ostree kargs --append-if-missing="mem_sleep_default=deep"
+fi
