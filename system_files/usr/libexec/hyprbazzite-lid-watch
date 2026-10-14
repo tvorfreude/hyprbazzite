@@ -29,9 +29,42 @@ sync() {
     /usr/libexec/hyprbazzite-ctl lid || true
 }
 
+# Startup only, not every event: confirmed live via journal from a real
+# boot - logging in lid-closed+docked, the very first sync (below) can run
+# before Hyprland has actually finished enumerating the external monitor,
+# even though graphical-session.target (what gates this service's start)
+# only guarantees Hyprland itself is ready, not that every output has been
+# detected yet. A false "nothing external connected" reading on THIS one
+# call is catastrophic, not cosmetic: lid_sync()'s undocked-closed branch
+# suspends the machine - confirmed exactly this happened (NetworkManager
+# ASLEEP + OOM killer disabled a few seconds after Hyprland started, with
+# no suspend requested by anything else in between). Retrying a few times
+# before the first real sync, same approach already used for
+# hyprbazzite-console-lid-watch's own boot-time connector-probe race, is
+# cheap and only engages when the lid is actually closed at startup at all.
+startup_sync() {
+    # Only the closed-lid case can suspend the machine, so only that case
+    # is worth the wait - an open lid at startup carries no such risk
+    # regardless of dock state, and shouldn't pay an artificial delay.
+    local closed
+    closed=$(busctl --system get-property org.freedesktop.login1 /org/freedesktop/login1 \
+        org.freedesktop.login1.Manager LidClosed 2>/dev/null)
+    if [[ "$closed" == "b true" ]]; then
+        local tries=0 external_count
+        while (( tries < 5 )); do
+            external_count=$(hyprctl -j monitors all 2>/dev/null \
+                | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length' 2>/dev/null)
+            [[ "${external_count:-0}" -gt 0 ]] && break
+            sleep 1
+            (( tries++ ))
+        done
+    fi
+    sync
+}
+
 # Catch whatever state the lid is already in the moment this starts -
 # session launch, or this service itself restarting.
-sync
+startup_sync
 
 gdbus monitor -y -d org.freedesktop.login1 -o /org/freedesktop/login1 2>/dev/null | \
 while IFS= read -r line; do
