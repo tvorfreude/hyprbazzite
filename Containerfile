@@ -80,6 +80,38 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y clean all
 
 # ---------------------------------------------------------------------------
+# Step 3b: Satisfy hyprland's Xwayland dependency on Terra-based bases
+# ---------------------------------------------------------------------------
+# Newer Bazzite bases ship terra-xorg-x11-server-Xwayland, which conflicts with
+# Fedora's xorg-x11-server-Xwayland and does not advertise the arch-qualified
+# "xorg-x11-server-Xwayland(x86-64)" capability that the Hyprland COPR's
+# hyprland package requires, so dnf can't resolve it. Xwayland is already
+# installed, so declare the capability with an empty shim package instead of
+# swapping out Terra's build. No-op when the capability already exists.
+RUN --mount=type=cache,dst=/var/cache \
+    if ! rpm -q --whatprovides 'xorg-x11-server-Xwayland(x86-64)' >/dev/null 2>&1 && \
+       rpm -q terra-xorg-x11-server-Xwayland >/dev/null 2>&1; then \
+      dnf5 -y install rpm-build && \
+      mkdir -p /tmp/shim && \
+      printf '%s\n' \
+        'Name: hyprbazzite-xwayland-shim' \
+        'Version: 1' \
+        'Release: 1' \
+        'Summary: Declares the Xwayland capability provided by the Terra build' \
+        'License: MIT' \
+        'BuildArch: noarch' \
+        'Provides: xorg-x11-server-Xwayland(x86-64)' \
+        '%description' \
+        'Empty shim; see Containerfile.' \
+        '%files' > /tmp/shim/shim.spec && \
+      rpmbuild -bb --define "_topdir /tmp/shim" /tmp/shim/shim.spec && \
+      rpm -i /tmp/shim/RPMS/noarch/hyprbazzite-xwayland-shim-1-1.noarch.rpm && \
+      dnf5 -y remove rpm-build && \
+      rm -rf /tmp/shim; \
+    fi && \
+    dnf5 -y clean all
+
+# ---------------------------------------------------------------------------
 # Step 4: Install HyprBazzite packages
 # ---------------------------------------------------------------------------
 RUN --mount=type=cache,dst=/var/cache \
