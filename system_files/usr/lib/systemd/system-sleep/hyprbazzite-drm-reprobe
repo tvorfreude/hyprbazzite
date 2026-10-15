@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# hyprbazzite-drm-reprobe - re-detect monitors that vanish across suspend
+#
+# After a real S3 suspend (see hyprbazzite-deep-sleep-setup) amdgpu comes back
+# with DisplayPort hotplug state lost: a monitor that went into standby while
+# the GPU was down is reported "disconnected" and never comes back until
+# something re-probes the connector, so Hyprland resumes with fewer outputs
+# than it went to sleep with (or none, leaving the screens black). Writing
+# "detect" to a connector's sysfs status file forces that re-probe, which
+# raises a normal DRM hotplug uevent that Hyprland already handles.
+#
+# A monitor can take a few seconds to wake and answer link training, so
+# retry on a short delay instead of only once right at resume. Only
+# connectors that are currently "disconnected" are touched, and only DP/HDMI
+# ones (internal eDP panels are not hotplugged).
+
+set -u
+
+[[ "$1" == "post" ]] || exit 0
+
+reprobe() {
+    local c
+    for c in /sys/class/drm/card*-DP-* /sys/class/drm/card*-HDMI-A-*; do
+        [[ -w "$c/status" ]] || continue
+        [[ "$(cat "$c/status" 2>/dev/null)" == "disconnected" ]] || continue
+        echo detect > "$c/status" 2>/dev/null || true
+    done
+}
+
+reprobe
+# Detached so systemd-sleep isn't held up waiting on the delayed retries.
+( for delay in 2 3 5; do sleep "$delay"; reprobe; done ) </dev/null >/dev/null 2>&1 &
+disown
