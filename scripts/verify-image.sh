@@ -84,6 +84,27 @@ for rule in "${REQUIRED_POLKIT[@]}"; do
 done
 echo "Polkit rules are in place."
 
+# 5b. Config sanity: the UI configs must parse, and the control script must be
+# valid bash. Catches things like an unsupported date specifier or a stripped
+# glyph/quote before a broken bar ships.
+python3 - <<'PY'
+import json, re, sys
+for path in ("/usr/lib/hyprbazzite/waybar/config.jsonc",
+             "/usr/lib/hyprbazzite/xdg/swaync/config.json"):
+    txt = open(path, encoding="utf-8").read()
+    txt = re.sub(r"^\s*//.*$", "", txt, flags=re.M)
+    try:
+        json.loads(txt)
+    except Exception as e:
+        print(f"ERROR: {path} is not valid JSON: {e}")
+        sys.exit(1)
+PY
+if ! bash -n /usr/libexec/hyprbazzite-ctl; then
+    echo "ERROR: /usr/libexec/hyprbazzite-ctl has a bash syntax error."
+    exit 1
+fi
+echo "UI configs and hyprbazzite-ctl parse cleanly."
+
 # 6. Font Health
 if [ ! -d "/usr/share/fonts" ]; then
     echo "ERROR: System font directory is missing."

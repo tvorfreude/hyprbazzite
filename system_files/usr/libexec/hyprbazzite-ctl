@@ -82,24 +82,49 @@ EOF
 # GAMEMODE MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Put the wallpaper back after gamemode cleared it. Prefers the cycle daemon
-# (it knows the current wallpaper); otherwise whichever current_wallpaper.*
-# actually exists - only the .png is guaranteed, the .jpg may not be there.
+# Wallpapers here are animated GIFs played by awww. Gamemode blanks them with
+# `awww clear`, so remember what was showing (per output) and put exactly that
+# back; falling back to the static current_wallpaper.png froze the animation.
+_gamemode_wall_state() { echo "${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-gamemode-wallpaper"; }
+
+_save_wallpaper() {
+    command -v awww &>/dev/null || return 0
+    local out
+    out=$(awww query 2>/dev/null | grep -F "image: ") || return 0
+    [[ -n "$out" ]] && printf '%s\n' "$out" > "$(_gamemode_wall_state)"
+}
+
 _restore_wallpaper() {
+    local state out name img restored=0
+    state=$(_gamemode_wall_state)
+    if command -v awww &>/dev/null && [[ -s "$state" ]]; then
+        while IFS= read -r line; do
+            name=$(sed -n 's/^: *\([^:]*\):.*/\1/p' <<<"$line")
+            img=${line##*image: }
+            [[ -n "$name" && -f "$img" ]] || continue
+            awww img -o "$name" "$img" --transition-type wipe --transition-duration 2 && restored=1
+        done < "$state"
+        rm -f "$state"
+    fi
+    (( restored )) && return 0
+
+    # Nothing saved (e.g. gamemode was enabled before this fix): let the cycle
+    # daemon pick a fresh GIF if it is running, else the static fallback.
     if pgrep -x wallpaper-cycle >/dev/null 2>&1; then
         pkill -USR1 wallpaper-cycle || true
         return 0
     fi
-    local f img=""
+    local f
     for f in "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" "$CONFIG_DIR/hypr/wallust/current_wallpaper.png"; do
-        [[ -f "$f" ]] && { img="$f"; break; }
+        if [[ -f "$f" ]]; then
+            if command -v awww &>/dev/null; then
+                awww img "$f" --transition-type wipe --transition-duration 2
+            else
+                swaybg -i "$f" -m fill &
+            fi
+            return 0
+        fi
     done
-    [[ -n "$img" ]] || return 0
-    if command -v awww &>/dev/null; then
-        awww img "$img" --transition-type wipe --transition-duration 2
-    else
-        swaybg -i "$img" -m fill &
-    fi
 }
 
 gamemode_toggle() {
@@ -117,6 +142,7 @@ gamemode_toggle() {
             general = { gaps_in = 0, gaps_out = 0, border_size = 1 },
         })
         hl.window_rule({ match = { class = ".*" }, opacity = "1 override 1 override 1 override" })' >/dev/null
+        _save_wallpaper
         if command -v awww &>/dev/null; then
             awww clear 000000 2>/dev/null || true
         else
@@ -126,17 +152,18 @@ gamemode_toggle() {
     else
         hyprctl eval 'hl.config({
             animations = { enabled = true },
-            decoration = { shadow = { enabled = true }, blur = { enabled = true }, rounding = 10, active_opacity = 1.0, inactive_opacity = 1.0 },
-            general = { gaps_in = 5, gaps_out = 20, border_size = 3 },
+            decoration = { shadow = { enabled = true }, blur = { enabled = true }, rounding = 8, active_opacity = 1.0, inactive_opacity = 1.0 },
+            general = { gaps_in = 5, gaps_out = 10, border_size = 2 },
         })
         hl.window_rule({ match = { class = ".*" }, opacity = "1 override" })' >/dev/null
         _restore_wallpaper
         sleep 0.5
         notify-send -e -u normal -i "$notif_icon" " Gamemode:" " disabled"
-        # No hyprctl reload here: the eval call above already restored the
-        # exact gamemode-off values (gaps_out=20, border_size=3, etc., which
-        # differ from the plain hyprland.lua defaults) - reloading would wipe
-        # them straight back to those defaults.
+        # No hyprctl reload here: the eval call above restores the gamemode-off
+        # values. They must stay in sync with general/decoration in
+        # hypr/hyprland.lua (gaps_in=5, gaps_out=10, border_size=2, rounding=8);
+        # they had drifted (20/3/10), leaving oversized gaps after turning
+        # gamemode off.
     fi
 }
 

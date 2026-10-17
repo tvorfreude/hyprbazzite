@@ -69,28 +69,29 @@ Rectangle {
         onTriggered: root.tick++
     }
 
-    // -- Clock: Minutes -- (hyprlock.conf: position 0,-80, font_size 180, $orange)
+    // -- Date -- (hyprlock.conf: date label, foreground @ 75%)
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: -root.height * 0.074
+        anchors.verticalCenterOffset: -root.height * 0.139
         horizontalAlignment: Text.AlignHCenter
-        text: { void (root.tick); return Qt.formatDateTime(new Date(), "mm"); }
-        color: "#ffb86c"
+        text: { void (root.tick); return Qt.formatDateTime(new Date(), "dddd, MMMM dd"); }
+        color: "#f8f8f2"
+        opacity: 0.75
         font.family: "JetBrains Mono"
-        font.pixelSize: Math.round(root.height * 0.167)
+        font.pixelSize: Math.round(root.height * 0.022)
     }
 
-    // -- Clock: Hours -- (hyprlock.conf: position 0,140, font_size 180, $purple)
+    // -- Time -- (hyprlock.conf: HH:MM, font_size 140, foreground)
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: root.height * 0.13
+        anchors.verticalCenterOffset: -root.height * 0.037
         horizontalAlignment: Text.AlignHCenter
-        text: { void (root.tick); return Qt.formatDateTime(new Date(), "HH"); }
-        color: "#bd93f9"
+        text: { void (root.tick); return Qt.formatDateTime(new Date(), "HH:mm"); }
+        color: "#f8f8f2"
         font.family: "JetBrains Mono"
-        font.pixelSize: Math.round(root.height * 0.167)
+        font.pixelSize: Math.round(root.height * 0.13)
     }
 
     // -- Keyboard layout indicator (top) -- matches hyprlock.conf's $LAYOUT label
@@ -100,9 +101,10 @@ Rectangle {
         anchors.topMargin: 20
         text: (keyboard.layouts.length > 0 && keyboard.currentLayout < keyboard.layouts.length)
               ? keyboard.layouts[keyboard.currentLayout].shortName : ""
-        color: "#8be9fd"
+        color: "#f8f8f2"
+        opacity: 0.6
         font.family: "JetBrains Mono"
-        font.pixelSize: 16
+        font.pixelSize: 14
     }
 
     // -- Password field -- a floating pill, not a boxed login card: matches
@@ -111,16 +113,15 @@ Rectangle {
     // submits, same as hyprlock - there's no login button here either.
     Rectangle {
         id: passwordBox
-        width: Math.min(350, root.width * 0.3)
-        height: 60
+        width: Math.min(320, root.width * 0.3)
+        height: 48
         radius: height / 2
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 120
-        color: "#44475a"
-        opacity: 0.9
-        border.width: 2
-        border.color: failed ? "#ff5555" : "#bd93f9"
+        color: "#8c282a36"   // Dracula bg @ ~55%, same glass as hyprlock's input
+        border.width: 1
+        border.color: failed ? "#ff5555" : "#26f8f8f2"
 
         property bool failed: false
 
@@ -136,7 +137,7 @@ Rectangle {
             verticalAlignment: TextInput.AlignVCenter
             font.family: "JetBrains Mono"
             font.pixelSize: 16
-            color: "#8be9fd"
+            color: "#f8f8f2"
             echoMode: TextInput.Password
             passwordCharacter: "*"
             focus: true
@@ -144,9 +145,9 @@ Rectangle {
 
             Text {
                 visible: passwordInput.text.length === 0
-                text: "🔒 Type Password"
-                color: "#8be9fd"
-                opacity: 0.6
+                text: "Type password"
+                color: "#f8f8f2"
+                opacity: 0.5
                 font: passwordInput.font
                 anchors.verticalCenter: parent.verticalCenter
             }
