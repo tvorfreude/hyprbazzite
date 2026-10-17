@@ -19,6 +19,7 @@ echo "All critical packages are present."
 # 2. Configuration Presence Checks
 declare -a REQUIRED_FILES=(
     "/usr/lib/hyprbazzite/hypr/hyprland.lua"
+    "/usr/lib/hyprbazzite/hypr/nightlight.frag"
     "/usr/lib/hyprbazzite/hypr/bindings.lua"
     "/usr/lib/hyprbazzite/hypr/autostart.lua"
     "/usr/lib/hyprbazzite/waybar/config.jsonc"

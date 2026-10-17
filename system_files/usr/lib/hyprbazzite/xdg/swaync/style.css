@@ -284,29 +284,42 @@
 }
 
 /* Volume slider */
-.widget-volume {
+.widget-volume,
+.widget-backlight,
+.intel,
+.amd0,
+.amd1 {
   margin: 4px 12px;
   padding: 6px 10px;
   border-radius: 10px;
   background: alpha(@foreground, 0.06);
 }
 
-.widget-volume scale trough,
-.widget-volume trough {
+.widget-volume trough,
+.widget-backlight trough,
+.intel trough,
+.amd0 trough,
+.amd1 trough {
   min-height: 6px;
   border-radius: 100px;
   background: alpha(@foreground, 0.15);
 }
 
-.widget-volume scale highlight,
-.widget-volume highlight {
+.widget-volume highlight,
+.widget-backlight highlight,
+.intel highlight,
+.amd0 highlight,
+.amd1 highlight {
   min-height: 6px;
   border-radius: 100px;
   background: @purple;
 }
 
-.widget-volume scale slider,
-.widget-volume slider {
+.widget-volume slider,
+.widget-backlight slider,
+.intel slider,
+.amd0 slider,
+.amd1 slider {
   min-width: 20px;   /* GTK's slider has a -8px margin; <16px goes negative */
   min-height: 20px;
   border-radius: 100px;

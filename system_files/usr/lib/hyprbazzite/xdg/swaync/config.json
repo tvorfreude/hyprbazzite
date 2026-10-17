@@ -40,6 +40,9 @@
         "buttons-grid",
         "mpris",
         "volume",
+        "backlight#intel",
+        "backlight#amd0",
+        "backlight#amd1",
         "title",
         "dnd",
         "notifications"
@@ -94,6 +97,13 @@
                     "command": "/usr/libexec/hyprbazzite-ctl qs awake set"
                 },
                 {
+                    "label": "󰖔\nNight",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs nightlight state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs nightlight set"
+                },
+                {
                     "label": "󰊴\nGame",
                     "type": "toggle",
                     "active": false,
@@ -113,6 +123,10 @@
                     "command": "/usr/libexec/hyprbazzite-ctl qs screenshot run"
                 },
                 {
+                    "label": "󰒓\nSettings",
+                    "command": "/usr/libexec/hyprbazzite-ctl settings"
+                },
+                {
                     "label": "󰐥\nPower",
                     "command": "/usr/libexec/hyprbazzite-ctl power menu"
                 }
@@ -124,7 +138,19 @@
         "mpris": {
             "show-album-art": "always",
             "autohide": true
+        },
+        "backlight#intel": {
+            "label": "󰃠",
+            "device": "intel_backlight"
+        },
+        "backlight#amd0": {
+            "label": "󰃠",
+            "device": "amdgpu_bl0"
+        },
+        "backlight#amd1": {
+            "label": "󰃠",
+            "device": "amdgpu_bl1"
         }
     },
-    "control-center-width": 420
+    "control-center-width": 480
 }

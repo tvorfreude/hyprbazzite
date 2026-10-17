@@ -22,7 +22,7 @@
   // ── Layout ────────────────────────────────────────────────────
   "modules-left": [
     "custom/menu",
-    "hyprland/window",
+    "custom/appname",
     "hyprland/workspaces"
   ],
   "modules-center": [],
@@ -51,39 +51,13 @@
     "tooltip-format": "App Launcher\nRight-click: power menu"
   },
 
-  // Focused application name (the macOS "app menu" slot, minus the menus)
-  "hyprland/window": {
-    "format": "{class}",
-    "max-length": 28,
-    "separate-outputs": true,
-    "rewrite": {
-      "": "Desktop",
-      "(app.zen_browser.zen|io.github.zen_browser.zen|zen|zen-browser|zen-alpha)": "Zen Browser",
-      "(firefox|org.mozilla.firefox)":   "Firefox",
-      "(google-chrome|com.google.Chrome|Google-chrome)": "Chrome",
-      "(com.brave.Browser|brave-browser)": "Brave",
-      "(kitty|kitty-dropterm)":          "Kitty",
-      "com.mitchellh.ghostty":           "Ghostty",
-      "org.wezfurlong.wezterm":          "WezTerm",
-      "(code|Code|code-oss|com.visualstudio.code|VSCodium|codium)": "VS Code",
-      "dev.zed.Zed":                     "Zed",
-      "(discord|com.discordapp.Discord|vesktop|Vesktop|WebCord)": "Discord",
-      "(slack|com.slack.Slack)":         "Slack",
-      "(Spotify|spotify|com.spotify.Client)": "Spotify",
-      "(steam|com.valvesoftware.Steam)": "Steam",
-      "(thunar|Thunar)":                 "Files",
-      "(nemo|Nemo)":                     "Files",
-      "org.gnome.Nautilus":              "Files",
-      "(mpv)":                           "mpv",
-      "(com.obsproject.Studio|obs)":     "OBS Studio",
-      "org.pulseaudio.pavucontrol":      "Volume Control",
-      "(pavucontrol)":                   "Volume Control",
-      "blueman-manager":                 "Bluetooth",
-      "(com.bitwarden.desktop|Bitwarden)": "Bitwarden",
-      "net.lutris.Lutris":               "Lutris",
-      "(org.gnome.Software)":            "Software",
-      "(libreoffice-.*)":                "LibreOffice"
-    }
+  // Focused application name (the macOS "app menu" slot, minus the menus).
+  // Long-running: resolves the window class to its real .desktop Name on each
+  // focus change, so there is no rename list to maintain.
+  "custom/appname": {
+    "return-type": "json",
+    "exec": "/usr/libexec/hyprbazzite-ctl waybar app-name",
+    "max-length": 28
   },
 
   "hyprland/workspaces": {

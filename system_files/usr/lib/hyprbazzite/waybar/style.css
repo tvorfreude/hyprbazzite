@@ -49,7 +49,7 @@ tooltip label {
 
 /* ── Module base ────────────────────────────────────────────── */
 #custom-menu,
-#window,
+#custom-appname,
 #workspaces,
 #cpu,
 #memory,
@@ -96,13 +96,9 @@ tooltip label {
 }
 
 /* Focused application name — the one bold thing on the bar */
-#window {
+#custom-appname {
   font-weight: bold;
   padding: 0 10px 0 4px;
-}
-
-window#waybar.empty #window {
-  padding: 0;
 }
 
 #workspaces {

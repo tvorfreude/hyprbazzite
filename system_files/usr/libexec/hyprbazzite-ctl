@@ -628,12 +628,26 @@ power_profile_cycle() {
 # AUTOMATION MODULE (waybar exec helpers & background services)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Hyprland's event socket: newer releases keep it under $XDG_RUNTIME_DIR/hypr,
+# older ones under /tmp/hypr. The DND/monitor automation only knew the latter,
+# so on this Hyprland it could never connect.
+_hypr_socket2() {
+    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}" d
+    [[ -n "$sig" ]] || return 1
+    for d in "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" /tmp/hypr; do
+        [[ -S "$d/$sig/.socket2.sock" ]] && { echo "$d/$sig/.socket2.sock"; return 0; }
+    done
+    return 1
+}
+
 automation_dnd() {
     if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
         echo "Hyprland instance signature not found." >&2
         return 1
     fi
-    socat -U - "UNIX-CONNECT:/tmp/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" | while read -r line; do
+    local sock
+    sock=$(_hypr_socket2) || { echo "Hyprland event socket not found." >&2; return 1; }
+    socat -U - "UNIX-CONNECT:$sock" | while read -r line; do
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
@@ -1105,6 +1119,62 @@ waybar_idle_status() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# WAYBAR FOCUSED-APP NAME
+# ═══════════════════════════════════════════════════════════════════════════════
+# Resolves the active window's class to its real application name from the
+# .desktop files (so unknown apps need no hand-written rename list), falling
+# back to a tidied class. Long-running: prints one JSON line per focus change.
+
+declare -A _APPNAME_CACHE=()
+
+_app_name_for_class() {
+    local cls="$1" lc f name dirs d
+    [[ -n "$cls" ]] || return 0
+    [[ -n "${_APPNAME_CACHE[$cls]+x}" ]] && { echo "${_APPNAME_CACHE[$cls]}"; return 0; }
+    lc=${cls,,}
+    dirs=("$HOME/.local/share/applications" "/usr/share/applications"
+          "/var/lib/flatpak/exports/share/applications"
+          "$HOME/.local/share/flatpak/exports/share/applications")
+    name=""
+    for d in "${dirs[@]}"; do
+        [[ -d "$d" ]] || continue
+        for f in "$d/$cls.desktop" "$d/$lc.desktop"; do
+            [[ -f "$f" ]] && { name=$(sed -n 's/^Name=//p' "$f" | head -n1); break 2; }
+        done
+    done
+    if [[ -z "$name" ]]; then
+        f=$(grep -il -m1 "^StartupWMClass=${cls}\$" "${dirs[@]/%//*.desktop}" 2>/dev/null | head -n1)
+        [[ -n "$f" ]] && name=$(sed -n 's/^Name=//p' "$f" | head -n1)
+    fi
+    if [[ -z "$name" ]]; then
+        name=${cls##*.}               # com.foo.Bar -> Bar
+        name=${name//[-_]/ }
+        name=${name^}                 # kitty -> Kitty
+    fi
+    _APPNAME_CACHE[$cls]="$name"
+    echo "$name"
+}
+
+_emit_app_name() {
+    local cls name
+    cls=$(hyprctl -j activewindow 2>/dev/null | jq -r '.class // empty' 2>/dev/null)
+    name=$(_app_name_for_class "$cls")
+    printf '{"text":"%s","tooltip":"%s","class":"%s"}\n' \
+        "$(json_escape "$name")" "$(json_escape "$cls")" "${name:+active}"
+}
+
+waybar_app_name() {
+    _emit_app_name
+    local sock
+    sock=$(_hypr_socket2) || return 0
+    socat -U - "UNIX-CONNECT:$sock" | while read -r line; do
+        case "$line" in
+            activewindow\>\>*|closewindow\>\>*|workspace\>\>*|focusedmon\>\>*) _emit_app_name ;;
+        esac
+    done
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SWAYNC QUICK-SETTINGS BUTTONS
 # ═══════════════════════════════════════════════════════════════════════════════
 # swaync's buttons-grid runs each command through its own parser, which mangles
@@ -1132,10 +1202,19 @@ qs() {
         awake:toggle)    pgrep -x hypridle >/dev/null 2>&1 && _awake_apply on || _awake_apply off ;;
         gamemode:state)  [[ "$(_animations_enabled)" == "0" ]] && echo true || echo false ;;
         gamemode:set)    gamemode_toggle ;;
+        nightlight:state)
+            hyprctl -j getoption decoration:screen_shader 2>/dev/null | jq -r '.str // ""' | grep -q "nightlight.frag" && echo true || echo false ;;
+        nightlight:set)
+            local shader="${HYPRBAZZITE_NIGHTLIGHT_SHADER:-/usr/lib/hyprbazzite/hypr/nightlight.frag}"
+            if [[ "${SWAYNC_TOGGLE_STATE:-}" == "true" ]]; then
+                hyprctl eval "hl.config({ decoration = { screen_shader = \"$shader\" } })" >/dev/null
+            else
+                hyprctl eval 'hl.config({ decoration = { screen_shader = "" } })' >/dev/null
+            fi ;;
         screenshot:run)  swaync-client -cp -sw; sleep 0.35; screenshot_take region ;;
         picker:run)      swaync-client -cp -sw; sleep 0.35; hyprpicker -a ;;
         lock:run)        swaync-client -cp -sw; sleep 0.35; hyprlock ;;
-        *) echo "Usage: hyprbazzite-ctl qs <wifi|bluetooth|speakers|mic|awake|gamemode> <state|set> | <screenshot|picker|lock> run"; return 1 ;;
+        *) echo "Usage: hyprbazzite-ctl qs <wifi|bluetooth|speakers|mic|awake|gamemode|nightlight> <state|set> | <screenshot|picker|lock> run"; return 1 ;;
     esac
 }
 
@@ -1162,7 +1241,7 @@ Modules:
   osk [toggle|swap-anchor]      On-screen keyboard control
   power [profile|menu|shutdown|reboot|suspend|sleep|lock|logout]
   automation [dnd|osk|temp]     Background services & waybar helpers
-  waybar [power-status|headset-battery|idle-status]  Waybar JSON exec modules
+  waybar [power-status|headset-battery|idle-status|app-name]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
   lid                            Re-sync clamshell/suspend state to the lid
   workspace rebind              Re-bind workspaces 1-5/6-10 to primary/secondary monitor
@@ -1228,7 +1307,8 @@ USAGE
                 power-status) waybar_power_status ;;
                 headset-battery) waybar_headset_battery ;;
                 idle-status) waybar_idle_status ;;
-                *) echo "Usage: hyprbazzite-ctl waybar [power-status|headset-battery|idle-status]"; return 1 ;;
+                app-name) waybar_app_name ;;
+                *) echo "Usage: hyprbazzite-ctl waybar [power-status|headset-battery|idle-status|app-name]"; return 1 ;;
             esac
             ;;
         keybinds) keybinds_switch "${1:-}" ;;
