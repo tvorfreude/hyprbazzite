@@ -9,7 +9,7 @@
 # The tag is PINNED (not floating :stable) so Renovate can open PRs bumping the
 # date-stamped tag — that's what makes upstream base updates visible/reviewable.
 # Declared before the first FROM so it can be referenced in the final FROM.
-ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable-44.20261006
+ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable-44.20261012
 
 # ---------------------------------------------------------------------------
 # Stage 1: Download external assets (fonts, themes)
@@ -77,6 +77,38 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y remove --setopt=protected_packages= \
     akonadi-server sddm baloo kate dolphin konsole khelpcenter \
     "plasma-*" "kde*" "gnome-*" "kf5-*" "kf6-*" && \
+    dnf5 -y clean all
+
+# ---------------------------------------------------------------------------
+# Step 3b: Satisfy hyprland's Xwayland dependency on Terra-based bases
+# ---------------------------------------------------------------------------
+# Newer Bazzite bases ship terra-xorg-x11-server-Xwayland, which conflicts with
+# Fedora's xorg-x11-server-Xwayland and does not advertise the arch-qualified
+# "xorg-x11-server-Xwayland(x86-64)" capability that the Hyprland COPR's
+# hyprland package requires, so dnf can't resolve it. Xwayland is already
+# installed, so declare the capability with an empty shim package instead of
+# swapping out Terra's build. No-op when the capability already exists.
+RUN --mount=type=cache,dst=/var/cache \
+    if ! rpm -q --whatprovides 'xorg-x11-server-Xwayland(x86-64)' >/dev/null 2>&1 && \
+       rpm -q terra-xorg-x11-server-Xwayland >/dev/null 2>&1; then \
+      dnf5 -y install rpm-build && \
+      mkdir -p /tmp/shim && \
+      printf '%s\n' \
+        'Name: hyprbazzite-xwayland-shim' \
+        'Version: 1' \
+        'Release: 1' \
+        'Summary: Declares the Xwayland capability provided by the Terra build' \
+        'License: MIT' \
+        'BuildArch: noarch' \
+        'Provides: xorg-x11-server-Xwayland(x86-64)' \
+        '%description' \
+        'Empty shim; see Containerfile.' \
+        '%files' > /tmp/shim/shim.spec && \
+      rpmbuild -bb --define "_topdir /tmp/shim" /tmp/shim/shim.spec && \
+      rpm -i /tmp/shim/RPMS/noarch/hyprbazzite-xwayland-shim-1-1.noarch.rpm && \
+      dnf5 -y remove rpm-build && \
+      rm -rf /tmp/shim; \
+    fi && \
     dnf5 -y clean all
 
 # ---------------------------------------------------------------------------
