@@ -133,7 +133,8 @@ if macos then
     -- ─── macOS-convention system shortcuts (Option key) ──────────────────────
     hl.bind(appmod .. " + SHIFT + 3", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
     hl.bind(appmod .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
-    hl.bind(appmod .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
+    hl.bind(appmod .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot window"))
+    hl.bind(appmod .. " + CTRL + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot clipboard"))
     hl.bind(appmod .. " + CTRL + Q",  hl.dsp.exec_cmd("hyprlock"))
 
     -- ═══════════════════════════════════════════════════════════════════════════

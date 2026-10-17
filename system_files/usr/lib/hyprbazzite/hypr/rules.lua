@@ -178,7 +178,12 @@ hl.window_rule({
 -- ==========================================
 
 hl.layer_rule({ match = { namespace = "selection" }, no_anim = true })
-hl.layer_rule({ match = { namespace = "swaync-control-center" }, blur = true })
-hl.layer_rule({ match = { namespace = "swaync-notification-window" }, blur = false })
+-- swaync: same glass as the bar. ignore_alpha stops the transparent margin around
+-- the panel/popups from being blurred (the reason popup blur used to be off).
+hl.layer_rule({ match = { namespace = "swaync-control-center" }, blur = true, ignore_alpha = 0.3 })
+hl.layer_rule({ match = { namespace = "swaync-notification-window" }, blur = true, ignore_alpha = 0.3 })
 hl.layer_rule({ match = { namespace = "walker" }, no_anim = true })
-hl.layer_rule({ match = { namespace = "^(wofi)$" }, no_anim = true, blur = true })
+hl.layer_rule({ match = { namespace = "^(wofi)$" }, no_anim = true, blur = true, ignore_alpha = 0.3 })
+-- waybar: blur what's behind the translucent bar; ignore_alpha keeps fully
+-- transparent pixels (and the area outside the bar) from being blurred.
+hl.layer_rule({ match = { namespace = "^(waybar)$" }, blur = true, ignore_alpha = 0.1 })

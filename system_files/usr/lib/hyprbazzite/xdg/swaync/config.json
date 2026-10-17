@@ -4,13 +4,14 @@
     "positionY": "top",
     "layer": "overlay",
     "control-center-layer": "top",
-    "control-center-margin-top": 10,
-    "control-center-margin-bottom": 10,
-    "control-center-margin-right": 10,
-    "control-center-margin-left": 10,
+    "control-center-margin-top": 6,
+    "control-center-margin-bottom": 6,
+    "control-center-margin-right": 6,
+    "control-center-margin-left": 6,
     "notification-2fa-action": true,
     "notification-inline-replies": true,
     "notification-window-width": 440,
+    "image-visibility": "when-available",
     "keyboard-shortcuts": true,
     "transition-time": 200,
     "hide-on-clear": false,
@@ -38,6 +39,7 @@
     "widgets": [
         "buttons-grid",
         "mpris",
+        "volume",
         "title",
         "dnd",
         "notifications"
@@ -54,36 +56,75 @@
         "dnd": {
             "text": "Do Not Disturb"
         },
-        "mpris": {
-            "image-size": 96
-        },
         "buttons-grid": {
             "actions": [
                 {
-                    "label": "󰖩",
-                    "command": "nm-connection-editor"
+                    "label": "󰖩\nWi-Fi",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs wifi state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs wifi set"
                 },
                 {
-                    "label": "󰂯",
-                    "command": "blueman-manager"
+                    "label": "󰂯\nBT",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs bluetooth state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs bluetooth set"
                 },
                 {
-                    "label": "󰕾",
-                    "command": "pavucontrol"
+                    "label": "󰝟\nSpeaker",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs speakers state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs speakers set"
                 },
                 {
-                    "label": "󰍬",
-                    "command": "pavucontrol -t 4"
+                    "label": "󰍭\nMic",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs mic state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs mic set"
                 },
                 {
-                    "label": "󰏘",
-                    "command": "wallpaper-cycle"
+                    "label": "󰅶\nAwake",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs awake state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs awake set"
                 },
                 {
-                    "label": "󰐥",
+                    "label": "󰊴\nGame",
+                    "type": "toggle",
+                    "active": false,
+                    "update-command": "/usr/libexec/hyprbazzite-ctl qs gamemode state",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs gamemode set"
+                },
+                {
+                    "label": "󰓅\nProfile",
+                    "command": "/usr/libexec/hyprbazzite-ctl power profile"
+                },
+                {
+                    "label": "󰌌\nKeys",
+                    "command": "/usr/libexec/hyprbazzite-ctl osk toggle"
+                },
+                {
+                    "label": "󰹑\nShot",
+                    "command": "/usr/libexec/hyprbazzite-ctl qs screenshot run"
+                },
+                {
+                    "label": "󰐥\nPower",
                     "command": "/usr/libexec/hyprbazzite-ctl power menu"
                 }
             ]
+        },
+        "volume": {
+            "label": "󰕾"
+        },
+        "mpris": {
+            "show-album-art": "always",
+            "autohide": true
         }
-    }
+    },
+    "control-center-width": 420
 }

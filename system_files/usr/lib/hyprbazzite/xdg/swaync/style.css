@@ -1,37 +1,38 @@
-/* Every other themed surface in this project (waybar, wofi, hyprlock,
-   SDDM) explicitly sets JetBrains Mono - this file never did, so
-   notifications silently fell back to GTK's default sans-serif and looked
-   visibly inconsistent with everything else on screen. */
+/* ═══════════════════════════════════════════════════════════════
+   SwayNC — translucent Dracula glass, matching the waybar
+   (waybar/style.css): same palette, regular-weight text, soft
+   foreground-tinted borders/hovers, small radii. Blur comes from the
+   Hyprland layer rules in hypr/rules.lua; here it is just a see-through
+   tint. Neutral by default; colour only where it carries meaning.
+   ═══════════════════════════════════════════════════════════════ */
+
 * {
   font-family: "JetBrainsMono Nerd Font", "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: normal;
+  text-shadow: none;
+  box-shadow: none;
 }
 
-/* .avatar-container matched nothing - not a real swaync CSS class at all
-   (confirmed against upstream's own source and stylesheet), just dead
-   copy-pasted CSS. Removed rather than kept as misleading clutter. */
-
-/* The real, GTK-native way to size these - confirmed against swaync's own
-   upstream style.scss. GTK's CSS engine doesn't support plain web-CSS
-   width/height/max-width/max-height/object-fit/position/z-index at all
-   (every one of those on .image/.app-icon below was a silent no-op this
-   whole time, confirmed live via the Gtk-WARNING theme parser errors they
-   throw on every load); `-gtk-icon-size` is the GTK-specific property
-   that actually controls a GtkImage's rendered size, and these two
-   custom properties feed into it the same way upstream's own theme does. */
+/* Sized via -gtk-icon-size, not width/height (GTK CSS ignores those). */
 :root {
-  --notification-icon-size: 64px;
+  --notification-icon-size: 48px;
   --notification-app-icon-size: calc(var(--notification-icon-size) / 3);
 }
 
-@define-color cc-bg rgba(40, 42, 54, 0.8);
-@define-color noti-border-color rgba(189, 147, 249, 0.4);
-@define-color noti-bg rgb(40, 42, 54);
-@define-color noti-bg-hover rgb(48, 50, 64);
-@define-color noti-bg-focus rgba(68, 68, 68, 0.6);
-@define-color noti-close-bg rgba(255, 255, 255, 0.1);
-@define-color noti-close-bg-hover rgba(255, 255, 255, 0.15);
-@define-color bg-selected rgb(0, 128, 255);
+/* ── Palette (same values as waybar) ────────────────────────── */
+@define-color background   #282a36;
+@define-color current_line #44475a;
+@define-color foreground   #f8f8f2;
+@define-color comment      #6272a4;
+@define-color cyan         #8be9fd;
+@define-color green        #50fa7b;
+@define-color orange       #ffb86c;
+@define-color pink         #ff79c6;
+@define-color purple       #bd93f9;
+@define-color red          #ff5555;
 
+/* ── Notification popups ────────────────────────────────────── */
 .notification-row {
   outline: none;
 }
@@ -42,230 +43,312 @@
 }
 
 .notification {
-  border-radius: 16px;
-  margin: 8px 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  background: alpha(@background, 0.72);
+  border: 1px solid alpha(@foreground, 0.10);
+  border-radius: 12px;
+  margin: 6px 10px;
   padding: 0;
-  border: 1px solid @noti-border-color;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.notification.critical {
+  border-color: alpha(@red, 0.7);
 }
 
 .notification-content {
-  background: @noti-bg;
-  padding: 12px;
-  border-radius: 16px;
-}
-
-.close-button {
   background: transparent;
-  color: #bd93f9;
-  text-shadow: none;
-  padding: 0;
-  border-radius: 100%;
-  margin-top: 10px;
-  margin-right: 16px;
-  box-shadow: none;
-  border: 1px solid #bd93f9;
-  min-width: 24px;
-  min-height: 24px;
+  padding: 10px 12px;
+  border-radius: 12px;
 }
 
-/* .notification-default-action is NOT a small "default button" - per
-   swaync's own stylesheet, it's the clickable wrapper around the ENTIRE
-   notification body (.notification-content is its child). Giving it a
-   border + background + 8px margin, as if it were a pill-shaped button,
-   nested a second border and a block of dead space inside the outer
-   .notification border on every single notification, with or without any
-   real actions attached - confirmed live, that's exactly the "double
-   border with an empty strip underneath" look. It should be an invisible
-   passthrough instead; .notification already owns the one visible border
-   and radius. .notification-action (plural - Reply/Dismiss, the actual
-   per-action buttons an app can attach) is the one that should look like
-   a button. */
+/* .notification-default-action wraps the whole body (not a button): keep
+   it an invisible passthrough so there is exactly one border/radius. */
 .notification-default-action {
   padding: 0;
   margin: 0;
-  box-shadow: none;
   background: transparent;
   border: none;
-  border-radius: 16px;
-  color: #f8f8f2;
+  border-radius: 12px;
+  color: @foreground;
 }
 
 .notification-default-action:hover {
-  background: rgba(189, 147, 249, 0.08);
+  background: alpha(@foreground, 0.06);
 }
 
+.close-button {
+  background: alpha(@foreground, 0.10);
+  color: alpha(@foreground, 0.8);
+  border: none;
+  border-radius: 100%;
+  padding: 0;
+  margin: 8px 10px 0 0;
+  min-width: 22px;
+  min-height: 22px;
+}
+
+.close-button:hover {
+  background: alpha(@red, 0.85);
+  color: @background;
+}
+
+/* Per-notification action buttons (Reply, Dismiss, …) */
 .notification-action {
+  background: alpha(@foreground, 0.08);
+  color: @foreground;
+  border: none;
+  border-top: 1px solid alpha(@foreground, 0.10);
+  border-right: 1px solid alpha(@foreground, 0.10);
+  border-radius: 0;
   padding: 6px;
   margin: 0;
-  box-shadow: none;
-  background: rgba(189, 147, 249, 0.1);
-  border: 1px solid #bd93f9;
-  color: #bd93f9;
-  border-radius: 0px;
-  border-top: none;
-  border-right: none;
+}
+
+.notification-action:hover {
+  background: alpha(@foreground, 0.16);
 }
 
 .notification-action:first-child {
-  border-bottom-left-radius: 10px;
+  border-bottom-left-radius: 12px;
 }
 
 .notification-action:last-child {
-  border-bottom-right-radius: 10px;
-  border-right: 1px solid @noti-border-color;
+  border-bottom-right-radius: 12px;
+  border-right: none;
 }
 
-/* The main avatar/profile picture (e.g. a Discord sender's avatar, or
-   the app's own icon when no avatar is supplied) - sized via
-   -gtk-icon-size, not width/height, see the :root block above. */
+/* Avatar / app icon. config.json sets image-visibility=when-available, so
+   there is no widget at all when no icon is supplied; no border or
+   background here, so a failed icon lookup can't leave an empty frame. */
 .image {
   -gtk-icon-size: var(--notification-icon-size);
   -gtk-icon-filter: none;
-  border-radius: 100px;
+  border-radius: 10px;
   margin-right: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-/* Larger images attached to the message body itself (not the sender's
-   avatar) - e.g. an image someone sent in the message, as opposed to
-   their profile picture. Sized via width_request/height_request in
-   swaync's own code (notification-body-image-width/height in
-   config.json), not CSS - this only controls decoration.
-   body_image never gets its own CSS class from swaync (confirmed against
-   its source - unlike .image/.app-icon, there's no add_css_class call for
-   it anywhere), so the old `.body-image` selector here matched nothing at
-   all; targeting the actual GTK picture node under .notification-content
-   is what actually reaches it. */
-.notification-content picture {
-  margin-top: 6px;
-  background-color: white;
-  border-radius: 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
-
-.summary {
-  font-size: 16px;
-  font-weight: bold;
+  border: none;
   background: transparent;
-  color: #f8f8f2;
-  text-shadow: none;
 }
 
-/* The small app-icon badge overlaid on the avatar (e.g. Discord's own
-   logo, badging whose message this is) - swaync already anchors this to
-   the avatar's bottom-right corner itself (an Overlay with
-   halign/valign: end in its own UI template, not something CSS
-   controls), so this only needs to handle decoration and size, not
-   position: absolute/right/bottom/z-index, which were silent no-ops here
-   same as on .image above. */
 .app-icon {
   -gtk-icon-size: var(--notification-app-icon-size);
   -gtk-icon-filter: none;
   -gtk-icon-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-  border-radius: 6px;
-  background: #282a36;
-  border: 2px solid #bd93f9;
+  border: none;
+  background: transparent;
+}
+
+/* Images attached to the message body (not the sender avatar) */
+.notification-content picture {
+  margin-top: 6px;
+  background-color: transparent;
+  border-radius: 8px;
+}
+
+.summary {
+  font-size: 14px;
+  font-weight: bold;
+  background: transparent;
+  color: @foreground;
 }
 
 .time {
-  font-size: 14px;
-  font-weight: normal;
+  font-size: 12px;
   background: transparent;
-  color: rgba(248, 248, 242, 0.6);
-  text-shadow: none;
+  color: alpha(@foreground, 0.5);
   margin-right: 18px;
 }
 
 .body {
-  font-size: 14px;
-  font-weight: normal;
+  font-size: 13px;
   background: transparent;
-  color: #f8f8f2;
-  text-shadow: none;
+  color: alpha(@foreground, 0.85);
 }
 
 .top-action-title {
-  color: white;
-  text-shadow: none;
+  color: @foreground;
 }
 
+/* ── Control center (the slide-out panel) ───────────────────── */
 .control-center {
-  background: #282a36;
-  border: 1px solid #bd93f9;
-  border-radius: 16px;
-  margin: 10px;
+  background: alpha(@background, 0.72);
+  border: 1px solid alpha(@foreground, 0.10);
+  border-radius: 12px;
+  margin: 6px 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
-.control-center-list {
-  background: transparent;
-}
-
+.control-center-list,
 .floating-notifications {
   background: transparent;
 }
 
-.blank-window {
-  background: alpha(black, 0.25);
+/* Notifications inside the panel sit flat on the glass */
+.control-center .notification {
+  background: alpha(@foreground, 0.06);
+  box-shadow: none;
+  margin: 4px 8px;
 }
 
+.blank-window {
+  background: transparent;
+}
+
+/* Title row: "Notifications" + Clear All */
 .widget-title {
-  margin: 8px;
-  font-size: 1.5rem;
-  color: #bd93f9;
+  margin: 10px 12px 4px 12px;
+  font-size: 14px;
+  font-weight: bold;
+  color: @foreground;
 }
+
 .widget-title > button {
-  font-size: initial;
-  color: #bd93f9;
-  text-shadow: none;
-  background: #282a36;
-  border: 1px solid #bd93f9;
-  box-shadow: none;
-  border-radius: 12px;
+  font-size: 12px;
+  font-weight: normal;
+  color: @foreground;
+  background: alpha(@foreground, 0.10);
+  border: none;
+  border-radius: 7px;
+  padding: 3px 10px;
 }
+
 .widget-title > button:hover {
-  background: @noti-bg-hover;
+  background: alpha(@foreground, 0.18);
+}
+
+/* Do Not Disturb row */
+.widget-dnd {
+  margin: 4px 12px;
+  font-size: 13px;
+  color: @foreground;
+}
+
+.widget-dnd > switch {
+  background: alpha(@foreground, 0.15);
+  border: none;
+  border-radius: 100px;
+}
+
+.widget-dnd > switch:checked {
+  background: @purple;
+}
+
+.widget-dnd > switch slider {
+  background: @foreground;
+  border: none;
+  border-radius: 100px;
 }
 
 .widget-label {
-  margin: 8px;
+  margin: 8px 12px;
 }
+
 .widget-label > label {
-  font-size: 1.1rem;
+  font-size: 13px;
   font-weight: bold;
-  color: #bd93f9;
-  margin: 10px 0px 5px 0px;
+  color: @foreground;
 }
 
+/* Quick-action grid: toggles (Wi-Fi, Bluetooth, mute…) light up purple
+   while on; plain buttons (profile, screenshot, lock…) stay neutral. */
 .widget-buttons-grid {
-  padding: 8px;
-  margin: 8px;
-  border-radius: 12px;
-  background-color: rgba(255, 255, 255, 0.05);
+  padding: 4px;
+  margin: 8px 12px;
+  border-radius: 10px;
+  background: alpha(@foreground, 0.06);
 }
 
+.widget-buttons-grid > flowbox > flowboxchild > button,
 .widget-buttons-grid > button {
-  background: #282a36;
-  border: 1px solid #bd93f9;
-  border-radius: 12px;
-  margin: 4px;
-  padding: 10px;
-  font-size: 1.5rem;
-  color: #bd93f9;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  margin: 2px;
+  padding: 6px 0;
+  min-width: 56px;
+  font-size: 13px;
+  color: alpha(@foreground, 0.85);
 }
 
+.widget-buttons-grid > flowbox > flowboxchild > button:hover,
 .widget-buttons-grid > button:hover {
-  background: @noti-bg-hover;
+  background: alpha(@foreground, 0.14);
+  color: @foreground;
+}
+
+.widget-buttons-grid > flowbox > flowboxchild > button.active,
+.widget-buttons-grid > flowbox > flowboxchild > button.toggle:checked,
+.widget-buttons-grid > button.active,
+.widget-buttons-grid > button.toggle:checked {
+  background: alpha(@purple, 0.30);
+  color: @purple;
+}
+
+/* Volume slider */
+.widget-volume {
+  margin: 4px 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: alpha(@foreground, 0.06);
+}
+
+.widget-volume scale trough,
+.widget-volume trough {
+  min-height: 6px;
+  border-radius: 100px;
+  background: alpha(@foreground, 0.15);
+}
+
+.widget-volume scale highlight,
+.widget-volume highlight {
+  min-height: 6px;
+  border-radius: 100px;
+  background: @purple;
+}
+
+.widget-volume scale slider,
+.widget-volume slider {
+  min-width: 20px;   /* GTK's slider has a -8px margin; <16px goes negative */
+  min-height: 20px;
+  border-radius: 100px;
+  background: @foreground;
+  border: none;
+}
+
+/* Now playing: swaync draws the album art as the card's backdrop with the
+   title/controls centred over it. Keep that (it's the blurred-art look),
+   just match the panel's radius/margins and keep the text legible on any art. */
+.widget-mpris {
+  margin: 4px 12px;
 }
 
 .widget-mpris-player {
   padding: 8px;
-  margin: 8px;
+  min-height: 110px;
+  margin: 4px 0;
+  border-radius: 12px;
 }
+
 .widget-mpris-title {
   font-weight: bold;
-  font-size: 1.25rem;
+  font-size: 13px;
+  color: @foreground;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
 }
+
 .widget-mpris-subtitle {
-  font-size: 1.1rem;
+  font-size: 12px;
+  color: alpha(@foreground, 0.85);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85);
+}
+
+.widget-mpris button {
+  color: @foreground;
+  background: alpha(@background, 0.45);
+  border: none;
+  border-radius: 7px;
+  text-shadow: none;
+}
+
+.widget-mpris button:hover {
+  background: alpha(@background, 0.75);
 }

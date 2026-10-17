@@ -1,243 +1,267 @@
 // ╔══════════════════════════════════════════════════════════════╗
-// ║           Waybar — Single-File Config (Dracula)              ║
-// ║  Merged: config + Modules + ModulesWorkspaces +              ║
-// ║          ModulesCustom + UserModules + ModulesGroups         ║
+// ║        Waybar — macOS-style translucent bar (Dracula)        ║
+// ║  Left:  launcher · focused app name · workspaces             ║
+// ║  Right: system drawer · status icons · notifications · clock ║
 // ╚══════════════════════════════════════════════════════════════╝
 
 {
   // ── Bar geometry ──────────────────────────────────────────────
   "layer": "top",
   "mode": "dock",
-  "exclusive": false,
-  "passthrough": false,
   "position": "top",
-  "spacing": 6,
-  "fixed-center": true,
+  "height": 30,
+  "exclusive": true,
+  "passthrough": false,
+  "spacing": 0,
   "ipc": true,
   "margin-top": 0,
-  "margin-left": 8,
-  "margin-right": 8,
-  "hide-on-focus": true,
+  "margin-left": 0,
+  "margin-right": 0,
+  "reload_style_on_change": true,
 
   // ── Layout ────────────────────────────────────────────────────
   "modules-left": [
-    "idle_inhibitor",
-    "tray",
-    "clock",
+    "custom/menu",
     "hyprland/window",
-    "custom/separator#dot-line",
-    "hyprland/taskbar"
-  ],
-  "modules-center": [
-    "group/app_drawer",
-    "custom/keyboard",
-    "custom/separator#dot-line",
     "hyprland/workspaces"
   ],
+  "modules-center": [],
   "modules-right": [
-    "group/laptop",
-    "group/mobo_drawer",
-    "custom/separator#line",
-    "group/connections",
-    "group/audio",
+    "group/system",
+    "custom/idle",
+    "custom/power-profiles-daemon",
+    "tray",
     "custom/headset-battery",
-    "custom/separator#dot-line",
-    "group/notify",
-    "group/status"
+    "pulseaudio",
+    "pulseaudio#microphone",
+    "battery",
+    "custom/notification",
+    "clock"
   ],
 
   // ════════════════════════════════════════════════════════════════
-  // GROUPS  (from ModulesGroups.jsonc)
+  // LEFT
   // ════════════════════════════════════════════════════════════════
 
-  "group/app_drawer": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-duration": 500,
-      "children-class": "custom/menu",
-      "transition-left-to-right": true
-    },
-    "modules": [
-      "custom/menu",
-      "custom/light_dark",
-      "custom/file_manager",
-      "custom/tty",
-      "custom/browser",
-      "custom/settings"
-    ]
+  "custom/menu": {
+    "format": "",
+    "on-click": "wofi --show drun --conf /etc/wofi/config --style /etc/wofi/style.css",
+    "on-click-right": "/usr/libexec/hyprbazzite-ctl power menu",
+    "tooltip": true,
+    "tooltip-format": "App Launcher\nRight-click: power menu"
   },
 
-  "group/mobo_drawer": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-duration": 500,
-      "children-class": "cpu",
-      "transition-left-to-right": true
-    },
-    "modules": [
-      "custom/temperature",
-      "cpu",
-      "custom/power-profiles-daemon",
-      "memory",
-      "disk"
-    ]
-  },
-
-  "group/laptop": {
-    "orientation": "inherit",
-    "modules": [
-      "backlight",
-      "battery"
-    ]
-  },
-
-  "group/audio": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-duration": 500,
-      "children-class": "pulseaudio",
-      "transition-left-to-right": true
-    },
-    "modules": [
-      "pulseaudio",
-      "pulseaudio#microphone"
-    ]
-  },
-
-  "group/connections": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-duration": 500,
-      "children-class": "bluetooth",
-      "transition-left-to-right": true
-    },
-    "modules": [
-      "network",
-      "bluetooth"
-    ]
-  },
-
-  "group/notify": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-duration": 500,
-      "children-class": "custom/notification",
-      "transition-left-to-right": false
-    },
-    "modules": [
-      "custom/notification",
-      "custom/dot_update"
-    ]
-  },
-
-  "group/status": {
-    "orientation": "inherit",
-    "drawer": {
-      "transition-duration": 500,
-      "children-class": "custom/power",
-      "transition-left-to-right": false
-    },
-    "modules": [
-      "custom/power",
-      "custom/lock",
-      "keyboard-state"
-    ]
-  },
-
-  // ════════════════════════════════════════════════════════════════
-  // WORKSPACES — numbered + per-window Nerd Font icon rewrite
-  // ════════════════════════════════════════════════════════════════
-
-  "hyprland/workspaces": {
-    "disable-scroll": false,
-    "all-outputs": true,
-    "warp-on-scroll": false,
-    "sort-by-number": true,
-    "show-special": false,
-    "on-click": "activate",
-    "on-scroll-up":   "hyprctl eval 'hl.dispatch(hl.dsp.focus({workspace = \"e-1\"}))'",
-    "on-scroll-down": "hyprctl eval 'hl.dispatch(hl.dsp.focus({workspace = \"e+1\"}))'",
-    "format": "{name} {windows}",
-    "format-window-separator": " ",
-    "window-rewrite-default": "󰣆",
-    "window-rewrite": {
-      // ── Browsers ──
-      "class<app.zen_browser.zen|zen|io.github.zen_browser.zen|firefox|org.mozilla.firefox|librewolf|floorp|mercury-browser|[Cc]achy-browser|tor browser|waterfox|waterfox-bin>": "󰈹",
-      "class<microsoft-edge>":                  "",
-      "class<Chromium|Thorium|[Cc]hrome|com.google.Chrome|brave-browser|com.brave.Browser>": "",
-      "title<.*amazon.*>":                      "",
-      "title<.*reddit.*>":                      "󰑍",
-      "title<.*youtube.*>":                     "󰗃",
-      "title<.*github.*>":                      "",
-      // ── Terminals ──
-      "class<kitty|konsole|kitty-dropterm|com.mitchellh.ghostty|org.wezfurlong.wezterm>":                   "",
-      // ── Communication ──
-      "class<[Tt]hunderbird|[Tt]hunderbird-esr|eu.betterbird.Betterbird>":  "󰊫",
-      "title<.*gmail.*>":                           "󰊫",
-      "class<[Tt]elegram-desktop|org.telegram.desktop|io.github.tdesktop_x64.TDesktop>": "",
-      "class<discord|[Ww]ebcord|Vesktop|com.discordapp.Discord>": "󰙯",
-      "title<.*whatsapp.*>":  "󰖣",
-      "title<.*zapzap.*>":    "󰖣",
-      "title<.*messenger.*>": "󰟀",
-      "class<slack|com.slack.Slack>": "",
-      // ── AI ──
-      "title<.*ChatGPT.*>":  "󰚩",
-      "title<.*deepseek.*>": "󰚩",
-      "title<.*qwen.*>":     "󰚩",
-      // ── Media ──
-      "class<mpv>":            "󰐹",
-      "class<celluloid|Zoom>": "󰼏",
-      "class<Cider>":          "󰎆",
-      "class<vlc>":            "󰕼",
-      "class<[Ss]potify|com.spotify.Client>": "󰓇",
-      "title<.*Picture-in-Picture.*>": "󰹗",
-      "title<.*cmus.*>":       "󰕿",
-      // ── Dev / Code ──
-      "class<VSCode|code-url-handler|code|code-oss|codium|codium-url-handler|VSCodium|com.visualstudio.code>": "󰨞",
-      "class<dev.zed.Zed>":             "󰵁",
-      "class<dev.aheadlibre.Cursor>":   "󰚩",
-      "class<codeblocks>":              "󰅩",
-      "class<subl>":                    "󰅳",
-      "class<mousepad>":                "󰈔",
-      "class<jetbrains-idea>":          "󰚝",
-      "class<android-studio>":          "󰐋",
-      "title<.*nvim.*>":                "",
-      "title<.*vim.*>":                 "",
-      "title<.*figma.*>":               "󰙨",
-      "title<.*jira.*>":                "󰳠",
-      // ── Office ──
-      "class<libreoffice-writer>":      "󰈬",
-      "class<libreoffice-startcenter>": "󰏆",
-      "class<libreoffice-calc>":        "󰈛",
-      // ── VMs / Remote ──
-      "class<virt-manager|.virt-manager-wrapped>": "󰛇",
-      "class<virtualbox manager>":                 "󰘚",
-      "title<virtualbox>":                         "󰘚",
-      "class<remmina>":                            "󰌘",
-      // ── System / Misc ──
-      "class<obs|com.obsproject.Studio>":              "󰕨",
-      "class<steam|com.valvesoftware.Steam>":           "󰣑",
-      "class<thunar|nemo|org.gnome.Nautilus>":          "󰝰",
-      "class<gimp>":                                    "󰏥",
-      "class<[Pp]avucontrol|org.pulseaudio.pavucontrol>": "󰝟",
-      "class<nwg-look>":                               "󰒓",
-      "class<polkit-gnome-authentication-agent-1>":    "󰒃",
-      "class<emulator>":                               "󰀲",
-      "class<org.pipewire.Helvum>":                    "󰓀",
-      "class<localsend>":                              "󰈅",
-      "class<PrusaSlicer|UltiMaker-Cura|OrcaSlicer>":  "󰦗",
-      "class<Gparted>":                                "󰋊"
+  // Focused application name (the macOS "app menu" slot, minus the menus)
+  "hyprland/window": {
+    "format": "{class}",
+    "max-length": 28,
+    "separate-outputs": true,
+    "rewrite": {
+      "": "Desktop",
+      "(app.zen_browser.zen|io.github.zen_browser.zen|zen|zen-browser|zen-alpha)": "Zen Browser",
+      "(firefox|org.mozilla.firefox)":   "Firefox",
+      "(google-chrome|com.google.Chrome|Google-chrome)": "Chrome",
+      "(com.brave.Browser|brave-browser)": "Brave",
+      "(kitty|kitty-dropterm)":          "Kitty",
+      "com.mitchellh.ghostty":           "Ghostty",
+      "org.wezfurlong.wezterm":          "WezTerm",
+      "(code|Code|code-oss|com.visualstudio.code|VSCodium|codium)": "VS Code",
+      "dev.zed.Zed":                     "Zed",
+      "(discord|com.discordapp.Discord|vesktop|Vesktop|WebCord)": "Discord",
+      "(slack|com.slack.Slack)":         "Slack",
+      "(Spotify|spotify|com.spotify.Client)": "Spotify",
+      "(steam|com.valvesoftware.Steam)": "Steam",
+      "(thunar|Thunar)":                 "Files",
+      "(nemo|Nemo)":                     "Files",
+      "org.gnome.Nautilus":              "Files",
+      "(mpv)":                           "mpv",
+      "(com.obsproject.Studio|obs)":     "OBS Studio",
+      "org.pulseaudio.pavucontrol":      "Volume Control",
+      "(pavucontrol)":                   "Volume Control",
+      "blueman-manager":                 "Bluetooth",
+      "(com.bitwarden.desktop|Bitwarden)": "Bitwarden",
+      "net.lutris.Lutris":               "Lutris",
+      "(org.gnome.Software)":            "Software",
+      "(libreoffice-.*)":                "LibreOffice"
     }
   },
 
+  "hyprland/workspaces": {
+    "format": "{name}",
+    "all-outputs": true,
+    "sort-by-number": true,
+    "show-special": false,
+    "disable-scroll": false,
+    "warp-on-scroll": false,
+    "on-click": "activate",
+    "on-scroll-up":   "hyprctl eval 'hl.dispatch(hl.dsp.focus({workspace = \"e-1\"}))'",
+    "on-scroll-down": "hyprctl eval 'hl.dispatch(hl.dsp.focus({workspace = \"e+1\"}))'"
+  },
+
   // ════════════════════════════════════════════════════════════════
-  // STANDARD MODULES  (from Modules.jsonc)
+  // RIGHT
   // ════════════════════════════════════════════════════════════════
 
+  // System stats live behind one drawer: hover the chip icon to expand
+  "group/system": {
+    "orientation": "inherit",
+    "drawer": {
+      "transition-duration": 400,
+      "children-class": "cpu",
+      "transition-left-to-right": false
+    },
+    "modules": [
+      "cpu",
+      "memory",
+      "disk",
+      "custom/temperature"
+    ]
+  },
+
+  "cpu": {
+    "interval": 5,
+    "format": "󰍛",
+    "format-alt": "{usage}% 󰍛",
+    "tooltip-format": "CPU {usage}%",
+    "on-click-right": "kitty -e btop"
+  },
+
+  "memory": {
+    "interval": 10,
+    "format": "{used:0.1f}G 󰾆",
+    "tooltip-format": "{used:0.1f}GB / {total:0.1f}GB ({percentage}%)",
+    "on-click-right": "kitty -e btop"
+  },
+
+  "disk": {
+    "interval": 30,
+    "path": "/var",
+    "format": "{percentage_used}% 󰋊",
+    "tooltip-format": "{used} used of {total}"
+  },
+
+  "custom/temperature": {
+    "return-type": "json",
+    "exec": "/usr/libexec/hyprbazzite-ctl automation temp",
+    "interval": 10,
+    "on-click-right": "kitty -e btop"
+  },
+
+  // Mirrors the swaync "Awake" toggle: both read/flip whether hypridle runs.
+  "custom/idle": {
+    "return-type": "json",
+    "exec": "/usr/libexec/hyprbazzite-ctl waybar idle-status",
+    "interval": 30,
+    "signal": 9,
+    "on-click": "/usr/libexec/hyprbazzite-ctl qs awake toggle"
+  },
+
+  "custom/power-profiles-daemon": {
+    "return-type": "json",
+    "exec": "/usr/libexec/hyprbazzite-ctl waybar power-status",
+    "interval": 30,
+    "signal": 8,
+    "on-click":       "/usr/libexec/hyprbazzite-ctl power profile",
+    "on-click-right": "/usr/libexec/hyprbazzite-ctl tdp profile"
+  },
+
+  "tray": {
+    "icon-size": 16,
+    "spacing": 8
+  },
+
+  "custom/headset-battery": {
+    "format": "󰋋 {}%",
+    "exec": "/usr/libexec/hyprbazzite-ctl waybar headset-battery",
+    "interval": 60,
+    "on-click": "solaar",
+    "return-type": "integer"
+  },
+
+  "pulseaudio": {
+    "format": "{icon} {volume}%",
+    "format-bluetooth": "{icon} {volume}%",
+    "format-muted": "󰝟",
+    "format-icons": {
+      "headphone": "󰋋",
+      "hands-free": "󰋎",
+      "headset": "󰋎",
+      "phone": "󰏲",
+      "portable": "󰏲",
+      "car": "󰄋",
+      "default": ["󰕿","󰖀","󰕾"]
+    },
+    "ignored-sinks": ["Easy Effects Sink"],
+    "scroll-step": 5.0,
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click-right": "pavucontrol -t 3",
+    "on-scroll-up":   "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
+    "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-",
+    "tooltip-format": "{desc}\nClick: mute  Right: mixer  Scroll: volume",
+    "smooth-scrolling-threshold": 1
+  },
+
+  "pulseaudio#microphone": {
+    "format": "{format_source}",
+    "format-source": "󰍬",
+    "format-source-muted": "󰍭",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
+    "on-click-right": "pavucontrol -t 4",
+    "on-scroll-up":   "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ 5%+",
+    "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ 5%-",
+    "tooltip-format": "{source_desc} · {source_volume}%\nClick: mute  Right: mixer",
+    "scroll-step": 5,
+    "smooth-scrolling-threshold": 1
+  },
+
+  "battery": {
+    "full-at": 100,
+    "design-capacity": false,
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "{icon} {capacity}%",
+    "format-charging": "󰂄 {capacity}%",
+    "format-plugged": "󰚥 {capacity}%",
+    "format-full": "󰁹 {capacity}%",
+    "format-alt": "{icon} {time}",
+    "format-icons": ["󰂎","󰁺","󰁻","󰁼","󰁽","󰁾","󰁿","󰂀","󰂁","󰂂","󰁹"],
+    "format-time": "{H}h {M}min",
+    "tooltip-format": "{timeTo} — {power}W",
+    "on-click-right": "/usr/libexec/hyprbazzite-ctl power menu",
+    "on-scroll-up":   "brightnessctl set +5%",
+    "on-scroll-down": "brightnessctl set 5%-",
+    "smooth-scrolling-threshold": 1
+  },
+
+  "custom/notification": {
+    "tooltip": false,
+    "format": "{icon}",
+    "format-icons": {
+      "notification":               "<span foreground='#ff79c6'>󰂚</span>",
+      "none":                       "󰂚",
+      "dnd-notification":           "<span foreground='#ff79c6'>󰂛</span>",
+      "dnd-none":                   "󰂛",
+      "inhibited-notification":     "<span foreground='#ff79c6'>󰂚</span>",
+      "inhibited-none":             "󰂚",
+      "dnd-inhibited-notification": "<span foreground='#ff79c6'>󰂛</span>",
+      "dnd-inhibited-none":         "󰂛"
+    },
+    "return-type": "json",
+    "exec-if": "which swaync-client",
+    "exec": "swaync-client -swb",
+    "on-click":       "swaync-client -t -sw",
+    "on-click-right": "swaync-client -d -sw",
+    "escape": true
+  },
+
+  // Hover for the calendar (unchanged), left-click toggles long date,
+  // right-click flips month/year view, scroll moves through months.
   "clock": {
-    "interval": 1,
-    "format": "󰥔 {:%I:%M %p}",
-    "format-alt": "󰃭 {:%H:%M  %d/%B/%Y, %A}",
+    "interval": 30,
+    "format": "{:%a %b %d  %I:%M %p}",
+    "format-alt": "{:%A, %d %B %Y  %H:%M}",
     "tooltip-format": "<tt><small>{calendar}</small></tt>",
     "calendar": {
       "mode": "year",
@@ -259,370 +283,5 @@
       "on-scroll-up":      "shift_up",
       "on-scroll-down":    "shift_down"
     }
-  },
-
-  "cpu": {
-    "format": "{usage}% 󰍛",
-    "interval": 1,
-    "min-length": 5,
-    "format-alt-click": "click",
-    "format-alt": "{icon0}{icon1}{icon2}{icon3} {usage:>2}% 󰍛",
-    "format-icons": ["▁","▂","▃","▄","▅","▆","▇","█"],
-    "on-click-right": "kitty -e btop"
-  },
-
-  "memory": {
-    "interval": 10,
-    "format": "{used:0.1f}G 󰾆",
-    "format-alt": "{percentage}% 󰾆",
-    "format-alt-click": "click",
-    "tooltip": true,
-    "tooltip-format": "{used:0.1f}GB / {total:0.1f}G",
-    "on-click-right": "kitty -e btop"
-  },
-
-  "disk": {
-    "interval": 30,
-    "path": "/var",
-    "format": "{percentage_used}% 󰋊",
-    "tooltip-format": "{used} used of {total} ({percentage_used}%)"
-  },
-
-  "backlight": {
-    "interval": 2,
-    "format": "{icon}",
-    "format-icons": ["󰃚","󰃛","󰃜","󰃝 ","󰃞","󰃟 ","󰃠 "],
-    "tooltip-format": "Brightness {percent}%",
-    "on-scroll-up":   "brightnessctl set +5%",
-    "on-scroll-down": "brightnessctl set 5%-",
-    "smooth-scrolling-threshold": 1
-  },
-
-  "battery": {
-    "full-at": 100,
-    "design-capacity": false,
-    "states": {
-      "good": 95,
-      "warning": 30,
-      "critical": 15
-    },
-    "format": "{icon} {capacity}%",
-    "format-charging": " {capacity}%",
-    "format-plugged": "󱘖 {capacity}%",
-    "format-full": "{icon} Full",
-    "format-alt": "{icon} {time}",
-    "format-icons": ["󰂎","󰁺","󰁻","󰁼","󰁽","󰁾","󰁿","󰂀","󰂁","󰂂","󰁹"],
-    "format-time": "{H}h {M}min",
-    "tooltip": true,
-    "tooltip-format": "{timeTo} — {power}w",
-    "on-click-right": "/usr/libexec/hyprbazzite-ctl power menu"
-  },
-
-  "bluetooth": {
-    "format": " ",
-    "format-disabled": "󰂳",
-    "format-connected": "󰂱 {num_connections}",
-    "tooltip-format": " {device_alias}",
-    "tooltip-format-connected": "{device_enumerate}",
-    "tooltip-format-enumerate-connected": " {device_alias} 󰂄{device_battery_percentage}%",
-    "on-click": "blueman-manager"
-  },
-
-  "network": {
-    "format-wifi": "{icon}",
-    "format-ethernet": "󰌘",
-    "format-disconnected": "󰌙",
-    "format-linked": "󰈁 {ifname} (No IP)",
-    "tooltip-format": "{ipaddr}  {bandwidthUpBits}  {bandwidthDownBits}",
-    "tooltip-format-wifi": "{essid} {icon} {signalStrength}%",
-    "tooltip-format-ethernet": "{ifname} 󰌘",
-    "tooltip-format-disconnected": "󰌙 Disconnected",
-    "max-length": 30,
-    "format-icons": ["󰤯 ","󰤟 ","󰤢 ","󰤥 ","󰤨 "],
-    "on-click-right": "kitty -e nmtui"
-  },
-
-  "pulseaudio": {
-    "format": "{icon} {volume}%",
-    "format-bluetooth": "{icon} 󰂰 {volume}%",
-    "format-muted": "󰖁",
-    "format-icons": {
-      "headphone": "󰋋",
-      "hands-free": "󰋍",
-      "headset": "󰋎",
-      "phone": "",
-      "portable": "󰦢",
-      "car": "󰄍",
-      "default": ["󰖁","󰕿","󰖀","󰕾"],
-      "ignored-sinks": ["Easy Effects Sink"]
-    },
-    "scroll-step": 5.0,
-    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-    "on-click-right": "pavucontrol -t 3",
-    "on-scroll-up":   "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
-    "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-",
-    "tooltip-format": "{icon} {desc} | {volume}%",
-    "smooth-scrolling-threshold": 1
-  },
-
-  "pulseaudio#microphone": {
-    "format": "{format_source}",
-    "format-source": " {volume}%",
-    "format-source-muted": "",
-    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle",
-    "on-click-right": "pavucontrol -t 4",
-    "on-scroll-up":   "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ 5%+",
-    "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ 5%-",
-    "tooltip-format": "{source_desc} | {source_volume}%",
-    "scroll-step": 5
-  },
-
-  "mpris": {
-    "interval": 10,
-    "format": "{player_icon} ",
-    "format-paused": "{status_icon} <i>{dynamic}</i>",
-    "on-click-middle": "playerctl play-pause",
-    "on-click":        "playerctl previous",
-    "on-click-right":  "playerctl next",
-    "scroll-step": 5.0,
-    "on-scroll-up":   "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
-    "on-scroll-down": "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%-",
-    "smooth-scrolling-threshold": 1,
-    "tooltip": true,
-    "tooltip-format": "{status_icon} {dynamic}\nLeft: previous  Mid: pause  Right: next",
-    "player-icons": {
-      "chromium":   "󰖟",
-      "default":    "󰟈",
-      "firefox":    "󰈹",
-      "kdeconnect": "󰌘",
-      "mopidy":     "󰕿",
-      "mpv":        "󰐹",
-      "spotify":    "󰓇",
-      "vlc":        "󰕼"
-    },
-    "status-icons": {
-      "paused":  "󰐎",
-      "playing": "󰐊",
-      "stopped": "󰓛"
-    },
-    "max-length": 30
-  },
-
-  "idle_inhibitor": {
-    "tooltip": true,
-    "tooltip-format-activated":   "Idle inhibitor active",
-    "tooltip-format-deactivated": "Idle inhibitor inactive",
-    "format": "{icon}",
-    "format-icons": {
-      "activated":   "󰈈 ",
-      "deactivated": " "
-    }
-  },
-
-  "keyboard-state": {
-    "capslock": true,
-    "format": {
-      "numlock":  "N {icon}",
-      "capslock": "󰪛 {icon}"
-    },
-    "format-icons": {
-      "locked":   "󰪛",
-      "unlocked": "󰪞"
-    }
-  },
-
-  "tray": {
-    "icon-size": 20,
-    "spacing": 4
-  },
-
-  "hyprland/window": {
-    "format": "{}",
-    "max-length": 40,
-    "separate-outputs": true,
-    "offscreen-css": true,
-    "offscreen-css-text": "(inactive)",
-    "rewrite": {
-      "(.*) — Mozilla Firefox":    " $1",
-      "(.*) - Mozilla Firefox":    " $1",
-      "(.*) — Google Chrome":      " $1",
-      "(.*) - Google Chrome":      " $1",
-      "(.*) — Zen Browser":        "󰖟 $1",
-      "(.*) - Zen Browser":        "󰖟 $1",
-      "(.*) — Visual Studio Code": "󰨞 $1",
-      "(.*) - Visual Studio Code": "󰨞 $1",
-      "Discord":                   "󰙯 Discord",
-      "Slack":                     " Slack",
-      "Telegram":                  "󰔥 Telegram",
-      "Thunar":                    "󰉋 Thunar",
-      "Steam":                     " Steam",
-      "Lutris":                    "󰮣 Lutris",
-      "Bitwarden":                 "󰒄 Bitwarden",
-      "(.*) - fish":               "> [$1]",
-      "(.*) - zsh":                "> [$1]"
-    }
-  },
-
-  "hyprland/taskbar": {
-    "format": "{icon}",
-    "icon-size": 18,
-    "icon-theme": "Papirus",
-    "app_ids-visible": [
-      "code","com.visualstudio.code","dev.aheadlibre.Cursor",
-      "discord","com.discordapp.Discord",
-      "spotify","com.spotify.Client",
-      "slack","com.slack.Slack",
-      "firefox","org.mozilla.firefox",
-      "google-chrome","com.google.Chrome",
-      "io.github.zen_browser.zen","com.brave.Browser",
-      "nemo","org.gnome.Nautilus",
-      "steam","com.valvesoftware.Steam",
-      "lutris","net.lutris.Lutris",
-      "com.bitwarden.desktop","neovide",
-      "org.kde.kate","org.gnome.TextEditor",
-      "pavucontrol","org.pulseaudio.pavucontrol",
-      "blueman-manager","org.gnome.Disks","org.gnome.Software"
-    ],
-    "ignore-list": ["wofi","swaync","hyprlock"],
-    "on-click":        "activate",
-    "on-click-middle": "close",
-    "tooltip-format":  "{window}"
-  },
-
-  // ════════════════════════════════════════════════════════════════
-  // CUSTOM MODULES  (from ModulesCustom.jsonc + UserModules.jsonc)
-  // ════════════════════════════════════════════════════════════════
-
-  "custom/temperature": {
-    "return-type": "json",
-    "exec": "/usr/libexec/hyprbazzite-ctl automation temp",
-    "interval": 10,
-    "on-click-right": "kitty -e btop"
-  },
-
-  "custom/power-profiles-daemon": {
-    "return-type": "json",
-    "exec": "/usr/libexec/hyprbazzite-ctl waybar power-status",
-    "interval": 30,
-    "signal": 8,
-    "on-click":       "/usr/libexec/hyprbazzite-ctl power profile",
-    "on-click-right": "/usr/libexec/hyprbazzite-ctl tdp profile"
-  },
-
-  "custom/headset-battery": {
-    "format": "󰠇 {}%",
-    "exec": "/usr/libexec/hyprbazzite-ctl waybar headset-battery",
-    "interval": 60,
-    "on-click": "solaar",
-    "return-type": "integer"
-  },
-
-  "custom/notification": {
-    "tooltip": false,
-    "format": "{icon}",
-    "format-icons": {
-      "notification":               "<span foreground='#ff5555'><sup>󰂚</sup></span>",
-      "none":                       "󰂚",
-      "dnd-notification":           "<span foreground='#ff5555'><sup>󰂛</sup></span>",
-      "dnd-none":                   "󰂛",
-      "inhibited-notification":     "<span foreground='#ff5555'><sup>󰂚</sup></span>",
-      "inhibited-none":             "󰂚",
-      "dnd-inhibited-notification": "<span foreground='#ff5555'><sup>󰂛</sup></span>",
-      "dnd-inhibited-none":         "󰂛"
-    },
-    "return-type": "json",
-    "exec-if": "which swaync-client",
-    "exec": "swaync-client -swb",
-    "on-click":       "swaync-client -t -sw",
-    "on-click-right": "swaync-client -d -sw",
-    "escape": true
-  },
-
-  "custom/menu": {
-    "format": "󰍜",
-    "on-click": "wofi --show drun --conf /etc/wofi/config --style /etc/wofi/style.css",
-    "tooltip": true,
-    "tooltip-format": "App Launcher"
-  },
-  "custom/browser": {
-    "format": "󰖟",
-    "on-click": "/usr/libexec/hyprbazzite-ctl open browser",
-    "tooltip": true,
-    "tooltip-format": "Launch Browser"
-  },
-  "custom/tty": {
-    "format": "󰆍",
-    "on-click": "kitty",
-    "tooltip": true,
-    "tooltip-format": "Launch Terminal"
-  },
-  "custom/file_manager": {
-    "format": "󰉋",
-    "on-click": "xdg-open \"$HOME\"",
-    "tooltip": true,
-    "tooltip-format": "File Manager"
-  },
-  "custom/keyboard": {
-    "format": "󰌌",
-    "on-click": "/usr/libexec/hyprbazzite-ctl osk toggle",
-    "tooltip": true,
-    "tooltip-format": "On-screen keyboard\nClick: Toggle open / close"
-  },
-  "custom/lock": {
-    "format": "󰌾",
-    "on-click": "hyprlock",
-    "tooltip": true,
-    "tooltip-format": "Lock Screen"
-  },
-  "custom/power": {
-    "format": "⏻",
-    "on-click": "/usr/libexec/hyprbazzite-ctl power menu",
-    "tooltip": true,
-    "tooltip-format": "Power Menu"
-  },
-  "custom/quit": {
-    "format": "󰗼",
-    "on-click": "hyprctl eval 'hl.dispatch(hl.dsp.exit())'",
-    "tooltip": true,
-    "tooltip-format": "Exit Hyprland"
-  },
-  "custom/light_dark": {
-    "format": "󰔎",
-    "on-click": "/usr/libexec/hyprbazzite-ctl settings",
-    "tooltip": true,
-    "tooltip-format": "Toggle Light / Dark"
-  },
-  "custom/settings": {
-    "format": "󰒓",
-    "on-click": "nwg-look || true",
-    "tooltip": true,
-    "tooltip-format": "Settings"
-  },
-  "custom/dot_update": {
-    "format": "󰚰",
-    "tooltip": true,
-    "tooltip-format": "Updates"
-  },
-
-  // ── Separators ────────────────────────────────────────────────
-  "custom/separator#dot": {
-    "format": "•",
-    "interval": "once",
-    "tooltip": false
-  },
-  "custom/separator#dot-line": {
-    "format": "┊",
-    "interval": "once",
-    "tooltip": false
-  },
-  "custom/separator#line": {
-    "format": "│",
-    "interval": "once",
-    "tooltip": false
-  },
-  "custom/separator#blank": {
-    "format": "  ",
-    "interval": "once",
-    "tooltip": false
   }
 }

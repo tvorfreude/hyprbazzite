@@ -82,6 +82,26 @@ EOF
 # GAMEMODE MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Put the wallpaper back after gamemode cleared it. Prefers the cycle daemon
+# (it knows the current wallpaper); otherwise whichever current_wallpaper.*
+# actually exists - only the .png is guaranteed, the .jpg may not be there.
+_restore_wallpaper() {
+    if pgrep -x wallpaper-cycle >/dev/null 2>&1; then
+        pkill -USR1 wallpaper-cycle || true
+        return 0
+    fi
+    local f img=""
+    for f in "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" "$CONFIG_DIR/hypr/wallust/current_wallpaper.png"; do
+        [[ -f "$f" ]] && { img="$f"; break; }
+    done
+    [[ -n "$img" ]] || return 0
+    if command -v awww &>/dev/null; then
+        awww img "$img" --transition-type wipe --transition-duration 2
+    else
+        swaybg -i "$img" -m fill &
+    fi
+}
+
 gamemode_toggle() {
     local notif_icon="$HOME/.config/swaync/images/ja.png"
     local enabled
@@ -110,12 +130,7 @@ gamemode_toggle() {
             general = { gaps_in = 5, gaps_out = 20, border_size = 3 },
         })
         hl.window_rule({ match = { class = ".*" }, opacity = "1 override" })' >/dev/null
-        if command -v awww &>/dev/null; then
-            awww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" \
-                --transition-type wipe --transition-duration 2
-        else
-            swaybg -i "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" -m fill &
-        fi
+        _restore_wallpaper
         sleep 0.5
         notify-send -e -u normal -i "$notif_icon" " Gamemode:" " disabled"
         # No hyprctl reload here: the eval call above already restored the
@@ -132,7 +147,7 @@ gamemode_toggle() {
 screenshot_take() {
     local mode="${1:-region}"
     local output_dir="${XDG_PICTURES_DIR:-$HOME/Pictures}"
-    local timestamp filename
+    local timestamp filename geo
 
     if [[ ! -d "$output_dir" ]]; then
         notify "Screenshot" "Directory does not exist: $output_dir" "critical"
@@ -165,9 +180,23 @@ screenshot_take() {
     elif command -v grim &>/dev/null; then
         pkill slurp || true
         case "$mode" in
-            clipboard) grim -g "$(slurp)" - | wl-copy; notify "Screenshot" "Copied to clipboard" ;;
-            output)    grim - | _screenshot_editor ;;
-            *)         grim -g "$(slurp)" - | _screenshot_editor ;;
+            clipboard) geo=$(slurp) || return 0; grim -g "$geo" - | wl-copy; notify "Screenshot" "Copied to clipboard" ;;
+            # macOS Shift+3: the focused screen, saved + copied straight away (no editor)
+            full|output)
+                local mon
+                mon=$(hyprctl -j monitors 2>/dev/null | jq -r '.[] | select(.focused) | .name' 2>/dev/null | head -n1)
+                if [[ -n "$mon" ]]; then grim -o "$mon" "$output_dir/$filename"; else grim "$output_dir/$filename"; fi
+                [[ -s "$output_dir/$filename" ]] || { notify "Screenshot" "Capture failed" "critical"; return 1; }
+                wl-copy < "$output_dir/$filename"
+                notify "Screenshot" "Saved to $filename and copied" ;;
+            # macOS Shift+5-style: click a window on the current workspace
+            window)
+                geo=$(hyprctl -j clients 2>/dev/null | jq -r --argjson ws "$(hyprctl -j activeworkspace 2>/dev/null | jq '.id')" \
+                    '.[] | select(.mapped and .workspace.id == $ws) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"' 2>/dev/null \
+                    | slurp -r) || return 0
+                grim -g "$geo" - | _screenshot_editor ;;
+            # macOS Shift+4 (area/region, the default): drag a region, then edit/save
+            *)         geo=$(slurp) || return 0; grim -g "$geo" - | _screenshot_editor ;;
         esac
     else
         notify "Screenshot" "No screenshot tool found (hyprshot or grim)" "critical"
@@ -702,12 +731,14 @@ waybar_power_status() {
         profile=$(tuned-adm active 2>/dev/null | sed -n 's/^Current active profile: *//p')
     fi
 
+    # Nerd Font (Material Design) glyphs, spelled as escapes so they can't be
+    # silently stripped from the file: rocket / gauge / leaf.
     local icon
     case "$profile" in
-        throughput-performance*|latency-performance*|performance*) icon="" ;;
-        balanced*) icon="" ;;
-        powersave*|power-saver*) icon="" ;;
-        *) icon="" ;;
+        throughput-performance*|latency-performance*|performance*) icon=$'\U000F14DE' ;;
+        balanced*) icon=$'\U000F0787' ;;
+        powersave*|power-saver*) icon=$'\U000F032A' ;;
+        *) icon=$'\U000F02DC' ;;   # help-circle
     esac
 
     local tdp="unavailable" tdp_supported=0
@@ -1022,6 +1053,65 @@ open_target() {
     return 1
 }
 
+# "Awake" = hypridle stopped. One source of truth shared by the swaync Awake
+# toggle and the waybar idle indicator (custom/idle, signal 9).
+_awake_apply() {
+    if [[ "$1" == "on" ]]; then
+        pkill -x hypridle || true
+    else
+        pgrep -x hypridle >/dev/null 2>&1 || setsid hypridle -c /etc/hypr/hypridle.conf >/dev/null 2>&1 &
+    fi
+    sleep 0.2
+    pkill -RTMIN+9 waybar 2>/dev/null || true
+}
+
+waybar_idle_status() {
+    local awake=0 text class tip
+    pgrep -x hypridle >/dev/null 2>&1 || awake=1
+    if (( awake )); then
+        text=$'\U000F0208'; class="activated"; tip=$'Staying awake: screen will not lock or sleep\n\nClick: allow idle again'
+    else
+        text=$'\U000F0209'; class="deactivated"; tip=$'Idle lock/sleep enabled\n\nClick: stay awake'
+    fi
+    printf '{"text":"%s","tooltip":"%s","class":"%s","alt":"%s"}\n' \
+        "$(json_escape "$text")" "$(json_escape "$tip")" "$class" "$class"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SWAYNC QUICK-SETTINGS BUTTONS
+# ═══════════════════════════════════════════════════════════════════════════════
+# swaync's buttons-grid runs each command through its own parser, which mangles
+# nested quotes/$(...) - so the logic lives here and the JSON just calls
+#   qs <name> state   -> prints true|false (toggle's initial state)
+#   qs <name> set     -> applies $SWAYNC_TOGGLE_STATE (true|false)
+#   qs <name> run     -> one-shot action (panel closes first where it matters)
+
+_qs_onoff() { [[ "${SWAYNC_TOGGLE_STATE:-}" == "true" ]] && echo "$1" || echo "$2"; }
+
+qs() {
+    local name="${1:-}" mode="${2:-run}"
+    local sink='@DEFAULT_AUDIO_SINK@' src='@DEFAULT_AUDIO_SOURCE@'
+    case "$name:$mode" in
+        wifi:state)      [[ "$(nmcli radio wifi 2>/dev/null)" == "enabled" ]] && echo true || echo false ;;
+        wifi:set)        nmcli radio wifi "$(_qs_onoff on off)" ;;
+        bluetooth:state) bluetoothctl show 2>/dev/null | grep -q "Powered: yes" && echo true || echo false ;;
+        bluetooth:set)   bluetoothctl power "$(_qs_onoff on off)" >/dev/null ;;
+        speakers:state)  wpctl get-volume "$sink" 2>/dev/null | grep -q MUTED && echo true || echo false ;;
+        speakers:set)    wpctl set-mute "$sink" "$(_qs_onoff 1 0)" ;;
+        mic:state)       wpctl get-volume "$src" 2>/dev/null | grep -q MUTED && echo true || echo false ;;
+        mic:set)         wpctl set-mute "$src" "$(_qs_onoff 1 0)" ;;
+        awake:state)     pgrep -x hypridle >/dev/null 2>&1 && echo false || echo true ;;
+        awake:set)       _awake_apply "$(_qs_onoff on off)" ;;
+        awake:toggle)    pgrep -x hypridle >/dev/null 2>&1 && _awake_apply on || _awake_apply off ;;
+        gamemode:state)  [[ "$(_animations_enabled)" == "0" ]] && echo true || echo false ;;
+        gamemode:set)    gamemode_toggle ;;
+        screenshot:run)  swaync-client -cp -sw; sleep 0.35; screenshot_take region ;;
+        picker:run)      swaync-client -cp -sw; sleep 0.35; hyprpicker -a ;;
+        lock:run)        swaync-client -cp -sw; sleep 0.35; hyprlock ;;
+        *) echo "Usage: hyprbazzite-ctl qs <wifi|bluetooth|speakers|mic|awake|gamemode> <state|set> | <screenshot|picker|lock> run"; return 1 ;;
+    esac
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1033,8 +1123,9 @@ Usage: hyprbazzite-ctl <module> [action] [args...]
 
 Modules:
   menu                          Interactive launcher menu
-  gamemode [toggle]             Toggle performance gamemode
-  screenshot [region|window|output|clipboard]
+  qs <name> <state|set|run>     Swaync quick-settings button helper
+  gamemode [toggle|status]      Toggle performance gamemode (status prints true/false)
+  screenshot [region|area|window|full|clipboard]
   wallpaper [pick]              Interactive wallpaper picker
   chezmoi [push|pull]           Dotfiles management
   refresh                       Restart session apps (waybar, idle, etc.)
@@ -1044,7 +1135,7 @@ Modules:
   osk [toggle|swap-anchor]      On-screen keyboard control
   power [profile|menu|shutdown|reboot|suspend|sleep|lock|logout]
   automation [dnd|osk|temp]     Background services & waybar helpers
-  waybar [power-status|headset-battery]  Waybar JSON exec modules
+  waybar [power-status|headset-battery|idle-status]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
   lid                            Re-sync clamshell/suspend state to the lid
   workspace rebind              Re-bind workspaces 1-5/6-10 to primary/secondary monitor
@@ -1057,7 +1148,13 @@ USAGE
 
     case "$module" in
         menu) menu_show ;;
-        gamemode) gamemode_toggle ;;
+        qs) qs "$@" ;;
+        gamemode)
+            case "${1:-}" in
+                status) [[ "$(_animations_enabled)" == "0" ]] && echo true || echo false ;;
+                *) gamemode_toggle ;;
+            esac
+            ;;
         screenshot) screenshot_take "${1:-region}" ;;
         wallpaper) wallpaper_pick ;;
         chezmoi) chezmoi_action "${1:-}" ;;
@@ -1103,7 +1200,8 @@ USAGE
             case "${1:-}" in
                 power-status) waybar_power_status ;;
                 headset-battery) waybar_headset_battery ;;
-                *) echo "Usage: hyprbazzite-ctl waybar [power-status|headset-battery]"; return 1 ;;
+                idle-status) waybar_idle_status ;;
+                *) echo "Usage: hyprbazzite-ctl waybar [power-status|headset-battery|idle-status]"; return 1 ;;
             esac
             ;;
         keybinds) keybinds_switch "${1:-}" ;;
