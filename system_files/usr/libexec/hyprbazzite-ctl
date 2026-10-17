@@ -26,11 +26,21 @@ command -v json_escape >/dev/null 2>&1 || json_escape() {
 # MENU MODULE — interactive launcher (replaces TritonCtl)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# 1 if Hyprland animations are on, 0 if off. `hyprctl getoption` prints
+# "bool: true" on this build (older builds printed "int: 1"), so asking for
+# JSON and normalising both shapes avoids comparing against the wrong literal.
+_animations_enabled() {
+    local v
+    v=$(hyprctl -j getoption animations:enabled 2>/dev/null \
+        | jq -r 'if has("bool") then (if .bool then 1 else 0 end) else (.int // 1) end' 2>/dev/null)
+    echo "${v:-1}"
+}
+
 menu_show() {
     local gamemode_status="Gamemode (disabled)"
     local gamemode_enabled
-    gamemode_enabled=$(hyprctl getoption animations:enabled 2>/dev/null | awk 'NR==1{print $2}')
-    [[ "${gamemode_enabled:-1}" == "0" ]] && gamemode_status="Gamemode (enabled)"
+    gamemode_enabled=$(_animations_enabled)
+    [[ "$gamemode_enabled" == "0" ]] && gamemode_status="Gamemode (enabled)"
 
     local options
     options=$(cat <<EOF
@@ -75,7 +85,7 @@ EOF
 gamemode_toggle() {
     local notif_icon="$HOME/.config/swaync/images/ja.png"
     local enabled
-    enabled=$(hyprctl getoption animations:enabled | awk 'NR==1{print $2}')
+    enabled=$(_animations_enabled)
 
     if [[ "$enabled" = "1" ]]; then
         # This build's Hyprland config is a native Lua engine ("non-legacy
@@ -835,21 +845,15 @@ lid_sync() {
             _sleep_best_effort
         fi
     else
-        # Chained, not left to hypridle's own after_sleep_cmd dpms(true):
-        # that fires from a completely independent trigger (its own native
-        # D-Bus handling vs. this script's gdbus-watched resume path), with
-        # no guaranteed ordering between the two. hypridle's call reliably
-        # wins the race (no bash/subprocess overhead on its side), so it
-        # fires while this output is still logically disabled - a no-op -
-        # and nothing re-asserts dpms once it's re-enabled a moment later.
-        # That's exactly "screen stays black on the first open after sleep,
-        # fixes itself on a second close/open" - confirmed by this being a
-        # regression from a previous version of this file that had the two
-        # correctly sequenced, before today's redesign dropped it reasoning
-        # (wrongly) that the two triggers were simply redundant. Keeping
-        # both enable and power-on together here, in order, in the one
-        # resume handler that actually knows this output was just
-        # re-enabled, removes the race instead of hoping to win it.
+        # Re-enable the panel and power it on together, in order, in the one
+        # resume handler that knows this output was just re-enabled.
+        # hypridle's own after_sleep_cmd also sends dpms "on" from a separate
+        # trigger with no ordering guarantee against this one, but both now
+        # pass an explicit { action = 'on' }, which is idempotent, so the
+        # order no longer matters. (The old "screen stays black on the first
+        # open after sleep, fixes itself on the second" symptom was blamed on
+        # that race, but the real cause was dpms(true) being a TOGGLE on this
+        # build: two "on" calls from two triggers cancelled each other out.)
         hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false }); hl.dispatch(hl.dsp.dpms({ action = 'on' }))"
     fi
 }
