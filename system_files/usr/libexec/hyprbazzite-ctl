@@ -850,7 +850,7 @@ lid_sync() {
         # both enable and power-on together here, in order, in the one
         # resume handler that actually knows this output was just
         # re-enabled, removes the race instead of hoping to win it.
-        hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false }); hl.dispatch(hl.dsp.dpms(true))"
+        hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false }); hl.dispatch(hl.dsp.dpms({ action = 'on' }))"
     fi
 }
 
