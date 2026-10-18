@@ -1,7 +1,7 @@
 mode=drun
 show=drun
 width=500
-height=350
+height=420
 always_dmenu=true
 rm_mode=false
 allow_images=true
