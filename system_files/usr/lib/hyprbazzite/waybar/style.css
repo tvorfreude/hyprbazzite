@@ -122,7 +122,8 @@ tooltip label {
 #workspaces button.active {
   color: @foreground;
   font-weight: bold;
-  background: alpha(@foreground, 0.18);
+  background: alpha(@purple, 0.30);
+  border-bottom: 2px solid @purple;
 }
 
 #workspaces button.urgent {
@@ -134,6 +135,7 @@ tooltip label {
 /* Icons stay neutral; colour only where it carries meaning. */
 #cpu, #memory, #disk              { color: alpha(@foreground, 0.85); }
 #custom-temperature               { color: @orange; }
+#custom-temperature.warning       { color: @yellow; }
 #custom-idle.deactivated         { color: alpha(@foreground, 0.45); }
 #custom-idle.activated           { color: @green; }
 #custom-power-profiles-daemon                  { color: @cyan; }
@@ -175,5 +177,7 @@ tooltip label {
 
 /* ── Clock ──────────────────────────────────────────────────── */
 #clock {
-  padding: 0 12px 0 8px;
+  padding: 0 12px;
+  margin-right: 6px;
+  background: alpha(@foreground, 0.08);
 }

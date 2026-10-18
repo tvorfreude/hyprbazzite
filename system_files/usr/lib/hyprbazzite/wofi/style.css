@@ -14,9 +14,9 @@
    `opacity: 1` pins out anything the GTK theme might stack on top. */
 window {
   margin: 0px;
-  border: 1px solid alpha(@fg, 0.10);
+  border: 1px solid alpha(@accent, 0.35);
   background-color: alpha(@bg, 0.72);
-  border-radius: 12px;
+  border-radius: 14px;
   opacity: 1;
   font-family: "JetBrainsMono Nerd Font", "Liberation Mono", monospace;
   font-size: 13px;
@@ -57,7 +57,8 @@ window {
 }
 
 #entry {
-  padding: 4px 8px;
+  padding: 6px 10px;
+  margin: 1px 0;
   border-radius: 8px;
 }
 
@@ -74,7 +75,7 @@ window {
 #entry:selected {
   background-color: alpha(@accent, 0.30);
   border-radius: 8px;
-  border: none;
+  border: 1px solid alpha(@accent, 0.55);
   outline: none;
 }
 
