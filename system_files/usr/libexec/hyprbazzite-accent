@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+# hyprbazzite-accent - one accent colour for waybar, swaync, wofi and the
+# Hyprland window border.
+#
+#   hyprbazzite-accent mode [dracula|auto|#rrggbb]   show / set the mode
+#   hyprbazzite-accent apply [--if-auto] [image]     recompute + re-render + live reload
+#   hyprbazzite-accent style <waybar|swaync>         print the stylesheet path to launch with
+#   hyprbazzite-accent hex                           print the active accent
+#   hyprbazzite-accent extract <image>               print the accent picked from an image
+#
+# Modes: dracula (default, #bd93f9) | auto (picked from the wallpaper) | #rrggbb.
+# Only the accent follows the mode; the Dracula background/foreground stay fixed.
+# Any failure falls back to Dracula purple, never to a broken bar.
+
+set -uo pipefail
+
+readonly DRACULA="#bd93f9"
+readonly STATE_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hyprbazzite"
+readonly MODE_FILE="$STATE_DIR/accent-mode"
+readonly OUT_DIR="${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite"
+readonly WALLPAPER="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/wallust/current_wallpaper.png"
+readonly WOFI_USER_STYLE="${XDG_CONFIG_HOME:-$HOME/.config}/wofi/style.css"
+readonly MARKER="/* hyprbazzite-accent: generated, do not edit */"
+
+# base stylesheets shipped in the image (tmpfiles copies them to /etc)
+# (overridable for testing against a checkout instead of the installed copies)
+readonly WAYBAR_BASE="${HYPRBAZZITE_WAYBAR_BASE:-/etc/waybar/style.css}"
+readonly SWAYNC_BASE="${HYPRBAZZITE_SWAYNC_BASE:-/etc/xdg/swaync/style.css}"
+readonly WOFI_BASE="${HYPRBAZZITE_WOFI_BASE:-/etc/wofi/style.css}"
+
+is_hex() { [[ "${1:-}" =~ ^#[0-9a-fA-F]{6}$ ]]; }
+
+get_mode() {
+    local m=""
+    [[ -r "$MODE_FILE" ]] && m=$(head -n1 "$MODE_FILE" | tr -d '[:space:]')
+    case "$m" in
+        auto|dracula) echo "$m" ;;
+        \#*) is_hex "$m" && echo "${m,,}" || echo dracula ;;
+        *) echo dracula ;;
+    esac
+}
+
+# Pick a vivid, readable accent from an image. Clamps saturation/lightness so
+# the colour keeps contrast on the dark Dracula glass (text uses it directly).
+extract() {
+    local img="$1" hist
+    [[ -f "$img" ]] || return 1
+    command -v magick >/dev/null 2>&1 || return 1
+    hist=$(magick "${img}[0]" -resize 96x96\! -depth 8 -colors 24 \
+        -format %c histogram:info:- 2>/dev/null) || return 1
+    [[ -n "$hist" ]] || return 1
+    awk '
+    function hsl(r, g, b,   mx, mn, d, h, s, l) {
+        r /= 255; g /= 255; b /= 255
+        mx = (r > g ? (r > b ? r : b) : (g > b ? g : b))
+        mn = (r < g ? (r < b ? r : b) : (g < b ? g : b))
+        l = (mx + mn) / 2; d = mx - mn
+        if (d == 0) { H = 0; S = 0; L = l; return }
+        s = (l > 0.5) ? d / (2 - mx - mn) : d / (mx + mn)
+        if (mx == r)      h = (g - b) / d + (g < b ? 6 : 0)
+        else if (mx == g) h = (b - r) / d + 2
+        else              h = (r - g) / d + 4
+        H = h * 60; S = s; L = l
+    }
+    function hue2rgb(p, q, t) {
+        if (t < 0) t += 1; if (t > 1) t -= 1
+        if (t < 1/6) return p + (q - p) * 6 * t
+        if (t < 1/2) return q
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6
+        return p
+    }
+    function lin(c) { return (c <= 0.03928) ? c / 12.92 : ((c + 0.055) / 1.055) ^ 2.4 }
+    function rgbof(h, s, l, out,   q, p) {
+        q = (l < 0.5) ? l * (1 + s) : l + s - l * s; p = 2 * l - q
+        out[1] = hue2rgb(p, q, h + 1/3); out[2] = hue2rgb(p, q, h); out[3] = hue2rgb(p, q, h - 1/3)
+    }
+    function hex(x,   i, v, d) {
+        v = 0; x = toupper(x)
+        for (i = 1; i <= 2; i++) { d = index("0123456789ABCDEF", substr(x, i, 1)) - 1; v = v * 16 + d }
+        return v
+    }
+    {
+        # histogram line: "   123: (  9, 12, 30) #090C1E srgb(9,12,30)"
+        if (!match($0, /^ *[0-9]+:/)) next
+        n = $1; sub(/:/, "", n)
+        if (!match($0, /#[0-9A-Fa-f]{6}/)) next
+        t = substr($0, RSTART + 1, 6)
+        c[1] = hex(substr(t, 1, 2)); c[2] = hex(substr(t, 3, 2)); c[3] = hex(substr(t, 5, 2))
+        hsl(c[1] + 0, c[2] + 0, c[3] + 0)
+        # skip near-greys and near-black/white; weight by area and saturation
+        if (S < 0.25 || L < 0.12 || L > 0.92) next
+        score = sqrt(n) * S * S
+        if (score > best) { best = score; bh = H; bs = S }
+    }
+    END {
+        if (best <= 0) exit 1
+        s = bs; if (s < 0.50) s = 0.50; if (s > 0.85) s = 0.85
+        h = bh / 360
+        # lift lightness until the colour reaches >= 5:1 against the Dracula
+        # background (#282a36, luminance 0.0235), so it stays readable as text
+        for (l = 0.70; l <= 0.90; l += 0.01) {
+            rgbof(h, s, l, o)
+            lum = 0.2126 * lin(o[1]) + 0.7152 * lin(o[2]) + 0.0722 * lin(o[3])
+            if ((lum + 0.05) / 0.0735 >= 5) break
+        }
+        printf "#%02x%02x%02x\n", o[1] * 255 + 0.5, o[2] * 255 + 0.5, o[3] * 255 + 0.5
+    }' <<<"$hist"
+}
+
+resolve_hex() {
+    local mode hex
+    mode=$(get_mode)
+    case "$mode" in
+        dracula) echo "$DRACULA" ;;
+        auto)
+            hex=$(extract "$WALLPAPER" 2>/dev/null) && is_hex "$hex" && echo "$hex" || echo "$DRACULA" ;;
+        *) echo "$mode" ;;
+    esac
+}
+
+# base file + @define-color overrides (a later @define-color wins in GTK CSS)
+render_css() {
+    local base="$1" out="$2" hex="$3" tmp
+    [[ -r "$base" ]] || return 1
+    tmp=$(mktemp "$out.XXXXXX") || return 1
+    {
+        echo "$MARKER"
+        cat "$base"
+        printf '\n/* accent override */\n@define-color purple %s;\n@define-color accent %s;\n' "$hex" "$hex"
+    } >"$tmp" || { rm -f "$tmp"; return 1; }
+    # identical content: leave the file alone so waybar's reload_style_on_change
+    # (and the wallpaper-cycle timer) don't cause a pointless reload
+    if [[ -f "$out" ]] && cmp -s "$tmp" "$out"; then rm -f "$tmp"; return 0; fi
+    mv -f "$tmp" "$out"
+}
+
+render_all() {
+    local hex="$1"
+    mkdir -p "$OUT_DIR"
+    render_css "$WAYBAR_BASE" "$OUT_DIR/waybar.css" "$hex"
+    render_css "$SWAYNC_BASE" "$OUT_DIR/swaync.css" "$hex"
+    echo "$hex" >"$OUT_DIR/accent"
+
+    # wofi has no --style at the call sites (bindings + ctl menus), so it reads
+    # ~/.config/wofi/style.css first. Only keep a user-level copy while a custom
+    # accent is active, and only ever touch a file that carries our marker.
+    mkdir -p "$(dirname "$WOFI_USER_STYLE")"
+    if [[ "$hex" == "$DRACULA" ]]; then
+        if [[ -f "$WOFI_USER_STYLE" ]] && head -n1 "$WOFI_USER_STYLE" | grep -qF "hyprbazzite-accent"; then
+            rm -f "$WOFI_USER_STYLE"
+        fi
+    elif [[ ! -f "$WOFI_USER_STYLE" ]] || head -n1 "$WOFI_USER_STYLE" | grep -qF "hyprbazzite-accent"; then
+        render_css "$WOFI_BASE" "$WOFI_USER_STYLE" "$hex"
+    else
+        echo "hyprbazzite-accent: leaving your own $WOFI_USER_STYLE alone" >&2
+    fi
+}
+
+live_reload() {
+    local hex="$1" rgb="${1#\#}"
+    # waybar has reload_style_on_change, but only for the file it was launched with
+    # (the generated one), so a rewrite is enough. swaync needs an explicit nudge.
+    command -v swaync-client >/dev/null 2>&1 && swaync-client -rs >/dev/null 2>&1 || true
+    if command -v hyprctl >/dev/null 2>&1 && [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+        hyprctl eval "hl.config({ general = { ['col.active_border'] = 'rgba(${rgb}ee)' } })" >/dev/null 2>&1 || true
+    fi
+}
+
+cmd_apply() {
+    local if_auto=0 img hex
+    if [[ "${1:-}" == "--if-auto" ]]; then if_auto=1; shift; fi
+    img="${1:-}"
+    # wallpaper hooks pass --if-auto: nothing to do unless the accent follows the wallpaper
+    [[ $if_auto -eq 1 && "$(get_mode)" != auto ]] && return 0
+    [[ -n "$img" && -f "$img" && "$(get_mode)" == auto ]] && {
+        # explicit image wins over the stored wallpaper (used right after a wallpaper change)
+        hex=$(extract "$img" 2>/dev/null) && is_hex "$hex" || hex=$(resolve_hex)
+    } || hex=$(resolve_hex)
+    is_hex "$hex" || hex="$DRACULA"
+    render_all "$hex"
+    live_reload "$hex"
+    echo "$hex"
+}
+
+cmd_style() {
+    local which="${1:-}" f
+    case "$which" in
+        waybar) f="$OUT_DIR/waybar.css"; base="$WAYBAR_BASE" ;;
+        swaync) f="$OUT_DIR/swaync.css"; base="$SWAYNC_BASE" ;;
+        *) echo "usage: $0 style <waybar|swaync>" >&2; return 2 ;;
+    esac
+    [[ -s "$f" ]] || render_all "$(resolve_hex)" 2>/dev/null
+    if [[ -s "$f" ]]; then echo "$f"; else echo "$base"; fi
+}
+
+cmd_mode() {
+    local m="${1:-}"
+    if [[ -z "$m" ]]; then get_mode; return; fi
+    case "$m" in
+        auto|dracula) ;;
+        *) m="${m,,}"; [[ "$m" == \#* ]] || m="#$m"
+           is_hex "$m" || { echo "invalid mode: $1 (use dracula, auto or #rrggbb)" >&2; return 2; } ;;
+    esac
+    mkdir -p "$STATE_DIR"
+    echo "$m" >"$MODE_FILE"
+    cmd_apply
+}
+
+case "${1:-}" in
+    mode)    shift; cmd_mode "${1:-}" ;;
+    apply)   shift; cmd_apply "${1:-}" ;;
+    style)   shift; cmd_style "${1:-}" ;;
+    hex)     resolve_hex ;;
+    extract) shift; extract "${1:-}" ;;
+    *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac

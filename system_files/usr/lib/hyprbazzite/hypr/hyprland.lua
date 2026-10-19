@@ -6,7 +6,17 @@ require("rules")
 require("styles")
 
 -- Essential Variables
+-- Accent comes from hyprbazzite-accent (Dracula purple unless the user chose
+-- "auto" or a custom colour). Any failure keeps the default.
 local active_border = "rgba(bd93f9ee)"
+do
+    local ok, pipe = pcall(io.popen, "/usr/libexec/hyprbazzite-accent hex 2>/dev/null")
+    if ok and pipe then
+        local hex = (pipe:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
+        pipe:close()
+        if hex then active_border = "rgba(" .. hex .. "ee)" end
+    end
+end
 local inactive_border = "rgba(44475aaa)"
 
 hl.config({

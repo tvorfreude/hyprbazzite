@@ -63,6 +63,9 @@ cycle_now() {
             # greeter theme reads from (see tmpfiles.d) - it can't reach
             # into $HOME to read the copy above.
             cp "$WALLUST_DIR/current_wallpaper.png" /var/lib/hyprbazzite/theme/current_wallpaper.png 2>/dev/null || true
+
+            # Accent follows the wallpaper only in "auto" mode (no-op otherwise)
+            /usr/libexec/hyprbazzite-accent apply --if-auto >/dev/null 2>&1 || true
         fi
     fi
 }

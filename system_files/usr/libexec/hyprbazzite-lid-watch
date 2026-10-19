@@ -53,10 +53,10 @@ startup_sync() {
         local tries=0 external_count
         while (( tries < 5 )); do
             external_count=$(hyprctl -j monitors all 2>/dev/null \
-                | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length' 2>/dev/null)
+                | jq '[.[] | select((.name | test("^(eDP|LVDS|FALLBACK)") | not) and (.disabled | not))] | length' 2>/dev/null)
             [[ "${external_count:-0}" -gt 0 ]] && break
             sleep 1
-            (( tries++ ))
+            tries=$((tries + 1))
         done
     fi
     sync

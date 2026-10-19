@@ -49,6 +49,8 @@ Screenshot
 Wallpaper
 Refresh Session
 Quick Settings
+Accent Colour
+Workspace Layout
 Theme Update
 Power Menu
 TDP Profile
@@ -68,6 +70,8 @@ EOF
         "Wallpaper")      wallpaper_pick ;;
         "Refresh Session") session_refresh ;;
         "Quick Settings") quicksettings_show ;;
+        "Accent Colour")  accent_menu ;;
+        "Workspace Layout") workspace_layout_menu ;;
         "Theme Update")   theme_update ;;
         "Power Menu")     power_menu ;;
         "TDP Profile")    tdp_menu ;;
@@ -283,6 +287,9 @@ wallpaper_pick() {
         # theme reads from (see tmpfiles.d) - it can't reach into $HOME.
         cp "$wallust_dir/current_wallpaper.png" /var/lib/hyprbazzite/theme/current_wallpaper.png 2>/dev/null || true
 
+        # Accent follows the wallpaper only in "auto" mode (no-op otherwise)
+        /usr/libexec/hyprbazzite-accent apply --if-auto >/dev/null 2>&1 || true
+
         if command -v wallust &>/dev/null; then
             wallust run "$wallust_current" -s
             hyprctl reload
@@ -441,12 +448,35 @@ quicksettings_show() {
 # THEME UPDATE MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+accent_menu() {
+    local current choice custom
+    current=$(/usr/libexec/hyprbazzite-accent mode)
+    choice=$(printf '%s\n' "Dracula purple" "Follow wallpaper" "Custom colour..." \
+        | wofi -dmenu -p "Accent (now: $current)" -i) || return 0
+    case "$choice" in
+        "Dracula purple")   /usr/libexec/hyprbazzite-accent mode dracula >/dev/null ;;
+        "Follow wallpaper") /usr/libexec/hyprbazzite-accent mode auto >/dev/null ;;
+        "Custom colour...")
+            custom=$(echo "" | wofi -dmenu -p "Hex colour, e.g. #ff79c6") || return 0
+            [[ -n "$custom" ]] || return 0
+            /usr/libexec/hyprbazzite-accent mode "$custom" >/dev/null \
+                || { notify "Accent" "Invalid colour: $custom" "critical"; return 1; } ;;
+        *) return 0 ;;
+    esac
+    notify "Accent" "Now $(/usr/libexec/hyprbazzite-accent hex)"
+}
+
 theme_update() {
     local wallpaper="${1:-$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg}"
 
     if ! command -v wallust &>/dev/null; then
-        notify "Theme" "wallust is not installed" "critical"
-        return 1
+        # No wallust on this image: the wallpaper-driven part is the accent
+        if /usr/libexec/hyprbazzite-accent apply >/dev/null; then
+            notify "Theme" "Accent refreshed ($(/usr/libexec/hyprbazzite-accent hex))"
+        else
+            notify "Theme" "Accent refresh failed" "critical"
+        fi
+        return
     fi
     if [[ ! -f "$wallpaper" ]]; then
         notify "Theme" "Wallpaper not found: $wallpaper" "critical"
@@ -651,9 +681,9 @@ automation_dnd() {
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
-            monitoradded\>\>*) workspace_rebind ;;
+            monitoradded\>\>*) workspace_reflow_soon ;;
             monitorremoved\>\>*)
-                workspace_rebind
+                workspace_reflow_soon
                 # Unplugging the last external display while the lid is
                 # closed should sleep the machine, same as closing the lid
                 # undocked (mirrors macOS clamshell behavior). logind's own
@@ -897,7 +927,11 @@ lid_sync() {
     [[ -z "$internal_output" ]] && return 0  # desktop-only setup, nothing to do
 
     local external_count
-    external_count=$(hyprctl -j monitors all 2>/dev/null | jq '[.[] | select(.name | test("^(eDP|LVDS)") | not)] | length')
+    # Enabled, real externals only: a disabled one is no dock (counting it would blank
+    # the panel on a laptop left with no display), and Hyprland's own FALLBACK
+    # output - which appears the moment the last real display goes away - is not one
+    # either, or unplugging the dock with the lid closed would never sleep.
+    external_count=$(hyprctl -j monitors all 2>/dev/null | jq '[.[] | select((.name | test("^(eDP|LVDS|FALLBACK)") | not) and (.disabled | not))] | length')
 
     # `hyprctl keyword`/`hyprctl dispatch` error on this build (native Lua
     # config engine, "non-legacy parser") - `hyprctl eval` is the working
@@ -905,6 +939,9 @@ lid_sync() {
     if _lid_is_closed; then
         if [[ "$external_count" -gt 0 ]]; then
             hyprctl eval "hl.monitor({ output = '$internal_output', disabled = true })"
+            # Panel is out of the workspace plan now: move its workspaces (and
+            # windows) onto the external displays.
+            sleep 1; workspace_rebind reflow
         else
             loginctl lock-session 2>/dev/null || true
             # Prefers suspend-then-hibernate over plain suspend: a laptop
@@ -927,6 +964,8 @@ lid_sync() {
         # that race, but the real cause was dpms(true) being a TOGGLE on this
         # build: two "on" calls from two triggers cancelled each other out.)
         hyprctl eval "hl.monitor({ output = '$internal_output', disabled = false }); hl.dispatch(hl.dsp.dpms({ action = 'on' }))"
+        # ...and hand them back to the panel once it is enabled again.
+        sleep 1; workspace_rebind reflow
     fi
 }
 
@@ -934,33 +973,151 @@ lid_sync() {
 # WORKSPACE MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+# Monitors get workspaces five at a time, in order: the first monitor 1-5, the
+# second 6-10, a third 11-15 (reachable by scrolling). Order is either
+#   position (default) left to right, then top to bottom within a column
+#   internal           laptop panel first, then external displays by position
+# Reads `hyprctl -j monitors all` JSON on stdin, prints "<name> <first workspace>
+# <disabled 0|1>" per monitor. Disabled monitors are left out: with the lid closed
+# (laptop panel off) the external displays take over its workspaces, and opening
+# the lid hands them back - like macOS/AeroSpace clamshell.
+_workspace_plan() {
+    local mode="${1:-position}"
+    jq -r --arg mode "$mode" '
+        def internal: .name | test("^(eDP|LVDS|DSI)");
+        def bypos: sort_by([.x, .y, .name]);
+        [.[] | select(.disabled | not)]
+        | (if $mode == "internal"
+            then ([.[] | select(internal)] | bypos) + ([.[] | select(internal | not)] | bypos)
+            else bypos end)
+        | to_entries[] | "\(.value.name) \(.key * 5 + 1) \(if .value.disabled then 1 else 0 end)"'
+}
+
+workspace_layout_get() {
+    local f="${XDG_CONFIG_HOME:-$HOME/.config}/hyprbazzite/workspace-layout" m=""
+    [[ -r "$f" ]] && m=$(head -n1 "$f" | tr -d '[:space:]')
+    case "$m" in internal) echo internal ;; *) echo position ;; esac
+}
+
+workspace_layout_menu() {
+    local current choice
+    current=$(workspace_layout_get)
+    choice=$(printf '%s\n' "By position (left to right)" "Laptop screen first (1-5)" \
+        | wofi -dmenu -p "Workspaces (now: $current)" -i) || return 0
+    case "$choice" in
+        "By position"*)  workspace_layout_set position ;;
+        "Laptop screen"*) workspace_layout_set internal ;;
+        *) return 0 ;;
+    esac
+    notify "Workspaces" "Layout: $(workspace_layout_get)"
+}
+
+workspace_layout_set() {
+    local m="${1:-}" dir="${XDG_CONFIG_HOME:-$HOME/.config}/hyprbazzite"
+    case "$m" in
+        position|internal) ;;
+        "") workspace_layout_get; return 0 ;;
+        *) echo "Usage: hyprbazzite-ctl workspace layout [position|internal]" >&2; return 1 ;;
+    esac
+    mkdir -p "$dir" && echo "$m" >"$dir/workspace-layout"
+    workspace_rebind init
+}
+
+# i3/AeroSpace-style: SUPER+1..5 always land on the first monitor, SUPER+6..10 on
+# the second, regardless of which monitor has focus (see _workspace_plan for the
+# ordering). Run with "init" at session start / layout change to also put each
+# monitor on its own first workspace - Hyprland creates default workspaces 1 and
+# 2 before this runs, and a workspace rule never moves a workspace that exists.
 workspace_rebind() {
-    # i3/AeroSpace-style: workspaces 1-5 always live on the primary (laptop
-    # panel) monitor, 6-10 on whichever secondary display is connected -
-    # pressing e.g. SUPER+6 always lands on the secondary monitor, regardless
-    # of which monitor currently has focus. "all" (not just active monitors)
-    # so this doesn't lose track of the laptop panel while it's disabled for
-    # clamshell mode (see the lid module above - same class of pitfall).
-    local primary
-    primary=$(hyprctl -j monitors all 2>/dev/null | jq -r '[.[] | select(.name | test("^(eDP|LVDS)"))][0].name // empty')
-    if [[ -z "$primary" ]]; then
-        # Desktop-only setup, no laptop panel - just use whatever is first.
-        primary=$(hyprctl -j monitors all 2>/dev/null | jq -r '.[0].name // empty')
+    local init=0 reflow=0
+    case "${1:-}" in init) init=1 ;; reflow) reflow=1 ;; esac
+
+    local plan count
+    plan=$(hyprctl -j monitors all 2>/dev/null | _workspace_plan "$(workspace_layout_get)")
+    [[ -z "$plan" ]] && return 0
+    count=$(wc -l <<<"$plan")
+
+    local first_name
+    first_name=$(head -n1 <<<"$plan" | cut -d' ' -f1)
+
+    # Emits the workspace rules; $1 = extra rule field (", persistent = true" etc.)
+    _ws_rules() {
+        local name first i suffix expr=""
+        while read -r name first _; do
+            for i in 1 2 3 4 5; do
+                suffix="$1"
+                if [[ $i -eq 1 ]]; then suffix+=", default = true"; fi
+                expr+="hl.workspace_rule({ workspace = '$((first + i - 1))', monitor = '$name'$suffix }); "
+            done
+        done <<<"$plan"
+        # Fewer than 2 monitors: the "missing" 6-10 stay reachable on the first one.
+        if (( count < 2 )); then
+            for i in 6 7 8 9 10; do
+                expr+="hl.workspace_rule({ workspace = '$i', monitor = '$first_name'$1 }); "
+            done
+        fi
+        echo "$expr"
+    }
+
+    if (( init || reflow )); then
+        # A persistent rule is what actually relocates an existing workspace
+        # (a plain rule only applies when a workspace is created, and Hyprland
+        # has already made defaults 1 and 2 by now). Pin everything, pick each
+        # monitor's workspace, then release so empty ones clean up normally.
+        local focused name first disabled expr=""
+        local prev_visible with_windows
+        focused=$(hyprctl -j monitors 2>/dev/null | jq -r '[.[] | select(.focused)][0].name // empty')
+        prev_visible=$(hyprctl -j monitors 2>/dev/null | jq -c '[.[].activeWorkspace.id]')
+        with_windows=$(hyprctl -j workspaces 2>/dev/null | jq -c '[.[] | select(.windows > 0) | .id]')
+        [[ -n "$prev_visible" ]] || prev_visible='[]'
+        [[ -n "$with_windows" ]] || with_windows='[]'
+        hyprctl eval "$(_ws_rules ", persistent = true")" >/dev/null 2>&1
+        if (( init )); then
+            # Last monitor first, so focus ends on the first monitor's first workspace.
+            # Disabled monitors (lid closed) are skipped: focusing a workspace that
+            # belongs to one would pull focus onto whichever display is left.
+            while read -r name first disabled; do
+                [[ "$disabled" == 1 ]] && continue
+                expr+="hl.dispatch(hl.dsp.focus({ workspace = $first })); "
+            done < <(tac <<<"$plan")
+        else
+            # Hotplug reflow: show on each monitor, from its own range, a workspace
+            # that was on screen and has windows, else any with windows, else one that
+            # was on screen (Hyprland's fresh empty default on a new monitor counts
+            # for least), else its first - then put focus back where it was.
+            local pick span=5
+            # A lone monitor owns every workspace (1-10), not just its own five.
+            (( count < 2 )) && span=10
+            while read -r name first disabled; do
+                [[ "$disabled" == 1 ]] && continue
+                pick=$(jq -n -r --argjson first "$first" --argjson span "$span" --argjson prev "$prev_visible" --argjson win "$with_windows" '
+                    [range($first; $first + $span)] as $r
+                    | [$r[] | select(. as $x | $prev | index($x))] as $vis
+                    | [$r[] | select(. as $x | $win | index($x))] as $occ
+                    | ([$vis[] | select(. as $x | $occ | index($x))] | first)
+                      // ($occ | first) // ($vis | first) // $first')
+                expr+="hl.dispatch(hl.dsp.focus({ workspace = $pick })); "
+            done < <(tac <<<"$plan")
+            if [[ -n "$focused" ]] && grep -q "^$focused " <<<"$plan"; then
+                expr+="hl.dispatch(hl.dsp.focus({ monitor = '$focused' })); "
+            fi
+        fi
+        [[ -n "$expr" ]] && hyprctl eval "$expr" >/dev/null 2>&1
+        hyprctl eval "$(_ws_rules ", persistent = false")" >/dev/null 2>&1
+    else
+        hyprctl eval "$(_ws_rules "")" >/dev/null 2>&1
     fi
-    [[ -z "$primary" ]] && return 0
+}
 
-    local secondary
-    secondary=$(hyprctl -j monitors all 2>/dev/null | jq -r --arg p "$primary" '[.[] | select(.name != $p)][0].name // empty')
-
-    local i
-    for i in 1 2 3 4 5; do
-        hyprctl eval "hl.workspace_rule({ workspace = '$i', monitor = '$primary' })" >/dev/null 2>&1
-    done
-    # No secondary connected: 6-10 fall back to primary too, so they stay
-    # reachable instead of being orphaned on a monitor that doesn't exist.
-    for i in 6 7 8 9 10; do
-        hyprctl eval "hl.workspace_rule({ workspace = '$i', monitor = '${secondary:-$primary}' })" >/dev/null 2>&1
-    done
+# Monitor hotplug: events arrive in bursts (one per output, plus wake-from-sleep
+# reprobes), so wait for them to settle, then reflow once.
+workspace_reflow_soon() {
+    local gen="$RANDOM$RANDOM" f="${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-ws-gen"
+    echo "$gen" >"$f"
+    (
+        sleep 1.5
+        [[ "$(cat "$f" 2>/dev/null)" == "$gen" ]] && workspace_rebind reflow
+    ) &
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1244,7 +1401,8 @@ Modules:
   waybar [power-status|headset-battery|idle-status|app-name]  Waybar JSON exec modules
   keybinds [macos|linux|toggle|status]
   lid                            Re-sync clamshell/suspend state to the lid
-  workspace rebind              Re-bind workspaces 1-5/6-10 to primary/secondary monitor
+  workspace rebind [init|reflow]  Bind workspaces 1-5/6-10/... to monitors (left to right, top to bottom); init/reflow also move existing ones
+  workspace layout [position|internal]  Number by position, or keep the laptop panel on 1-5
   open [browser|files [path]|<target>]  Launch common apps via XDG defaults
 USAGE
         return 0
@@ -1263,6 +1421,7 @@ USAGE
             ;;
         screenshot) screenshot_take "${1:-region}" ;;
         wallpaper) wallpaper_pick ;;
+        accent) /usr/libexec/hyprbazzite-accent "$@" ;;
         chezmoi) chezmoi_action "${1:-}" ;;
         refresh) session_refresh ;;
         settings) quicksettings_show ;;
@@ -1315,8 +1474,9 @@ USAGE
         lid) lid_sync ;;
         workspace)
             case "${1:-}" in
-                rebind) workspace_rebind ;;
-                *) echo "Usage: hyprbazzite-ctl workspace rebind"; return 1 ;;
+                rebind) workspace_rebind "${2:-}" ;;
+                layout) workspace_layout_set "${2:-}" ;;
+                *) echo "Usage: hyprbazzite-ctl workspace <rebind [init|reflow]|layout [position|internal]>"; return 1 ;;
             esac
             ;;
         open)

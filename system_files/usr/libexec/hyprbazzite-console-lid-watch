@@ -123,7 +123,7 @@ startup_sync() {
     while (( tries < 5 )); do
         _external_connected && break
         sleep 1
-        (( tries++ ))
+        tries=$((tries + 1))
     done
     sync
 }

@@ -17,8 +17,10 @@ hl.on("hyprland.start", function()
     exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
 
     -- UI ELEMENTS
-    exec_once("waybar --config /etc/waybar/config.jsonc --style /etc/waybar/style.css", "waybar")
-    exec_once("swaync -c /etc/xdg/swaync/config.json -s /etc/xdg/swaync/style.css", "swaync")
+    -- Stylesheets come from hyprbazzite-accent: the shipped CSS plus the accent
+    -- override (falls back to the plain /etc file if rendering ever fails).
+    exec_once("waybar --config /etc/waybar/config.jsonc --style \"$(/usr/libexec/hyprbazzite-accent style waybar)\"", "waybar")
+    exec_once("swaync -c /etc/xdg/swaync/config.json -s \"$(/usr/libexec/hyprbazzite-accent style swaync)\"", "swaync")
     exec_once("hypridle -c /etc/hypr/hypridle.conf", "hypridle")
     exec_once("fcitx5", "fcitx5")
 
@@ -33,7 +35,7 @@ hl.on("hyprland.start", function()
     -- (systemd --user, reacts to logind directly) - not here, so starting a
     -- session with the lid already closed is covered by that service's own
     -- startup sync instead of a second one racing it from this hook.
-    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl workspace rebind")
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl workspace rebind init")
     exec_once("/usr/libexec/hyprbazzite-ctl automation dnd", "socat")
     exec_once("/usr/libexec/hyprbazzite-ctl automation osk", "udevadm")
 

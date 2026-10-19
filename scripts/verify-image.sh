@@ -39,6 +39,7 @@ echo "Essential configuration files are in place."
 # 3. Critical scripts and services
 declare -a REQUIRED_SCRIPTS=(
     "/usr/libexec/hyprbazzite-ctl"
+    "/usr/libexec/hyprbazzite-accent"
     "/usr/libexec/hyprbazzite-install-apps"
     "/usr/libexec/hyprbazzite-flatpak-overrides"
     "/usr/libexec/hyprbazzite-user-firstboot"
@@ -100,6 +101,10 @@ for path in ("/usr/lib/hyprbazzite/waybar/config.jsonc",
         print(f"ERROR: {path} is not valid JSON: {e}")
         sys.exit(1)
 PY
+if ! bash -n /usr/libexec/hyprbazzite-accent; then
+    echo "ERROR: /usr/libexec/hyprbazzite-accent has a bash syntax error."
+    exit 1
+fi
 if ! bash -n /usr/libexec/hyprbazzite-ctl; then
     echo "ERROR: /usr/libexec/hyprbazzite-ctl has a bash syntax error."
     exit 1
