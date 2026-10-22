@@ -26,7 +26,9 @@ hl.on("hyprland.start", function()
 
     -- WALLPAPER
     exec_once("awww-daemon", "awww-daemon")
-    exec_once("wallpaper-cycle", "wallpaper-cycle")
+    -- No name guard: it runs as "bash", so `pgrep -x wallpaper-cycle` never
+    -- matched; the script keeps itself to one instance per Hyprland instance.
+    hl.exec_cmd("wallpaper-cycle")
 
     -- AUTOMATION (hyprbazzite-ctl long-running services)
     -- workspace rebind is a one-shot (not a daemon, so no exec_once guard);
