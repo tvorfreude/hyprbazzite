@@ -533,12 +533,13 @@ _tdp_cap_file() {
 }
 
 tdp_get_backend() {
-    # ryzenadj/amdctl only drive AMD's SMU, and the Bazzite base ships
-    # ryzenadj on every image, so Intel machines used to pick it too.
-    if _is_amd_cpu; then
-        if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
-        if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
-    fi
+    # AMD only. ryzenadj/amdctl drive AMD's SMU (and the Bazzite base ships
+    # ryzenadj on every image, so Intel machines used to pick it too). On an
+    # Intel machine a hwmon power1_cap belongs to a discrete GPU, not the CPU,
+    # so falling back to it would have throttled the dGPU instead.
+    _is_amd_cpu || return 1
+    if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
+    if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
     if _tdp_cap_file >/dev/null; then echo "sysfs"; return 0; fi
     return 1
 }
