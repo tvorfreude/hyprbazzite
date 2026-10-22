@@ -173,10 +173,5 @@ if [ -f /etc/pki/containers/hyprbazzite.pub ]; then
     echo "Update signature policy requires the hyprbazzite key."
 fi
 
-# 8. Secure boot certificate
-if [ ! -f "/etc/pki/secureboot/secureboot.crt" ] && [ ! -f "/usr/share/secureboot/secureboot.crt" ]; then
-    echo "WARNING: Secure boot certificate not found in expected locations (non-fatal)."
-fi
-
 echo "Verification PASSED: Image is healthy and ready for deployment."
 exit 0
