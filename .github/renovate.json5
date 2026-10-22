@@ -67,6 +67,20 @@
       pinDigests: true,
     },
     {
+      // Files the image build neither builds nor tests (build.yml's path
+      // filters skip them), so their PRs never get a status check, and
+      // Renovate won't automerge a PR without one - they sat open forever.
+      // None of them affects the image. Kept in their own group so a grouped
+      // PR can never mix these with changes to build.yml, which stay tested.
+      matchFileNames: [
+        '.github/workflows/build-iso.yml',
+        '.github/workflows/pr-cleanup.yml',
+        'Justfile',
+      ],
+      groupName: 'untested tooling (ISO workflow, PR cleanup, Justfile)',
+      ignoreTests: true,
+    },
+    {
       // Assets stage is a tiny, build-only base (curl + unzip only). Let
       // Renovate keep its tag current so we don't drift onto an EOL Alpine, but
       // DON'T pin a digest: tag-only updates avoid the tag/digest-mismatch class
