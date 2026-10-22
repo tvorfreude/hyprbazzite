@@ -1,7 +1,9 @@
-# Polkit rule to allow users in the 'wheel' group to use TDP control without password.
-# Scoped to only the specific binaries needed for TDP management.
+// Polkit rule to allow users in the 'wheel' group to use TDP control without password.
+// Scoped to only the specific binaries needed for TDP management (hyprbazzite-ctl
+// runs them through pkexec), and to an active local session - not SSH.
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.policykit.exec" &&
+        subject.local && subject.active &&
         subject.isInGroup("wheel")) {
         // Only allow passwordless execution for TDP-related binaries
         var allowedPrograms = [
