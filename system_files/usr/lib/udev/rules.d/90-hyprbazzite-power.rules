@@ -1,14 +1,16 @@
-# Allow runtime power management (autosuspend-when-idle) on every PCI
-# device - confirmed live this matters, not just in theory: the NVMe
+# Allow runtime power management (autosuspend-when-idle) on NVMe
+# controllers - confirmed live this matters, not just in theory: the NVMe
 # controller's power/control defaulted to "on" (never autosuspend) despite
 # already having APST low-power states negotiated and available, so it
-# never actually used them, during s2idle or otherwise. "auto" just permits
-# the kernel's runtime PM framework to suspend a device when idle if its
-# driver supports it safely - devices that don't support it simply ignore
-# the hint, so this is safe across arbitrary hardware (the same rule
-# `powertop --auto-tune` and tlp both apply broadly, not NVMe-specific).
+# never actually used them, during s2idle or otherwise.
+#
+# NVMe only (PCI class 0x010802), not every PCI device as before. The PCI
+# core leaves runtime PM off by default on purpose, because some hardware
+# misbehaves with it: TLP's default denylist keeps it off for amdgpu,
+# mei_me, nouveau, nvidia and xhci_hcd (USB controllers), and TLP doesn't
+# enable it at all on AC power. Devices don't simply ignore the hint.
 #
 # Placed directly under /usr/lib/udev/rules.d/, not /usr/lib/hyprbazzite/ -
 # that's one of udevd's real search paths, read automatically with no
 # tmpfiles copy-into-/etc step needed (same as /usr/lib/systemd/user/ units).
-ACTION=="add", SUBSYSTEM=="pci", ATTR{power/control}="auto"
+ACTION=="add", SUBSYSTEM=="pci", ATTR{class}=="0x010802", ATTR{power/control}="auto"
