@@ -13,10 +13,15 @@
 # retry on a short delay instead of only once right at resume. Only
 # connectors that are currently "disconnected" are touched, and only DP/HDMI
 # ones (internal eDP panels are not hotplugged).
+#
+# The delayed retries run as their own transient unit. This hook runs inside
+# systemd-suspend.service, which kills whatever is left in its cgroup the
+# moment systemd-sleep exits, so a backgrounded `sleep; reprobe` was killed
+# before its first retry. Running them in the foreground is no better: user
+# processes stay frozen until the hooks return, so the desktop would hang for
+# ~10s after every resume.
 
 set -u
-
-[[ "$1" == "post" ]] || exit 0
 
 reprobe() {
     local c
@@ -27,7 +32,13 @@ reprobe() {
     done
 }
 
-reprobe
-# Detached so systemd-sleep isn't held up waiting on the delayed retries.
-( for delay in 2 3 5; do sleep "$delay"; reprobe; done ) </dev/null >/dev/null 2>&1 &
-disown
+case "${1:-}" in
+    post)
+        reprobe
+        systemd-run --no-block --collect --quiet --unit=hyprbazzite-drm-reprobe-retry \
+            /usr/lib/systemd/system-sleep/hyprbazzite-drm-reprobe retry || true
+        ;;
+    retry)
+        for delay in 2 3 5; do sleep "$delay"; reprobe; done
+        ;;
+esac
