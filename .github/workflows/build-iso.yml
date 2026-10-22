@@ -4,7 +4,7 @@ name: Build ISO
 # Trigger options:
 #   1. Manually via Actions → "Build ISO" → "Run workflow" (any branch).
 #   2. By commenting '/build-iso' on a pull request (repo owners and members only).
-#      The ISO is built from the PR's head branch.
+#      The ISO is built from the PR's head commit and published as a pre-release.
 on:
   workflow_dispatch:
   issue_comment:
@@ -35,7 +35,7 @@ jobs:
       github.event_name == 'workflow_dispatch' || (
         github.event_name == 'issue_comment' &&
         github.event.issue.pull_request != null &&
-        contains(github.event.comment.body, '/build-iso') &&
+        startsWith(github.event.comment.body, '/build-iso') &&
         contains(fromJson('["OWNER","MEMBER"]'), github.event.comment.author_association)
       )
 
@@ -59,30 +59,42 @@ jobs:
       - name: Maximize build space
         uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
 
-      # When triggered from a PR comment, resolve the PR's head branch name
-      - name: Get PR head ref
+      # When triggered from a PR comment, resolve the PR's head COMMIT (not its
+      # branch name, which for a fork PR would resolve against this repo, and
+      # which can move between here and checkout). Fork PRs are refused: this
+      # job holds a contents: write token.
+      - name: Get PR head commit
         if: github.event_name == 'issue_comment'
         id: pr_ref
         run: |
-          PR_REF=$(gh pr view ${{ github.event.issue.number }} \
-            --repo ${{ github.repository }} \
-            --json headRefName --jq '.headRefName')
-          echo "ref=${PR_REF}" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          read -r SHA CROSS < <(gh pr view "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" \
+            --json headRefOid,isCrossRepository --jq '"\(.headRefOid) \(.isCrossRepository)"')
+          if [ "${CROSS}" = "true" ]; then
+            echo "::error::Refusing to build an ISO from a fork PR."
+            exit 1
+          fi
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.issue.number }}
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Check out the PR branch when triggered via comment; default ref otherwise
-          ref: ${{ github.event_name == 'issue_comment' && steps.pr_ref.outputs.ref || github.ref }}
+          # The PR's head commit when triggered via comment; the dispatched ref otherwise
+          ref: ${{ steps.pr_ref.outputs.sha || github.sha }}
+          persist-credentials: false
 
+      # github.sha is the default branch's commit for issue_comment events, so
+      # take the SHA from what was actually checked out.
       - name: Prepare environment
         id: vars
         run: |
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
-          # Generate the short SHA here
-          echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          sha=$(git rev-parse HEAD)
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${sha:0:7}" >> "$GITHUB_OUTPUT"
 
       - name: Build container image
         id: build_image
@@ -132,7 +144,7 @@ jobs:
             -v /tmp/iso-output:/output \
             quay.io/centos-bootc/bootc-image-builder:latest \
             --type iso \
-            --rootfs xfs \
+            --rootfs btrfs \
             --config /config/iso.toml \
             --output /output \
             localhost/${{ env.IMAGE_NAME }}:latest
@@ -145,14 +157,26 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      # PR-comment builds are test ISOs: published as pre-releases, so the
+      # repository's "Latest" release stays a deliberately dispatched build.
       - name: Publish ISO as GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD_SHA: ${{ steps.vars.outputs.sha }}
+          FROM_PR: ${{ github.event_name == 'issue_comment' && github.event.issue.number || '' }}
         run: |
           ISO_FILE=$(find /tmp/iso-output -name '*.iso' | head -n1)
           RELEASE_TAG="iso-$(date -u +'%Y%m%d-%H%M%S')"
+          extra=()
+          notes="Automated ISO build from commit ${BUILD_SHA}."
+          if [ -n "${FROM_PR}" ]; then
+            extra=(--prerelease --latest=false)
+            notes="Test ISO from pull request #${FROM_PR}, commit ${BUILD_SHA}."
+          fi
           gh release create "${RELEASE_TAG}" \
-            --repo "${{ github.repository }}" \
+            --repo "${GITHUB_REPOSITORY}" \
             --title "ISO ${RELEASE_TAG}" \
-            --notes "Automated ISO build from commit ${{ github.sha }}." \
+            --target "${BUILD_SHA}" \
+            --notes "${notes}" \
+            "${extra[@]}" \
             "${ISO_FILE}"
