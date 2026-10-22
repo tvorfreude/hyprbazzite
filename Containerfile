@@ -82,23 +82,28 @@ RUN --mount=type=cache,dst=/var/cache \
 # ---------------------------------------------------------------------------
 # Step 4: Install HyprBazzite packages
 # ---------------------------------------------------------------------------
+# No --skip-unavailable: a package that has vanished (renamed, or a COPR
+# without a build for the new Fedora) must fail the build, not ship an image
+# quietly missing its lock screen or notification daemon. It used to hide
+# that `lact`, `gdk-pixbuf2-modules` and `jetbrains-mono` never installed.
+# (LACT: upstream recommends its Flatpak on Fedora Atomic.)
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
-    dnf5 -y install --skip-unavailable \
+    dnf5 -y install \
     hyprland hyprland-guiutils hyprlock hypridle hyprpicker hyprpaper uwsm hyprland-uwsm \
     awww waybar SwayNotificationCenter wofi wvkbd \
     xdg-desktop-portal-hyprland lxqt-policykit sddm \
     openrgb openrgb-udev-rules \
-    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep \
-    hhd adjustor hhd-ui lact \
+    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep socat libnotify \
+    hhd adjustor hhd-ui \
     rom-properties lutris steam-devices \
     brightnessctl gparted systemd-devel btop \
     nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
     network-manager-applet pavucontrol \
     gnome-keyring gnome-keyring-pam seahorse libsecret libsecret-devel gcr gcr-devel \
     blueman breeze-icon-theme papirus-icon-theme papirus-icon-theme-dark \
-    gdk-pixbuf2-modules qt5ct qt6ct \
-    jetbrains-mono jetbrains-mono-fonts \
+    qt5ct qt6ct \
+    jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
     ImageMagick fcitx5 ocean-sound-theme && \
     dnf5 -y autoremove && \

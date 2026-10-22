@@ -7,7 +7,13 @@ set -e
 echo "Starting HyprBazzite Image Verification..."
 
 # 1. Critical Package Checks
-declare -a REQUIRED_PKGS=("hyprland" "waybar" "wofi" "zsh" "starship" "sddm" "kitty" "awww" "hypridle" "nemo")
+declare -a REQUIRED_PKGS=(
+    "hyprland" "waybar" "wofi" "zsh" "starship" "sddm" "kitty" "awww" "hypridle" "nemo"
+    # session-critical: lock screen, notifications/quick settings, portal, and
+    # what hyprbazzite-ctl's daemons and waybar modules shell out to
+    "hyprlock" "SwayNotificationCenter" "xdg-desktop-portal-hyprland"
+    "socat" "jq" "ImageMagick" "libnotify" "cliphist" "wvkbd" "hhd"
+)
 for pkg in "${REQUIRED_PKGS[@]}"; do
     if ! rpm -q "$pkg" > /dev/null 2>&1; then
         echo "ERROR: Required package '$pkg' is missing from the image."
