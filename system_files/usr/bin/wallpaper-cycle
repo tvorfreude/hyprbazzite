@@ -9,6 +9,9 @@
 
 set -euo pipefail
 
+# hypr_instance_alive, hypr_instance_lock
+source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh
+
 # -- Configuration -----------------------------------------------------------
 readonly DIR="/usr/share/backgrounds/gif_wallpapers"
 readonly TRANSITION_TYPE="grow"
@@ -24,14 +27,6 @@ readonly CURRENT_FILE="$RUNTIME_DIR/wallpaper-current"
 readonly PID_FILE="$RUNTIME_DIR/wallpaper-cycle.pid"
 
 # -- Helpers ------------------------------------------------------------------
-
-# False once the Hyprland instance this was started for has gone away, so an
-# instance left behind by a compositor crash/restart or a logout exits instead
-# of lingering. Always true when run outside Hyprland.
-hyprland_alive() {
-    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}"
-    [[ -z "$sig" || -S "$RUNTIME_DIR/hypr/$sig/.socket.sock" || -S "/tmp/hypr/$sig/.socket.sock" ]]
-}
 
 cycle_now() {
     # Skip if user has pinned a wallpaper via the wallpaper picker
@@ -120,7 +115,7 @@ monitor_hotplug() {
         # A hotplug or a resume re-probe arrives as a burst of events, one per
         # connector: let it settle (bounded), then re-apply once.
         for _ in {1..30}; do read -r -t 2 _ || break; done
-        hyprland_alive || exit 0
+        hypr_instance_alive || exit 0
         reapply_current || true
     done
 }
@@ -143,9 +138,7 @@ cleanup() {
 main() {
     # One instance per Hyprland instance (autostart can't de-duplicate by
     # process name: this runs as "bash").
-    exec 9>"$RUNTIME_DIR/wallpaper-cycle-${HYPRLAND_INSTANCE_SIGNATURE:-default}.lock"
-    flock -n 9 || exit 0
-    echo "$$" > "$PID_FILE"
+    hypr_instance_lock wallpaper-cycle || exit 0
 
     # Turn termination into a normal exit so the EXIT trap always runs and
     # takes the hotplug listener (and its udevadm) down too.
@@ -156,6 +149,9 @@ main() {
     # `|| true`: under set -e, a failing command inside a trap handler
     # (awww-daemon briefly unavailable, say) would end the daemon.
     trap 'on_usr1 || true' USR1
+    # Only now advertise the PID: hyprbazzite-ctl sends USR1 to it, and before
+    # the handler above exists that signal's default action ends the process.
+    echo "$$" > "$PID_FILE"
 
     # Initial delay to ensure awww daemon is ready
     sleep 2
@@ -169,13 +165,13 @@ main() {
 
     # Interruptible sleep: a USR1 cuts it short (the trap has already
     # cycled), and the interval starts over.
-    while hyprland_alive; do
+    while hypr_instance_alive; do
         sleep "$CYCLE_INTERVAL" 9>&- &
         sleep_pid=$!
         if wait "$sleep_pid"; then
             # Re-check first: after a logout/login within one interval the
             # same WAYLAND_DISPLAY belongs to the new session.
-            hyprland_alive || break
+            hypr_instance_alive || break
             cycle_now || true
         else
             kill "$sleep_pid" 2>/dev/null || true

@@ -10,17 +10,9 @@ set -euo pipefail
 # ===============================================================================
 
 # --- Shared Library ---
-source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh 2>/dev/null || true
-
-# Fallbacks if common.sh failed to load
-command -v notify >/dev/null 2>&1 || notify() {
-    local title="$1" msg="$2" urgency="${3:-normal}"
-    command -v notify-send >/dev/null 2>&1 && notify-send -u "$urgency" "$title" "$msg"
-}
-command -v json_escape >/dev/null 2>&1 || json_escape() {
-    local s="$1"; s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/\\n}; printf '%s' "$s"
-}
-: "${CONFIG_DIR:="${XDG_CONFIG_HOME:-$HOME/.config}"}"
+# Required: notify, json_escape, CONFIG_DIR and the Hyprland instance helpers
+# live there (shipped with this script; verify-image.sh checks it).
+source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MENU MODULE — interactive launcher (replaces TritonCtl)
@@ -715,37 +707,14 @@ power_profile_cycle() {
 # AUTOMATION MODULE (waybar exec helpers & background services)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Hyprland's event socket: newer releases keep it under $XDG_RUNTIME_DIR/hypr,
-# older ones under /tmp/hypr. The DND/monitor automation only knew the latter,
-# so on this Hyprland it could never connect.
-_hypr_socket2() {
-    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}" d
-    [[ -n "$sig" ]] || return 1
-    for d in "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" /tmp/hypr; do
-        [[ -S "$d/$sig/.socket2.sock" ]] && { echo "$d/$sig/.socket2.sock"; return 0; }
-    done
-    return 1
-}
-
-# Keeps a long-running automation daemon to one instance per Hyprland
-# instance. autostart used to de-duplicate them by process name ("socat",
-# "udevadm"), but waybar's app-name module runs socat and wallpaper-cycle runs
-# udevadm, so either could suppress the real daemon, and leftovers from an
-# earlier Hyprland instance in the same login did too. Children that outlive
-# a single event get `9>&-` so they don't keep holding the lock.
-_singleton() {
-    exec 9>"${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-$1-${HYPRLAND_INSTANCE_SIGNATURE:-default}.lock"
-    flock -n 9
-}
-
 automation_dnd() {
     if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
         echo "Hyprland instance signature not found." >&2
         return 1
     fi
-    _singleton automation-dnd || return 0
+    hypr_instance_lock automation-dnd || return 0
     local sock
-    sock=$(_hypr_socket2) || { echo "Hyprland event socket not found." >&2; return 1; }
+    sock=$(hypr_socket2) || { echo "Hyprland event socket not found." >&2; return 1; }
     socat -U - "UNIX-CONNECT:$sock" 9>&- | while read -r line; do
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
@@ -769,7 +738,7 @@ automation_dnd() {
 }
 
 automation_osk() {
-    _singleton automation-osk || return 0
+    hypr_instance_lock automation-osk || return 0
     local conf="/etc/hypr/wvkbd.conf"
     [[ -f "$conf" ]] && . "$conf"
     local layout="${WVKBD_LAYOUT:-mobintl}"
@@ -807,7 +776,7 @@ automation_osk() {
     udevadm monitor --udev --subsystem-match=input --property 9>&- | while read -r line; do
         # udevadm never exits on its own: stop once this Hyprland instance
         # is gone instead of lingering into the next one.
-        [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || _hypr_socket2 >/dev/null || break
+        hypr_instance_alive || break
         [[ "$line" =~ ACTION=(add|remove|change) ]] && _sync_state
     done
 }
@@ -1409,7 +1378,7 @@ _emit_app_name() {
 waybar_app_name() {
     _emit_app_name
     local sock
-    sock=$(_hypr_socket2) || return 0
+    sock=$(hypr_socket2) || return 0
     socat -U - "UNIX-CONNECT:$sock" | while read -r line; do
         case "$line" in
             activewindow\>\>*|closewindow\>\>*|workspace\>\>*|focusedmon\>\>*) _emit_app_name ;;
