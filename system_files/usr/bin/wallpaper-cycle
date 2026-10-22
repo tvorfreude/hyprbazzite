@@ -2,7 +2,10 @@
 # wallpaper-cycle - Cycle through GIF wallpapers using awww
 #
 # This script sets a random GIF wallpaper from the configured directory,
-# cycles it at regular intervals, and responds to monitor hotplug events.
+# cycles it at regular intervals, re-applies it when monitors are hotplugged,
+# and picks a new one on SIGUSR1 (hyprbazzite-ctl sends that to the PID in
+# $XDG_RUNTIME_DIR/wallpaper-cycle.pid - the process name is "bash", so
+# pgrep/pkill by name never find it).
 
 set -euo pipefail
 
@@ -16,13 +19,23 @@ readonly TRANSITION_DURATION=2
 readonly CYCLE_INTERVAL=900  # seconds (15 minutes)
 readonly FILTER="${WALLPAPER_FILTER:-Nearest}"  # Nearest keeps GIFs crisp; set WALLPAPER_FILTER=Lanczos3 to smooth-scale photos
 readonly WALLUST_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/wallust"
+readonly RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+readonly CURRENT_FILE="$RUNTIME_DIR/wallpaper-current"
+readonly PID_FILE="$RUNTIME_DIR/wallpaper-cycle.pid"
 
 # -- Helpers ------------------------------------------------------------------
 
+# False once the Hyprland instance this was started for has gone away, so an
+# instance left behind by a compositor crash/restart or a logout exits instead
+# of lingering. Always true when run outside Hyprland.
+hyprland_alive() {
+    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}"
+    [[ -z "$sig" || -S "$RUNTIME_DIR/hypr/$sig/.socket.sock" || -S "/tmp/hypr/$sig/.socket.sock" ]]
+}
+
 cycle_now() {
     # Skip if user has pinned a wallpaper via the wallpaper picker
-    local runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
-    if [[ -f "${runtime_dir}/wallpaper-pinned" ]]; then
+    if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
         return 0
     fi
 
@@ -48,6 +61,7 @@ cycle_now() {
             --resize crop \
             --filter "$FILTER" \
             "$wallpaper"
+        printf '%s\n' "$wallpaper" > "$CURRENT_FILE"
 
         # hyprlock.conf's background.path reads a static frame from here - it
         # has no idea awww or GIF cycling exist, so without this it's stuck
@@ -70,22 +84,64 @@ cycle_now() {
     fi
 }
 
+# Put what is already showing on every output again - a newly connected or
+# re-detected monitor comes up without it. Not a new random pick (which used
+# to happen on every hotplug and every post-resume re-probe), and no frame
+# extraction or accent work: nothing about the wallpaper changed.
+reapply_current() {
+    local current=""
+    if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
+        current="$WALLUST_DIR/current_wallpaper.jpg"   # the picker's copy
+    elif [[ -r "$CURRENT_FILE" ]]; then
+        current=$(<"$CURRENT_FILE")
+    fi
+    [[ -f "$current" ]] || return 0
+    awww img --transition-type none --resize crop --filter "$FILTER" "$current"
+}
+
 # -- Monitor hotplug listener ------------------------------------------------
 
 monitor_hotplug() {
-    udevadm monitor --udev --subsystem-match=drm | \
+    # 9>&-: don't hand the instance lock to udevadm.
+    udevadm monitor --udev --subsystem-match=drm 9>&- | \
     while read -r line; do
-        if echo "$line" | grep -q 'change'; then
-            cycle_now || true
-        fi
+        [[ "$line" == *change* ]] || continue
+        # A hotplug or a resume re-probe arrives as a burst of events, one per
+        # connector: let it settle (bounded), then re-apply once.
+        for _ in {1..30}; do read -r -t 2 _ || break; done
+        hyprland_alive || exit 0
+        reapply_current || true
     done
+}
+
+cleanup() {
+    if [[ -n "${hotplug_pid:-}" ]]; then
+        pkill -P "$hotplug_pid" 2>/dev/null || true
+        kill "$hotplug_pid" 2>/dev/null || true
+    fi
+    if [[ "$(cat "$PID_FILE" 2>/dev/null)" == "$$" ]]; then
+        rm -f "$PID_FILE"
+    fi
 }
 
 # -- Main ---------------------------------------------------------------------
 
 main() {
-    # Trap USR1 signal for manual cycle
-    trap cycle_now USR1
+    # One instance per Hyprland instance (autostart can't de-duplicate by
+    # process name: this runs as "bash").
+    exec 9>"$RUNTIME_DIR/wallpaper-cycle-${HYPRLAND_INSTANCE_SIGNATURE:-default}.lock"
+    flock -n 9 || exit 0
+    echo "$$" > "$PID_FILE"
+
+    # Turn termination into a normal exit so the EXIT trap always runs and
+    # takes the hotplug listener (and its udevadm) down too.
+    trap 'exit 143' TERM
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap cleanup EXIT
+    # Manual cycle. `|| true`: under set -e, a failing command inside a trap
+    # handler (awww-daemon briefly unavailable, say) would end the daemon.
+    trap 'cycle_now || true' USR1
 
     # Initial delay to ensure awww daemon is ready
     sleep 2
@@ -93,16 +149,19 @@ main() {
 
     # Start monitor hotplug listener in background
     monitor_hotplug &
-    readonly hotplug_pid=$!
+    hotplug_pid=$!
 
-    # Cleanup hotplug listener on exit
-    trap "kill $hotplug_pid 2>/dev/null" EXIT
-
-    # Infinite loop with interruptible sleep
-    while true; do
+    # Interruptible sleep: a USR1 cuts it short (the trap has already
+    # cycled), and the interval starts over.
+    local sleep_pid
+    while hyprland_alive; do
         sleep "$CYCLE_INTERVAL" &
-        wait $!
-        cycle_now || true
+        sleep_pid=$!
+        if wait "$sleep_pid"; then
+            cycle_now || true
+        else
+            kill "$sleep_pid" 2>/dev/null || true
+        fi
     done
 }
 

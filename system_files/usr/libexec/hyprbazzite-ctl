@@ -98,6 +98,16 @@ _save_wallpaper() {
     [[ -n "$out" ]] && printf '%s\n' "$out" > "$(_gamemode_wall_state)"
 }
 
+# wallpaper-cycle runs under bash, so its process name is "bash" and
+# `pgrep -x wallpaper-cycle` never found it; it records its PID instead.
+# The cmdline check guards against a stale file pointing at a reused PID.
+_wallpaper_cycle_pid() {
+    local pid
+    pid=$(cat "${XDG_RUNTIME_DIR:-/tmp}/wallpaper-cycle.pid" 2>/dev/null) || return 1
+    [[ "$pid" =~ ^[0-9]+$ ]] && grep -qa wallpaper-cycle "/proc/$pid/cmdline" 2>/dev/null || return 1
+    echo "$pid"
+}
+
 _restore_wallpaper() {
     local state out name img restored=0
     state=$(_gamemode_wall_state)
@@ -114,8 +124,9 @@ _restore_wallpaper() {
 
     # Nothing saved (e.g. gamemode was enabled before this fix): let the cycle
     # daemon pick a fresh GIF if it is running, else the static fallback.
-    if pgrep -x wallpaper-cycle >/dev/null 2>&1; then
-        pkill -USR1 wallpaper-cycle || true
+    local pid
+    if pid=$(_wallpaper_cycle_pid); then
+        kill -USR1 "$pid" || true
         return 0
     fi
     local f
@@ -385,8 +396,9 @@ session_refresh() {
     swaync-client -R -rs >/dev/null 2>&1 || true
     sleep 0.5
 
-    if command -v wallpaper-cycle &>/dev/null && pgrep -x wallpaper-cycle >/dev/null 2>&1; then
-        pkill -USR1 wallpaper-cycle || true
+    local pid
+    if pid=$(_wallpaper_cycle_pid); then
+        kill -USR1 "$pid" || true
     elif [[ -f "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" ]]; then
         awww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" --transition-type wipe --transition-duration 2
     fi
