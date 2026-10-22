@@ -1,11 +1,14 @@
+// Wheel users in an active local session may suspend-then-hibernate (part of
+// the "sleep" chain used by the lid and the power menu) without a prompt,
+// also while other sessions exist. Deliberately not the -ignore-inhibit
+// variant: an inhibitor should still be able to hold off sleep.
 polkit.addRule(function(action, subject) {
     var allowed = [
         "org.freedesktop.login1.suspend-then-hibernate",
-        "org.freedesktop.login1.suspend-then-hibernate-multiple-sessions",
-        "org.freedesktop.login1.suspend-then-hibernate-ignore-inhibit"
+        "org.freedesktop.login1.suspend-then-hibernate-multiple-sessions"
     ];
 
-    if (allowed.indexOf(action.id) >= 0 && (subject.user == "root" || subject.isInGroup("wheel"))) {
+    if (allowed.indexOf(action.id) >= 0 && subject.local && subject.active && subject.isInGroup("wheel")) {
         return polkit.Result.YES;
     }
 });

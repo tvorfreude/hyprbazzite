@@ -497,52 +497,63 @@ theme_update() {
 # TDP MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-tdp_get_backend() {
-    if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
-    if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
-    if [[ -d /sys/class/hwmon ]]; then echo "sysfs"; return 0; fi
+_is_amd_cpu() { grep -q AuthenticAMD /proc/cpuinfo 2>/dev/null; }
+
+# First hwmon power cap. A glob, not `find /sys/class/hwmon/hwmon*`: those
+# entries are symlinks, and find doesn't descend into symlinked start points.
+_tdp_cap_file() {
+    local f
+    for f in /sys/class/hwmon/hwmon*/power1_cap; do
+        [[ -e "$f" ]] && { echo "$f"; return 0; }
+    done
     return 1
 }
 
+tdp_get_backend() {
+    # ryzenadj/amdctl only drive AMD's SMU, and the Bazzite base ships
+    # ryzenadj on every image, so Intel machines used to pick it too.
+    if _is_amd_cpu; then
+        if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
+        if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
+    fi
+    if _tdp_cap_file >/dev/null; then echo "sysfs"; return 0; fi
+    return 1
+}
+
+# $1 = "privileged": read through pkexec (wheel only, so it never prompts).
+# Only for interactive callers - the waybar module polls every 30s.
 tdp_get_current() {
-    local backend
+    local backend run=()
+    [[ "${1:-}" == privileged ]] && id -nG | grep -qw wheel && run=(pkexec)
     backend=$(tdp_get_backend || echo "unknown")
     case "$backend" in
-        ryzenadj) ryzenadj --info | grep -E 'TDP|CPU Name' ;;
-        amdctl) amdctl info | grep -i 'power limit\|cpu model' ;;
-        sysfs)
-            local cap_file
-            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" 2>/dev/null | head -n1)
-            if [[ -n "$cap_file" ]]; then
-                echo "Current TDP: $(( $(cat "$cap_file") / 1000000 ))W"
-            else
-                echo "TDP not found in sysfs"
-            fi
-            ;;
+        ryzenadj) "${run[@]}" ryzenadj --info | grep -E 'TDP|CPU Name' ;;
+        amdctl) "${run[@]}" amdctl info | grep -i 'power limit\|cpu model' ;;
+        sysfs) echo "Current TDP: $(( $(< "$(_tdp_cap_file)") / 1000000 ))W" ;;
         *) echo "TDP control unsupported" ;;
     esac
 }
 
+# pkexec, not sudo: this runs from waybar/wofi, where there is no terminal
+# for sudo to prompt on, so it used to fail silently. 10-tdp-control.rules
+# lets wheel users in an active local session run ryzenadj/amdctl without a
+# password; anything else gets a normal polkit prompt.
 tdp_set() {
-    local watts="$1"
-    local backend
-    backend=$(tdp_get_backend || { notify "Error" "TDP backend not found"; return 1; })
+    local watts="${1:-}" backend
+    [[ "$watts" =~ ^[0-9]+$ ]] || { echo "Usage: hyprbazzite-ctl tdp set <watts>" >&2; return 1; }
+    backend=$(tdp_get_backend) || { notify "Error" "TDP backend not found"; return 1; }
 
     case "$backend" in
-        ryzenadj) sudo ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
-        amdctl) sudo amdctl set power-limit "$watts" ;;
-        sysfs)
-            local cap_file
-            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" 2>/dev/null | head -n1)
-            echo $((watts * 1000000)) | sudo tee "$cap_file" >/dev/null
-            ;;
-    esac
+        ryzenadj) pkexec ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
+        amdctl) pkexec amdctl set power-limit "$watts" ;;
+        sysfs) echo $((watts * 1000000)) | pkexec tee "$(_tdp_cap_file)" >/dev/null ;;
+    esac || { notify "TDP" "Could not set ${watts}W via $backend" "critical"; return 1; }
     notify "TDP" "Set to ${watts}W via $backend"
 }
 
 tdp_menu() {
     local current
-    current=$(tdp_get_current | grep -o '[0-9]\+' | head -n1 || echo "unknown")
+    current=$(tdp_get_current privileged | grep -o '[0-9]\+' | head -n1 || echo "unknown")
     local options="10W\n15W\n25W\n35W\n45W"
     local choice
     choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Set TDP (Current: ${current}W)") || return 0
@@ -1456,7 +1467,7 @@ USAGE
             ;;
         tdp)
             case "${1:-}" in
-                get) tdp_get_current ;;
+                get) tdp_get_current privileged ;;
                 set) tdp_set "${2:-}" ;;
                 profile) tdp_menu ;;
                 *) echo "Usage: hyprbazzite-ctl tdp [get|set <watts>|profile]"; return 1 ;;
