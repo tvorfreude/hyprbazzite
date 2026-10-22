@@ -135,7 +135,7 @@ if macos then
     hl.bind(appmod .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
     hl.bind(appmod .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot window"))
     hl.bind(appmod .. " + CTRL + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot clipboard"))
-    hl.bind(appmod .. " + CTRL + Q",  hl.dsp.exec_cmd("hyprlock"))
+    hl.bind(appmod .. " + CTRL + Q",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl power lock"))
 
     -- ═══════════════════════════════════════════════════════════════════════════
     -- RESIZE SUBMAP — mirrors AeroSpace [mode.resize.binding]
@@ -252,7 +252,7 @@ else
     hl.bind(mod .. " + CTRL + S",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
 
     -- ─── System ──────────────────────────────────────────────────────────────
-    hl.bind(mod .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
+    hl.bind(mod .. " + ALT + L",   hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl power lock"))
     hl.bind(mod .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
     hl.bind(mod .. " + SHIFT + K", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk swap-anchor"))
 

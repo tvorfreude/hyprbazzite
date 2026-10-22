@@ -620,6 +620,19 @@ power_menu() {
     esac
 }
 
+# Lock through logind so hypridle's lock_cmd runs: one hyprlock instance, with
+# the image's config. A bare `hyprlock` finds no config at all (it searches
+# ~/.config/hypr and /etc/xdg/hypr, never /etc/hypr) and exits without
+# locking. lock-session does nothing if hypridle isn't running, so start
+# hyprlock directly in that case.
+_lock_now() {
+    if pgrep -x hypridle >/dev/null 2>&1; then
+        loginctl lock-session
+    else
+        pidof hyprlock >/dev/null 2>&1 || hyprlock -c /etc/hypr/hyprlock.conf
+    fi
+}
+
 power_action() {
     local action="$1"
     case "$action" in
@@ -627,7 +640,7 @@ power_action() {
         reboot) systemctl reboot ;;
         suspend) systemctl suspend ;;
         sleep) _sleep_best_effort ;;
-        lock) hyprlock ;;
+        lock) _lock_now ;;
         logout) hyprctl eval 'hl.dispatch(hl.dsp.exit())' ;;
         *) echo "Unknown power action: $action"; return 1 ;;
     esac
@@ -1251,12 +1264,22 @@ open_target() {
     return 1
 }
 
-# "Awake" = hypridle stopped. One source of truth shared by the swaync Awake
-# toggle and the waybar idle indicator (custom/idle, signal 9).
+# "Awake" = an idle inhibitor held by a transient user unit. One source of
+# truth shared by the swaync Awake toggle and the waybar idle indicator
+# (custom/idle, signal 9). hypridle honours systemd idle inhibitors, so its
+# idle lock/screen-off listeners pause while before_sleep_cmd still locks the
+# screen before every suspend. Stopping hypridle instead (as this used to)
+# also dropped that lock: closing the lid resumed to an unlocked desktop.
+_AWAKE_UNIT="hyprbazzite-awake.service"
+
+_awake_active() { systemctl --user is-active --quiet "$_AWAKE_UNIT"; }
+
 _awake_apply() {
     if [[ "$1" == "on" ]]; then
-        pkill -x hypridle || true
+        _awake_active || systemd-run --user --quiet --collect --unit="$_AWAKE_UNIT" \
+            systemd-inhibit --what=idle --who=HyprBazzite --why="Awake mode" sleep infinity
     else
+        systemctl --user stop "$_AWAKE_UNIT" 2>/dev/null || true
         pgrep -x hypridle >/dev/null 2>&1 || setsid hypridle -c /etc/hypr/hypridle.conf >/dev/null 2>&1 &
     fi
     sleep 0.2
@@ -1265,9 +1288,9 @@ _awake_apply() {
 
 waybar_idle_status() {
     local awake=0 text class tip
-    pgrep -x hypridle >/dev/null 2>&1 || awake=1
+    _awake_active && awake=1
     if (( awake )); then
-        text=$'\U000F0208'; class="activated"; tip=$'Staying awake: screen will not lock or sleep\n\nClick: allow idle again'
+        text=$'\U000F0208'; class="activated"; tip=$'Staying awake: idle lock and screen-off are paused\n(the screen still locks before sleep)\n\nClick: allow idle again'
     else
         text=$'\U000F0209'; class="deactivated"; tip=$'Idle lock/sleep enabled\n\nClick: stay awake'
     fi
@@ -1354,9 +1377,9 @@ qs() {
         speakers:set)    wpctl set-mute "$sink" "$(_qs_onoff 1 0)" ;;
         mic:state)       wpctl get-volume "$src" 2>/dev/null | grep -q MUTED && echo true || echo false ;;
         mic:set)         wpctl set-mute "$src" "$(_qs_onoff 1 0)" ;;
-        awake:state)     pgrep -x hypridle >/dev/null 2>&1 && echo false || echo true ;;
+        awake:state)     _awake_active && echo true || echo false ;;
         awake:set)       _awake_apply "$(_qs_onoff on off)" ;;
-        awake:toggle)    pgrep -x hypridle >/dev/null 2>&1 && _awake_apply on || _awake_apply off ;;
+        awake:toggle)    if _awake_active; then _awake_apply off; else _awake_apply on; fi ;;
         gamemode:state)  [[ "$(_animations_enabled)" == "0" ]] && echo true || echo false ;;
         gamemode:set)    gamemode_toggle ;;
         nightlight:state)
@@ -1370,7 +1393,7 @@ qs() {
             fi ;;
         screenshot:run)  swaync-client -cp -sw; sleep 0.35; screenshot_take region ;;
         picker:run)      swaync-client -cp -sw; sleep 0.35; hyprpicker -a ;;
-        lock:run)        swaync-client -cp -sw; sleep 0.35; hyprlock ;;
+        lock:run)        swaync-client -cp -sw; sleep 0.35; _lock_now ;;
         *) echo "Usage: hyprbazzite-ctl qs <wifi|bluetooth|speakers|mic|awake|gamemode|nightlight> <state|set> | <screenshot|picker|lock> run"; return 1 ;;
     esac
 }
