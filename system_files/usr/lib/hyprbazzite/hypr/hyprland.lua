@@ -11,15 +11,31 @@ require("styles")
 -- it last rendered into $XDG_RUNTIME_DIR first: `hyprbazzite-accent hex` runs
 -- ImageMagick on the wallpaper in "auto" mode, and this file is evaluated on
 -- the compositor's main thread, so every reload froze the screen while it ran.
--- The command remains the fallback for a session's first load, before
--- anything has rendered the accent.
+-- The cached value is only used while it was rendered for the mode chosen now
+-- (that can change outside the tool, e.g. a chezmoi pull of accent-mode).
+-- The command remains the fallback for that and for a session's first load.
 local active_border = "rgba(bd93f9ee)"
 do
-    local hex
-    local f = io.open((os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprbazzite/accent", "r")
-    if f then
-        hex = (f:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
+    local function first_line(path)
+        local f = io.open(path, "r")
+        if not f then return nil end
+        local line = f:read("*l")
         f:close()
+        return line
+    end
+    -- Same normalisation as get_mode in hyprbazzite-accent.
+    local function chosen_mode()
+        local cfg = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
+        local m = (first_line(cfg .. "/hyprbazzite/accent-mode") or ""):gsub("%s", "")
+        if m == "auto" or m == "dracula" then return m end
+        if m:match("^#%x%x%x%x%x%x$") then return m:lower() end
+        return "dracula"
+    end
+
+    local hex
+    local run = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprbazzite"
+    if first_line(run .. "/accent-mode") == chosen_mode() then
+        hex = (first_line(run .. "/accent") or ""):match("^#(%x%x%x%x%x%x)$")
     end
     if not hex then
         local ok, pipe = pcall(io.popen, "/usr/libexec/hyprbazzite-accent hex 2>/dev/null")
