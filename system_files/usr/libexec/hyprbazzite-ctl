@@ -535,25 +535,15 @@ theme_update() {
 
 _is_amd_cpu() { grep -q AuthenticAMD /proc/cpuinfo 2>/dev/null; }
 
-# First hwmon power cap. A glob, not `find /sys/class/hwmon/hwmon*`: those
-# entries are symlinks, and find doesn't descend into symlinked start points.
-_tdp_cap_file() {
-    local f
-    for f in /sys/class/hwmon/hwmon*/power1_cap; do
-        [[ -e "$f" ]] && { echo "$f"; return 0; }
-    done
-    return 1
-}
-
 tdp_get_backend() {
-    # AMD only. ryzenadj/amdctl drive AMD's SMU (and the Bazzite base ships
-    # ryzenadj on every image, so Intel machines used to pick it too). On an
-    # Intel machine a hwmon power1_cap belongs to a discrete GPU, not the CPU,
-    # so falling back to it would have throttled the dGPU instead.
+    # AMD only: ryzenadj/amdctl drive AMD's SMU, and the Bazzite base ships
+    # ryzenadj on every image, so Intel machines used to pick it too. There
+    # is deliberately no hwmon power1_cap fallback: no CPU driver exposes
+    # one, so that file belongs to a GPU (a dGPU, unless it's an APU), and
+    # "TDP" would have throttled the graphics card instead.
     _is_amd_cpu || return 1
     if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
     if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
-    if _tdp_cap_file >/dev/null; then echo "sysfs"; return 0; fi
     return 1
 }
 
@@ -566,7 +556,6 @@ tdp_get_current() {
     case "$backend" in
         ryzenadj) "${run[@]}" ryzenadj --info | grep -E 'TDP|CPU Name' ;;
         amdctl) "${run[@]}" amdctl info | grep -i 'power limit\|cpu model' ;;
-        sysfs) echo "Current TDP: $(( $(< "$(_tdp_cap_file)") / 1000000 ))W" ;;
         *) echo "TDP control unsupported" ;;
     esac
 }
@@ -583,7 +572,6 @@ tdp_set() {
     case "$backend" in
         ryzenadj) pkexec ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
         amdctl) pkexec amdctl set power-limit "$watts" ;;
-        sysfs) echo $((watts * 1000000)) | pkexec tee "$(_tdp_cap_file)" >/dev/null ;;
     esac || { notify "TDP" "Could not set ${watts}W via $backend" "critical"; return 1; }
     notify "TDP" "Set to ${watts}W via $backend"
 }
