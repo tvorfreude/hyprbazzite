@@ -779,33 +779,39 @@ automation_osk() {
 }
 
 automation_temp() {
-    local best_temp_mc="" best_source="" best_score=-1
+    # Polled by waybar every 10s, so no forks per sensor: builtin reads, the
+    # score set in a variable rather than echoed through a subshell, and
+    # hwmon scored once per device (the score only depends on its name).
+    local best_temp_mc="" best_source="" best_score=-1 score
     _score() {
-        local src_lc=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
-        if [[ "$src_lc" =~ (tctl|cpu|package|x86_pkg_temp|coretemp|k10temp|zenpower|soc_thermal) ]]; then echo 300
-        elif [[ "$src_lc" =~ acpitz ]]; then echo 180
-        elif [[ "$src_lc" =~ (junction|edge|amdgpu|gpu) ]]; then echo 120
-        elif [[ "$src_lc" =~ (nvme|ssd) ]]; then echo 90
-        else echo 60; fi
+        local src_lc=${1,,}
+        if [[ "$src_lc" =~ (tctl|cpu|package|x86_pkg_temp|coretemp|k10temp|zenpower|soc_thermal) ]]; then score=300
+        elif [[ "$src_lc" =~ acpitz ]]; then score=180
+        elif [[ "$src_lc" =~ (junction|edge|amdgpu|gpu) ]]; then score=120
+        elif [[ "$src_lc" =~ (nvme|ssd) ]]; then score=90
+        else score=60; fi
     }
+    local zone temp_mc type
     for zone in /sys/class/thermal/thermal_zone*; do
         [[ -r "$zone/temp" ]] || continue
-        local temp_mc type score
-        temp_mc=$(cat "$zone/temp" 2>/dev/null || true)
-        type=$(cat "$zone/type" 2>/dev/null || echo "unknown")
-        score=$(_score "$type")
+        { read -r temp_mc < "$zone/temp"; } 2>/dev/null || continue
+        { read -r type < "$zone/type"; } 2>/dev/null || type="unknown"
+        _score "$type"
         (( score > best_score )) && { best_score=$score; best_temp_mc=$temp_mc; best_source="thermal:${type}"; }
     done
+    local hw name input label
     for hw in /sys/class/hwmon/hwmon*; do
         [[ -d "$hw" ]] || continue
-        local name=$(cat "$hw/name" 2>/dev/null || echo "unknown")
+        { read -r name < "$hw/name"; } 2>/dev/null || name="unknown"
+        _score "$name"
+        (( score > best_score )) || continue
+        # First readable input of the best-scoring device, as before.
         for input in "$hw"/temp*_input; do
             [[ -r "$input" ]] || continue
-            local temp_mc label score
-            temp_mc=$(cat "$input" 2>/dev/null || true)
-            label=$(cat "${input%_input}_label" 2>/dev/null || echo "temp")
-            score=$(_score "$name")
-            (( score > best_score )) && { best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"; }
+            { read -r temp_mc < "$input"; } 2>/dev/null || continue
+            { read -r label < "${input%_input}_label"; } 2>/dev/null || label="temp"
+            best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"
+            break
         done
     done
 
@@ -829,9 +835,10 @@ automation_temp() {
 waybar_power_status() {
     local backend="unknown" profile="unknown"
 
-    if busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile >/dev/null 2>&1; then
+    local out
+    if out=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null); then
         backend="tuned-ppd"
-        profile=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null | awk -F'"' '{print $2}')
+        profile=${out#s \"}; profile=${profile%\"}   # s "balanced" -> balanced
     elif command -v tuned-adm >/dev/null 2>&1; then
         backend="tuned"
         profile=$(tuned-adm active 2>/dev/null | sed -n 's/^Current active profile: *//p')
