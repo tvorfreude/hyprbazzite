@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
-# hyprbazzite-user-firstboot - per-user first-login setup (runs once).
+# hyprbazzite-user-firstboot - per-user first-login setup.
 #
-# Ensures the image's system Hyprland config (/etc/hypr) is authoritative by
-# removing stale/default Hyprland dotfiles that may have been left behind (e.g.
-# by a previous image, a rebase, or Hyprland's own first-run generation) —
-# UNLESS the user provides their own ~/.config/hypr/hyprland.lua (dotfiles /
-# chezmoi), which is left untouched so the session launcher uses it.
+# 1. Once per user: makes the image's system Hyprland config (/etc/hypr)
+#    authoritative by moving stale/default Hyprland dotfiles out of the way
+#    (e.g. left by a previous image, a rebase, or Hyprland's own first-run
+#    generation) - UNLESS the user provides their own
+#    ~/.config/hypr/hyprland.lua (dotfiles / chezmoi), which is left untouched
+#    so the session launcher uses it. Moved aside, never deleted: a classic
+#    hyprland.conf setup, scripts or wallpapers in there are the user's.
+# 2. Replaces ~/.config links into the read-only /usr/share/hyprbazzite/config
+#    (how older images seeded new accounts) with real, writable copies, and
+#    adds the skel files those images never installed, where missing.
 #
 # Flatpak theming/integration is handled system-wide by hyprbazzite-flatpak-overrides;
 # no Flatpak apps are installed by the image (users install their own).
@@ -14,23 +19,45 @@ set -euo pipefail
 log() { echo "[user-firstboot] $*" >&2; }
 
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/hyprbazzite"
-marker="$state_dir/user-firstboot.done"
 config_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
 hypr_dir="$config_dir/hypr"
+shared_config=/usr/share/hyprbazzite/config
+skel=/usr/lib/hyprbazzite/skel
 
-[[ -f "$marker" ]] && exit 0
+mkdir -p "$state_dir" "$config_dir"
 
-if [[ -d "$hypr_dir" ]]; then
-    if [[ -f "$hypr_dir/hyprland.lua" ]]; then
-        log "User Hyprland config detected ($hypr_dir/hyprland.lua) — leaving it untouched."
-    else
-        log "Removing stale default Hyprland dotfiles at $hypr_dir (no user hyprland.lua present)."
-        rm -rf "$hypr_dir"
+# 1. Hyprland dotfiles. Keeps the original marker, so accounts that already
+#    went through this are not touched again.
+if [[ ! -f "$state_dir/user-firstboot.done" ]]; then
+    if [[ -d "$hypr_dir" && ! -f "$hypr_dir/hyprland.lua" ]]; then
+        backup="$hypr_dir.bak-$(date +%Y%m%d-%H%M%S)"
+        mv "$hypr_dir" "$backup"
+        log "Moved $hypr_dir (no hyprland.lua) to $backup - the system config in /etc/hypr is used now."
     fi
-else
-    log "No ~/.config/hypr present — nothing to clean."
+    : > "$state_dir/user-firstboot.done"
 fi
 
-mkdir -p "$state_dir"
-: > "$marker"
+# 2. Read-only links -> writable copies. `cp -R` without preserving
+#    ownership or SELinux context, so the copies are plain user files.
+for link in "$config_dir"/*; do
+    [[ -L "$link" ]] || continue
+    target=$(readlink "$link")
+    [[ "$target" == "$shared_config"/* ]] || continue
+    rm "$link"
+    if [[ -e "$target" ]]; then
+        cp -R "$target" "$link"
+        log "Replaced $link (read-only link) with a writable copy."
+    else
+        log "Removed $link (linked to a default the image no longer ships)."
+    fi
+done
+
+for f in .zshrc .config/starship.toml; do
+    if [[ ! -e "$HOME/$f" && ! -L "$HOME/$f" && -f "$skel/$f" ]]; then
+        cp "$skel/$f" "$HOME/$f"
+        log "Installed default $HOME/$f."
+    fi
+done
+
+: > "$state_dir/user-firstboot-v2.done"
 log "First-login setup complete."

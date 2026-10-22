@@ -29,9 +29,17 @@ menu entries) manage it going forward.
 
 ## Default Configuration (No Dotfiles)
 
-Without chezmoi, you get this image's shipped defaults, seeded into new home
-directories via `/etc/skel/.config/` (Hyprland, Waybar, wofi, GTK/Qt theming,
-etc.) at the time each user account is created.
+Without chezmoi, you get this image's shipped defaults:
+
+- **Hyprland, Waybar and wofi** are system-wide: `/etc/hypr`, `/etc/waybar`
+  and `/etc/wofi`, refreshed from the image on every boot. To customize
+  Hyprland, put your own `~/.config/hypr/hyprland.lua` (plus the modules it
+  `require()`s) in place - the session launcher prefers it.
+- **Per-user defaults** (kitty, GTK/Qt theming, Thunar, swappy, starship,
+  zsh) are copied from `/etc/skel` into each new home directory when the
+  account is created, as normal files you can edit. Accounts created on older
+  builds had read-only links into `/usr` instead; the first login on a newer
+  build replaces those with writable copies.
 
 ## Important: Configuration Updates for Existing Users
 
@@ -42,9 +50,9 @@ does not get updated automatically - the new default only applies to brand
 new accounts. (System-owned files this project needs to always keep
 authoritative - like the swaync/XDG defaults - are instead delivered through
 a tmpfiles rule that re-applies on every boot; the skel-seeded per-user
-config files below are intentionally NOT handled that way, since they are
-meant to be freely user-customizable from that point on - forcibly
-overwriting them on every update would destroy your own changes.)
+config files are intentionally NOT handled that way, since they are yours to
+customize from that point on - forcibly overwriting them on every update
+would destroy your own changes.)
 
 ### How to stay up to date
 
@@ -56,14 +64,13 @@ overwriting them on every update would destroy your own changes.)
 2. **Manual diff**: compare your local config against the shipped default and
    selectively copy over what you want:
    ```bash
-   diff -r ~/.config/hypr /usr/share/hyprbazzite/config/hypr
+   diff -r ~/.config/kitty /etc/skel/.config/kitty
    ```
-3. **Nuclear option**: remove your local config and let the skel default
-   re-apply on next login (you lose any personal customizations to that
-   directory):
+3. **Nuclear option**: replace your local copy with the shipped default (you
+   lose any personal customizations to that directory). Nothing re-applies
+   `/etc/skel` on login, so copy it yourself:
    ```bash
-   rm -rf ~/.config/hypr ~/.config/waybar ~/.config/wofi
-   # Log out and back in - symlinks from /etc/skel will be recreated
+   rm -rf ~/.config/kitty && cp -r /etc/skel/.config/kitty ~/.config/
    ```
 
 ### Why this happens

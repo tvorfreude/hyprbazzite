@@ -124,15 +124,18 @@ RUN if [ -f /etc/yum.repos.d/terra-mesa.repo ]; then \
     fi
 
 # ---------------------------------------------------------------------------
-# Step 7: Set up user config symlinks (bootc-compliant)
+# Step 7: Seed new home directories (/etc/skel)
 # ---------------------------------------------------------------------------
-RUN mkdir -p /usr/share/hyprbazzite/config && \
-    cp -af /usr/lib/hyprbazzite/skel/.config/. /usr/share/hyprbazzite/config/ && \
-    mkdir -p /etc/skel/.config && \
-    for dir in /usr/share/hyprbazzite/config/*/; do \
-        dirname=$(basename "$dir"); \
-        ln -sf "/usr/share/hyprbazzite/config/$dirname" "/etc/skel/.config/$dirname"; \
-    done
+# Real copies, not symlinks: useradd copies symlinks as-is, so links into the
+# read-only /usr tree left new users unable to save their own GTK bookmarks,
+# kitty or qt5ct settings (EROFS), and only directories were ever linked, so
+# .zshrc and starship.toml never reached anyone. /usr/share/hyprbazzite/config
+# stays as a read-only reference copy: accounts created from older images
+# still link into it until hyprbazzite-user-firstboot swaps the links for
+# copies.
+RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
+    mkdir -p /usr/share/hyprbazzite/config && \
+    cp -af /usr/lib/hyprbazzite/skel/.config/. /usr/share/hyprbazzite/config/
 
 # ---------------------------------------------------------------------------
 # Step 8: Set permissions on scripts and executables
