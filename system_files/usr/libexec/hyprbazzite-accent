@@ -140,9 +140,10 @@ render_all() {
     render_css "$WAYBAR_BASE" "$OUT_DIR/waybar.css" "$hex"
     render_css "$SWAYNC_BASE" "$OUT_DIR/swaync.css" "$hex"
     echo "$hex" >"$OUT_DIR/accent"
-    # The mode this was resolved for: hyprland.lua only trusts the cached hex
-    # while the chosen mode still matches (it may change outside this tool).
-    get_mode >"$OUT_DIR/accent-mode"
+    # Cache key for hyprland.lua: the raw first line of the mode file this was
+    # resolved for. It only trusts the cached hex while the file still says
+    # exactly that, so a change made outside this tool can't go unnoticed.
+    { head -n1 "$MODE_FILE" 2>/dev/null || true; } >"$OUT_DIR/accent-mode"
 
     # wofi has no --style at the call sites (bindings + ctl menus), so it reads
     # ~/.config/wofi/style.css first. Only keep a user-level copy while a custom
