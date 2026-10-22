@@ -24,6 +24,14 @@ hypr-tdp-balanced:
 hypr-tdp-perf:
     /usr/libexec/hyprbazzite-ctl tdp set 65
 
+# Deep sleep is turned off automatically after two hung resumes in a row (two
+# power cuts while suspended look the same).
+# Re-enable deep (S3) sleep after it was turned off automatically
+hypr-deep-sleep-reset:
+    sudo rm -f /var/lib/hyprbazzite/deep-sleep-blacklisted /var/lib/hyprbazzite/deep-sleep-failures /var/lib/hyprbazzite/sleep-pending
+    sudo systemctl restart hyprbazzite-deep-sleep-setup.service
+    echo "Deep sleep re-armed. Reboot to apply."
+
 # Show current TDP status
 hypr-tdp-status:
     /usr/libexec/hyprbazzite-ctl tdp get
