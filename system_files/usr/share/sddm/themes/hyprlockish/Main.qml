@@ -61,6 +61,19 @@ Rectangle {
         }
     }
 
+    // Account to log in as. Starts at the last user SDDM remembers; with more
+    // than one account, Up/Down in the password field (or clicking the name)
+    // picks another. There used to be no way to log in as anyone else.
+    property int userIndex: Math.max(0, userModel.lastIndex)
+    readonly property string userName: userModel.data(userModel.index(userIndex, 0), 257)  // NameRole
+
+    function cycleUser(step) {
+        if (userModel.count < 2)
+            return;
+        userIndex = (userIndex + step + userModel.count) % userModel.count;
+        passwordInput.text = "";
+    }
+
     property int tick: 0
     Timer {
         interval: 1000
@@ -105,6 +118,25 @@ Rectangle {
         opacity: 0.6
         font.family: "JetBrains Mono"
         font.pixelSize: 14
+    }
+
+    // -- Account -- only shown when there is more than one to choose from
+    Text {
+        visible: userModel.count > 1
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: passwordBox.top
+        anchors.bottomMargin: 16
+        text: "\u25C2  " + root.userName + "  \u25B8"
+        color: "#f8f8f2"
+        opacity: 0.75
+        font.family: "JetBrains Mono"
+        font.pixelSize: 16
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.cycleUser(1)
+        }
     }
 
     // -- Password field -- a floating pill, not a boxed login card: matches
@@ -152,9 +184,11 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
+            Keys.onUpPressed: root.cycleUser(-1)
+            Keys.onDownPressed: root.cycleUser(1)
+
             onAccepted: {
-                sddm.login(userModel.data(userModel.index(userModel.lastIndex, 0), 257),
-                           passwordInput.text, sessionModel.lastIndex);
+                sddm.login(root.userName, passwordInput.text, sessionModel.lastIndex);
             }
         }
     }
