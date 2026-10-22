@@ -1,12 +1,7 @@
-[[customizations.filesystem]]
-mountpoint = "/"
-minsize = "20 GiB"
-type = "xfs"
-
-[[customizations.filesystem]]
-mountpoint = "/boot"
-minsize = "1 GiB"
-type = "ext4"
+# No [[customizations.filesystem]] here: bootc-image-builder ignores it for
+# anaconda-iso once a kickstart is supplied (below), and partitioning is left
+# to the installer, whose Fedora default is btrfs (what tblue-hibernate-setup
+# needs for its swapfile).
 
 [customizations.installer.kickstart]
 contents = '''
@@ -31,11 +26,8 @@ if [ -z "$sysroot" ]; then
   exit 0
 fi
 
-build_commit="$(awk -F= '/^TBLUE_GIT_COMMIT=/{gsub(/"/,"",$2);print $2}' "$sysroot/usr/lib/os-release" 2>/dev/null | head -n1 || true)"
-if [ -n "$build_commit" ]; then
-  echo "Installer payload commit: $build_commit"
-  echo "TBlue Installer payload commit: $build_commit" > /etc/system-release
-fi
+build_id="$(awk -F= '/^TBLUE_BUILD_ID=/{print $2}' "$sysroot/usr/lib/os-release" 2>/dev/null | head -n1 || true)"
+echo "Installer payload build: ${build_id:-unknown}"
 
 if [ ! -d /sys/firmware/efi ]; then
   echo "EFI mode not detected. Skipping key enrollment."
