@@ -146,17 +146,6 @@ RUN --mount=type=bind,target=/ctx \
     fi
 
 # ---------------------------------------------------------------------------
-# Step 6: Import terra-mesa GPG key (instead of disabling gpgcheck)
-# ---------------------------------------------------------------------------
-RUN if [ -f /etc/yum.repos.d/terra-mesa.repo ]; then \
-        rpm --import https://repos.fyralabs.com/terra42/key.asc 2>/dev/null || \
-        rpm --import https://repos.fyralabs.com/terra41/key.asc 2>/dev/null || \
-        (echo "Warning: Could not import terra GPG key, disabling gpgcheck as fallback" && \
-         sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo && \
-         sed -i 's/^repo_gpgcheck=1/repo_gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo); \
-    fi
-
-# ---------------------------------------------------------------------------
 # Step 7: Seed new home directories (/etc/skel)
 # ---------------------------------------------------------------------------
 # Real copies, not symlinks: useradd copies symlinks as-is, so links into the
