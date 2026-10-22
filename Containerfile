@@ -158,33 +158,20 @@ RUN usermod -s /bin/zsh root && \
     chmod -R 0755 /usr/share/sddm/themes && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
     # Enable system services via preset
+    units="hhd.service sddm.service tblue-hibernate-setup.service tblue-disable-nonpower-wakeup.service hyprbazzite-flatpak-overrides.service tblue-secureboot-firstboot.service tblue-hhd-enable-user.service hyprbazzite-power-tuning.service hyprbazzite-deep-sleep-setup.service hyprbazzite-console-lid.service" && \
     mkdir -p /usr/lib/systemd/system-preset && \
-    echo "enable hhd.service" > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable sddm.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-hibernate-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-disable-nonpower-wakeup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-flatpak-overrides.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-secureboot-firstboot.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-hhd-enable-user.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-power-tuning.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-deep-sleep-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-console-lid.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    printf 'enable %s\n' $units > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
     # A preset FILE alone is just a policy declaration - it does nothing
-    # until something actually applies it, and nothing ever did. Confirmed
-    # live by booting this image in a fresh QEMU VM: every single service
-    # in the preset list above showed disabled despite "preset: enabled",
-    # except sddm.service - which works for a completely different reason
-    # (the sddm RPM's own install scriptlet calls systemctl preset on
-    # itself immediately during package install, not deferred to this
-    # file at all). Every one of our own custom services enabled only
-    # through this preset file - hhd, tblue-hibernate-setup,
-    # hyprbazzite-power-tuning, hyprbazzite-console-lid, etc. - has never
-    # actually been enabled, on any machine, for this project's entire
-    # history. systemctl preset-all materializes the real .wants/ symlinks
-    # at build time instead of leaving them as an inert declaration;
-    # verified live in the same VM that this one command alone fixes every
-    # affected unit.
-    systemctl preset-all && \
+    # until something applies it (confirmed in a fresh VM: every unit above
+    # showed disabled despite "preset: enabled"). Apply it to OUR units only.
+    # Never `systemctl preset-all` here: that applies the whole preset policy
+    # to every unit in the image, and Fedora's catch-all `disable *` then
+    # removes everything Bazzite turned on with a plain `systemctl enable` -
+    # it silently disabled uupd.timer (automatic updates), greenboot's
+    # healthcheck/rollback trigger, bazzite-hardware-setup and
+    # bazzite-flatpak-manager on every install. verify-image.sh now checks
+    # those stay enabled.
+    systemctl preset $units && \
     # Enable the per-user first-login service for all users (global user preset
     # + an explicit default.target.wants symlink so it activates without relying
     # on preset timing for freshly-created users)

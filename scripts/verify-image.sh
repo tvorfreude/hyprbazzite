@@ -74,6 +74,35 @@ for unit in "${REQUIRED_UNITS[@]}"; do
 done
 echo "All systemd units are present."
 
+# 4b. Enablement. Our own units must be enabled by the build, and the base
+# image's update/rollback machinery must survive it: a `systemctl preset-all`
+# once silently disabled all of the latter (no automatic updates, no greenboot
+# rollback) and nothing noticed, because only unit files were checked above.
+# SYSTEMD_OFFLINE=1: there is no running systemd in the verification container.
+mapfile -t OUR_UNITS < <(awk '$1 == "enable" {print $2}' /usr/lib/systemd/system-preset/50-hyprbazzite.preset)
+for unit in "${OUR_UNITS[@]}"; do
+    if ! SYSTEMD_OFFLINE=1 systemctl is-enabled --quiet "$unit"; then
+        echo "ERROR: Unit '$unit' is listed in 50-hyprbazzite.preset but not enabled."
+        exit 1
+    fi
+done
+declare -a BASE_UNITS=(
+    "uupd.timer"
+    "greenboot-healthcheck.service"
+    "greenboot-set-rollback-trigger.service"
+    "bazzite-hardware-setup.service"
+    "bazzite-flatpak-manager.service"
+)
+for unit in "${BASE_UNITS[@]}"; do
+    if [ ! -e "/usr/lib/systemd/system/$unit" ]; then
+        echo "WARNING: Base unit '$unit' no longer exists (renamed upstream?); not checked."
+    elif ! SYSTEMD_OFFLINE=1 systemctl is-enabled --quiet "$unit"; then
+        echo "ERROR: Base image unit '$unit' was disabled by this build."
+        exit 1
+    fi
+done
+echo "Our units are enabled and the base image's update/rollback units are intact."
+
 # 5. Polkit rules
 declare -a REQUIRED_POLKIT=(
     "/usr/lib/hyprbazzite/polkit-1/rules.d/10-tdp-control.rules"
