@@ -154,21 +154,29 @@ gamemode_toggle() {
         fi
         notify-send -e -u low -i "$notif_icon" " Gamemode:" " enabled"
     else
-        hyprctl eval 'hl.config({
-            animations = { enabled = true },
-            decoration = { shadow = { enabled = true }, blur = { enabled = true }, rounding = 8, active_opacity = 1.0, inactive_opacity = 1.0 },
-            general = { gaps_in = 5, gaps_out = 10, border_size = 2 },
-        })
-        hl.window_rule({ match = { class = ".*" }, opacity = "1 override" })' >/dev/null
+        # A reload, not a mirror-image eval: re-running the config restores
+        # gaps/blur/animations exactly as hyprland.lua has them, and drops the
+        # gamemode window rule above. Countering it with another
+        # `opacity = "1 override"` rule (as this used to) overrode rules.lua's
+        # inactive opacity for every window until the next reload, and each
+        # toggle stacked two more rules.
+        _reload_config
         _restore_wallpaper
         sleep 0.5
         notify-send -e -u normal -i "$notif_icon" " Gamemode:" " disabled"
-        # No hyprctl reload here: the eval call above restores the gamemode-off
-        # values. They must stay in sync with general/decoration in
-        # hypr/hyprland.lua (gaps_in=5, gaps_out=10, border_size=2, rounding=8);
-        # they had drifted (20/3/10), leaving oversized gaps after turning
-        # gamemode off.
     fi
+}
+
+# `hyprctl reload` re-evaluates the Lua config from scratch, which also drops
+# what was applied at runtime through `hyprctl eval`: the workspace-to-monitor
+# rules (workspace_rebind) and the night-light shader. Put those back.
+_reload_config() {
+    local nightlight=0
+    [[ "$(qs nightlight state 2>/dev/null)" == true ]] && nightlight=1
+    hyprctl reload >/dev/null
+    workspace_rebind
+    if (( nightlight )); then SWAYNC_TOGGLE_STATE=true qs nightlight set; fi
+    return 0
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -292,7 +300,7 @@ wallpaper_pick() {
 
         if command -v wallust &>/dev/null; then
             wallust run "$wallust_current" -s
-            hyprctl reload
+            _reload_config
         fi
 
         if command -v awww &>/dev/null; then
@@ -361,17 +369,20 @@ chezmoi_action() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 session_refresh() {
-    local apps=(hypridle mako waybar fcitx5 awww-daemon)
+    local apps=(hypridle waybar fcitx5 awww-daemon)
     for app in "${apps[@]}"; do
-        pkill "$app" || true
+        pkill -x "$app" || true
     done
 
     sleep 0.3
+    # Same command lines as autostart.lua: a bare `waybar` finds no config on
+    # this image (it lives in /etc/waybar) and exits, leaving no bar at all.
     hypridle -c /etc/hypr/hypridle.conf &
-    mako &
-    waybar &
+    waybar --config /etc/waybar/config.jsonc --style "$(/usr/libexec/hyprbazzite-accent style waybar)" &
     fcitx5 &
     awww-daemon &
+    # swaync (this image's notification daemon) reloads in place.
+    swaync-client -R -rs >/dev/null 2>&1 || true
     sleep 0.5
 
     if command -v wallpaper-cycle &>/dev/null && pgrep -x wallpaper-cycle >/dev/null 2>&1; then
@@ -439,7 +450,7 @@ quicksettings_show() {
                 sed -i "s/^theme = .*/theme = $gtk_dark/" "$CONFIG_DIR/qt6ct/qt6ct.conf" 2>/dev/null || true
                 notify "Settings" "Switched to dark mode"
             fi
-            hyprctl reload
+            _reload_config
             ;;
     esac
 }
@@ -487,8 +498,8 @@ theme_update() {
 
     # Reload running services
     pgrep -x waybar >/dev/null && killall -SIGUSR2 waybar || true
-    pgrep -x mako >/dev/null && makoctl reload || true
-    hyprctl reload 2>/dev/null || true
+    swaync-client -rs >/dev/null 2>&1 || true
+    _reload_config 2>/dev/null || true
 
     notify "Theme" "Updated from $(basename "$wallpaper")"
 }
@@ -1165,7 +1176,7 @@ keybinds_switch() {
             linux) rm -f "$marker" ;;
         esac
         notify "Keybinds" "Switched to ${1} profile. Reloading..."
-        hyprctl reload
+        _reload_config
     }
 
     case "$action" in
@@ -1426,6 +1437,7 @@ Modules:
   wallpaper [pick]              Interactive wallpaper picker
   chezmoi [push|pull]           Dotfiles management
   refresh                       Restart session apps (waybar, idle, etc.)
+  reload                        Reload the Hyprland config, keeping runtime state
   settings                      Quick settings menu
   theme [update] [wallpaper]    Update color theme from wallpaper
   tdp [get|set <watts>|profile] TDP power management
@@ -1458,6 +1470,7 @@ USAGE
         accent) /usr/libexec/hyprbazzite-accent "$@" ;;
         chezmoi) chezmoi_action "${1:-}" ;;
         refresh) session_refresh ;;
+        reload) _reload_config ;;
         settings) quicksettings_show ;;
         theme)
             case "${1:-update}" in
