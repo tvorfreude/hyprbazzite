@@ -89,9 +89,8 @@ sync() {
 
     # "connected" is the normal auto-detect state for a present, open lid -
     # if that's already current, there's nothing to restore, so skip the
-    # write entirely. Without this, busctl monitor fires on *any* login1
-    # chatter (not just lid events), which would otherwise mean a redundant
-    # DRM re-probe on basically every property change while logged in.
+    # write entirely. Without this, any login1 signal (not just lid events)
+    # would mean a redundant DRM re-probe on every session property change.
     local current
     current=$(cat "${connector}/status" 2>/dev/null || echo "")
 
@@ -108,12 +107,15 @@ sync() {
     else
         [[ "$current" != "connected" ]] && _write_status "$connector" detect
     fi
+    # Explicit: the `[[ ]] && ...` lines above are false in the steady state,
+    # and a non-zero return here would end the whole script under set -e.
+    return 0
 }
 
 # First sync only: on a cold boot, this service can start before the GPU
 # driver has finished probing *external* connectors - a too-early check
 # could read "nothing plugged in" even though a monitor genuinely is there,
-# and never retry since the next sync only fires on the next login1 event.
+# and the probe finishing doesn't always raise a hotplug event to retry on.
 # Retrying a few times here (cheap, and harmless if genuinely undocked)
 # absorbs that race without needing to guess a fixed boot-order dependency
 # that can't exist anyway (systemd has no target for "DRM connector
@@ -130,15 +132,30 @@ startup_sync() {
 
 startup_sync
 
-# Debounced, not instant: logind's own session bookkeeping (what
-# _user_session_active reads) has a brief settling window right at login/
-# logout, before and after which this and hyprbazzite-lid.service could
-# both react to the same event a beat apart. A short delay here means we
-# read session state just after it's finished settling instead of right in
-# the middle of it, on every single trigger, not just this race's exact
-# window - cheap enough not to matter for lid-close responsiveness.
-busctl --system monitor org.freedesktop.login1 2>/dev/null | \
+# Event-driven: login1 signals (lid switch, sessions coming and going) plus
+# DRM hotplug uevents (a dock plugged in or out at the greeter). gdbus
+# subscribes to signals only. This used to be `busctl monitor`, which also
+# prints every method call to login1 and its reply, many lines each, and ran
+# one sync per line - and sync's own loginctl/busctl queries are such calls,
+# so the loop fed itself and woke about once a second for as long as anyone
+# was logged in.
+#
+# Debounced: wait a beat so logind's session bookkeeping (what
+# _user_session_active reads) settles at login/logout, drain the rest of the
+# burst (bounded, so an event storm can't starve the sync), then look at the
+# current state once.
+{
+    gdbus monitor --system --dest org.freedesktop.login1 & login1_pid=$!
+    udevadm monitor --udev --subsystem-match=drm & drm_pid=$!
+    # Either monitor ending ends the watch (Restart=always brings it back).
+    # Take the other one down too: its open end of the pipe would otherwise
+    # keep this loop alive on only half of its events.
+    wait -n || true
+    kill "$login1_pid" "$drm_pid" 2>/dev/null || true
+    exit 1
+} 2>/dev/null | \
 while IFS= read -r _; do
     sleep 1
+    for _ in {1..50}; do IFS= read -r -t 0.2 _ || break; done
     sync
 done
