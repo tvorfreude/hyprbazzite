@@ -178,18 +178,29 @@ gamemode_toggle() {
     fi
 }
 
-# `hyprctl reload` re-evaluates the Lua config from scratch, which also drops
-# what was applied at runtime through `hyprctl eval`: the workspace-to-monitor
-# rules (workspace_rebind), the on-screen keyboard's window rule and the
-# night-light shader. Put those back.
-_reload_config() {
-    local nightlight=0
-    [[ "$(qs nightlight state 2>/dev/null)" == true ]] && nightlight=1
-    hyprctl reload >/dev/null
-    workspace_rebind
+# Some state only exists in the running compositor, set with `hyprctl eval`:
+# the workspace-to-monitor rules (workspace_rebind), the on-screen keyboard's
+# window rule and the night-light shader. Evaluating the config again - a
+# `hyprctl reload` from anywhere, Hyprland's own auto-reload - drops it, so
+# hyprland.lua starts this in the background on every load (on the very first
+# load, before the compositor answers, each step just fails quietly). Every
+# step is guarded: under set -e one failing hyprctl call would otherwise end
+# the caller (gamemode-off was left on a black screen that way).
+restore_runtime() {
+    local shader
+    workspace_rebind >/dev/null 2>&1 || true
     _osk_window_rule
-    if (( nightlight )); then SWAYNC_TOGGLE_STATE=true qs nightlight set; fi
+    if shader=$(cat "${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite/nightlight" 2>/dev/null) && [[ -n "$shader" ]]; then
+        hyprctl eval "hl.config({ decoration = { screen_shader = \"$shader\" } })" >/dev/null 2>&1 || true
+    fi
     return 0
+}
+
+# Reload and restore right away, without waiting on hyprland.lua's background
+# restore (and for a user's own hyprland.lua, which doesn't start one).
+_reload_config() {
+    hyprctl reload >/dev/null 2>&1 || true
+    restore_runtime
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1449,11 +1460,16 @@ qs() {
         nightlight:state)
             hyprctl -j getoption decoration:screen_shader 2>/dev/null | jq -r '.str // ""' | grep -q "nightlight.frag" && echo true || echo false ;;
         nightlight:set)
+            # The state file lets restore_runtime put the shader back after
+            # a config reload.
             local shader="${HYPRBAZZITE_NIGHTLIGHT_SHADER:-/usr/lib/hyprbazzite/hypr/nightlight.frag}"
+            local state="${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite/nightlight"
             if [[ "${SWAYNC_TOGGLE_STATE:-}" == "true" ]]; then
                 hyprctl eval "hl.config({ decoration = { screen_shader = \"$shader\" } })" >/dev/null
+                mkdir -p "${state%/*}" && printf '%s\n' "$shader" > "$state"
             else
                 hyprctl eval 'hl.config({ decoration = { screen_shader = "" } })' >/dev/null
+                rm -f "$state"
             fi ;;
         screenshot:run)  swaync-client -cp -sw; sleep 0.35; screenshot_take region ;;
         picker:run)      swaync-client -cp -sw; sleep 0.35; hyprpicker -a ;;
@@ -1480,6 +1496,7 @@ Modules:
   chezmoi [push|pull]           Dotfiles management
   refresh                       Restart session apps (waybar, idle, etc.)
   reload                        Reload the Hyprland config, keeping runtime state
+  restore-runtime               Re-apply runtime-only state (run by hyprland.lua on load)
   settings                      Quick settings menu
   theme [update] [wallpaper]    Update color theme from wallpaper
   tdp [get|set <watts>|profile] TDP power management
@@ -1513,6 +1530,7 @@ USAGE
         chezmoi) chezmoi_action "${1:-}" ;;
         refresh) session_refresh ;;
         reload) _reload_config ;;
+        restore-runtime) restore_runtime ;;
         settings) quicksettings_show ;;
         theme)
             case "${1:-update}" in

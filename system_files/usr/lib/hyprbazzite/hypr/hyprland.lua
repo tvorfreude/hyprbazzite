@@ -106,3 +106,10 @@ hl.config({
     ecosystem = { no_update_news = true },
     debug = { full_cm_proto = true },
 })
+
+-- Workspace-to-monitor rules, the on-screen keyboard's window rule and night
+-- light are applied at runtime with `hyprctl eval`, so every evaluation of this
+-- file (`hyprctl reload` from anywhere, Hyprland's own auto-reload) drops them.
+-- Put them back - in the background, because that talks to the compositor,
+-- which is busy evaluating this file right now.
+os.execute("/usr/libexec/hyprbazzite-ctl restore-runtime >/dev/null 2>&1 &")
