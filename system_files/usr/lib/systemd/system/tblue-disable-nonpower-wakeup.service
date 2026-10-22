@@ -7,6 +7,11 @@ Description=Disable non-power/lid wakeup sources (bag-safe: USB/PCIe/etc. can't 
 # suspend/resume) and reset on reboot, so running once at boot is sufficient.
 After=multi-user.target
 ConditionPathExists=/proc/acpi/wakeup
+# Laptops (and handhelds) only. On a desktop this left only the power button
+# able to wake it - no keyboard, mouse or Wake-on-LAN - while
+# hyprbazzite-deep-sleep-setup puts desktops into S3. A battery is the same
+# "this is a laptop" signal hyprbazzite-battery.service and that unit use.
+ConditionPathExistsGlob=/sys/class/power_supply/BAT*
 
 [Service]
 Type=oneshot

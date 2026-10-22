@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # tblue-hibernate-setup - Configure hybrid sleep/hibernation for btrfs swapfiles
 #
-# Sets up resume kernel parameters, configures systemd sleep settings,
-# and disables unnecessary wakeup sources.
+# Sets up resume kernel parameters and configures systemd sleep settings.
+# (Wakeup sources are filtered by tblue-disable-nonpower-wakeup.service.)
 
 set -euo pipefail
 
@@ -146,13 +146,6 @@ main() {
     configure_sleep_setting "AllowSuspendThenHibernate" "yes"
 
     log "Hybrid sleep setup complete."
-
-    # 5. Disable non-power/lid wakeup sources. This duplicated the logic that
-    # tblue-disable-nonpower-wakeup.service (and its underlying script) also
-    # runs on every boot; now just delegate to it instead of keeping two
-    # copies of the same allow-list in sync.
-    log "Disabling non-power/lid wakeup sources."
-    /usr/lib/hyprbazzite/hypr/scripts/disable-nonpower-wakeup.sh
 }
 
 main "$@"
