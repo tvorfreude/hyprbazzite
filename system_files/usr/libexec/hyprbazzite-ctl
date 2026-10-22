@@ -717,14 +717,26 @@ _hypr_socket2() {
     return 1
 }
 
+# Keeps a long-running automation daemon to one instance per Hyprland
+# instance. autostart used to de-duplicate them by process name ("socat",
+# "udevadm"), but waybar's app-name module runs socat and wallpaper-cycle runs
+# udevadm, so either could suppress the real daemon, and leftovers from an
+# earlier Hyprland instance in the same login did too. Children that outlive
+# a single event get `9>&-` so they don't keep holding the lock.
+_singleton() {
+    exec 9>"${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-$1-${HYPRLAND_INSTANCE_SIGNATURE:-default}.lock"
+    flock -n 9
+}
+
 automation_dnd() {
     if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
         echo "Hyprland instance signature not found." >&2
         return 1
     fi
+    _singleton automation-dnd || return 0
     local sock
     sock=$(_hypr_socket2) || { echo "Hyprland event socket not found." >&2; return 1; }
-    socat -U - "UNIX-CONNECT:$sock" | while read -r line; do
+    socat -U - "UNIX-CONNECT:$sock" 9>&- | while read -r line; do
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
@@ -747,6 +759,7 @@ automation_dnd() {
 }
 
 automation_osk() {
+    _singleton automation-osk || return 0
     local conf="/etc/hypr/wvkbd.conf"
     [[ -f "$conf" ]] && . "$conf"
     local layout="${WVKBD_LAYOUT:-mobintl}"
@@ -774,7 +787,7 @@ automation_osk() {
                 "$bin" --hidden -H "$height" -L "$height_land" -l "$layers" \
                     --landscape-layers "$land_layers" --fn "$font" --alpha "$alpha" \
                     --bg "$bg" --fg "$fg" --fg-sp "$fg_sp" --press "$press" \
-                    --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 &
+                    --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 9>&- &
             fi
         fi
     }
@@ -785,7 +798,10 @@ automation_osk() {
     else
         hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","50%"} })' >/dev/null 2>&1 || true
     fi
-    udevadm monitor --udev --subsystem-match=input --property | while read -r line; do
+    udevadm monitor --udev --subsystem-match=input --property 9>&- | while read -r line; do
+        # udevadm never exits on its own: stop once this Hyprland instance
+        # is gone instead of lingering into the next one.
+        [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || _hypr_socket2 >/dev/null || break
         [[ "$line" =~ ACTION=(add|remove|change) ]] && _sync_state
     done
 }

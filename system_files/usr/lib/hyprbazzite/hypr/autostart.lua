@@ -38,8 +38,10 @@ hl.on("hyprland.start", function()
     -- session with the lid already closed is covered by that service's own
     -- startup sync instead of a second one racing it from this hook.
     hl.exec_cmd("/usr/libexec/hyprbazzite-ctl workspace rebind init")
-    exec_once("/usr/libexec/hyprbazzite-ctl automation dnd", "socat")
-    exec_once("/usr/libexec/hyprbazzite-ctl automation osk", "udevadm")
+    -- No name guards: they used generic names ("socat", "udevadm") that other
+    -- things here also run. The daemons hold a per-instance lock themselves.
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl automation dnd")
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl automation osk")
 
     -- UTILITIES
     exec_once("wl-paste --watch cliphist store", "wl-paste")
