@@ -143,10 +143,16 @@ main() {
     # resume_delay=5 used to be appended here, but the kernel parameter is
     # resumedelay= (no underscore), so it was a no-op. The real resume runs
     # from the initramfs, which ignores that delay anyway, while the correctly
-    # spelled one would add 5s to every boot. A re-run removes the old one.
-    if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'nohibernate' \
-       || ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^resume='; then
-        log "Provisioning hibernation kargs (remove nohibernate, add resume; reboot required)."
+    # spelled one would add 5s to every boot. Installs provisioned before this
+    # keep the harmless leftover until the setup is re-run (remove
+    # /var/lib/tblue/hibernate-setup.done), which then deletes it - not worth
+    # a forced rpm-ostree transaction on every machine.
+    local kargs
+    kargs=$(rpm-ostree kargs | tr ' ' '\n')
+    if grep -qx 'nohibernate' <<<"$kargs" \
+       || ! grep -q '^resume=' <<<"$kargs" \
+       || grep -qx 'resume_delay=5' <<<"$kargs"; then
+        log "Provisioning hibernation kargs (remove nohibernate/resume_delay, add resume; reboot required)."
         rpm-ostree kargs \
             --delete-if-present="nohibernate" \
             --append-if-missing="resume=UUID=$dec_uuid" \
