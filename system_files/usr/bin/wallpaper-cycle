@@ -3,9 +3,9 @@
 #
 # This script sets a random GIF wallpaper from the configured directory,
 # cycles it at regular intervals, re-applies it when monitors are hotplugged,
-# and picks a new one on SIGUSR1 (hyprbazzite-ctl sends that to the PID in
-# $XDG_RUNTIME_DIR/wallpaper-cycle.pid - the process name is "bash", so
-# pgrep/pkill by name never find it).
+# and on SIGUSR1 puts a wallpaper back on screen (hyprbazzite-ctl sends that
+# to the PID in $XDG_RUNTIME_DIR/wallpaper-cycle.pid - the process name is
+# "bash", so pgrep/pkill by name never find it).
 
 set -euo pipefail
 
@@ -99,11 +99,22 @@ reapply_current() {
     awww img --transition-type none --resize crop --filter "$FILTER" "$current"
 }
 
+# SIGUSR1: hyprbazzite-ctl sends it right after restarting awww-daemon
+# (Refresh Session, gamemode off), when nothing is showing. A new random GIF,
+# or the pinned picture again while one is pinned - cycle_now alone skips a
+# pinned wallpaper, which left the desktop blank.
+on_usr1() {
+    if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
+        reapply_current
+    else
+        cycle_now
+    fi
+}
+
 # -- Monitor hotplug listener ------------------------------------------------
 
 monitor_hotplug() {
-    # 9>&-: don't hand the instance lock to udevadm.
-    udevadm monitor --udev --subsystem-match=drm 9>&- | \
+    udevadm monitor --udev --subsystem-match=drm | \
     while read -r line; do
         [[ "$line" == *change* ]] || continue
         # A hotplug or a resume re-probe arrives as a burst of events, one per
@@ -115,6 +126,9 @@ monitor_hotplug() {
 }
 
 cleanup() {
+    if [[ -n "${sleep_pid:-}" ]]; then
+        kill "$sleep_pid" 2>/dev/null || true
+    fi
     if [[ -n "${hotplug_pid:-}" ]]; then
         pkill -P "$hotplug_pid" 2>/dev/null || true
         kill "$hotplug_pid" 2>/dev/null || true
@@ -139,25 +153,29 @@ main() {
     trap 'exit 129' HUP
     trap 'exit 130' INT
     trap cleanup EXIT
-    # Manual cycle. `|| true`: under set -e, a failing command inside a trap
-    # handler (awww-daemon briefly unavailable, say) would end the daemon.
-    trap 'cycle_now || true' USR1
+    # `|| true`: under set -e, a failing command inside a trap handler
+    # (awww-daemon briefly unavailable, say) would end the daemon.
+    trap 'on_usr1 || true' USR1
 
     # Initial delay to ensure awww daemon is ready
     sleep 2
     cycle_now || true
 
-    # Start monitor hotplug listener in background
-    monitor_hotplug &
+    # Background children get `9>&-` so they never hold the instance lock:
+    # anything left behind with it (the interval sleep used to be) would make
+    # a restart in the same Hyprland instance exit silently.
+    monitor_hotplug 9>&- &
     hotplug_pid=$!
 
     # Interruptible sleep: a USR1 cuts it short (the trap has already
     # cycled), and the interval starts over.
-    local sleep_pid
     while hyprland_alive; do
-        sleep "$CYCLE_INTERVAL" &
+        sleep "$CYCLE_INTERVAL" 9>&- &
         sleep_pid=$!
         if wait "$sleep_pid"; then
+            # Re-check first: after a logout/login within one interval the
+            # same WAYLAND_DISPLAY belongs to the new session.
+            hyprland_alive || break
             cycle_now || true
         else
             kill "$sleep_pid" 2>/dev/null || true
