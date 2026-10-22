@@ -36,22 +36,25 @@ log() { echo "[hyprbazzite-deep-sleep-setup] $*"; }
 
 mkdir -p /var/lib/hyprbazzite
 
+# The marker is only cleared once it has been dealt with: if the revert below
+# fails (set -e, e.g. another rpm-ostree transaction is running), the next
+# boot sees it again and retries instead of losing the revert.
 if [[ -f "$FAIL_MARKER" ]]; then
-    rm -f "$FAIL_MARKER"
     count=$(( $(cat "$FAIL_COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
     echo "$count" > "$FAIL_COUNT_FILE"
     log "Last sleep never cleanly resumed (failure $count/$MAX_FAILURES)."
     if (( count >= MAX_FAILURES )); then
         log "Reverting mem_sleep_default=deep after repeated failed resumes - falling back to s2idle."
         rpm-ostree kargs --delete-if-present="mem_sleep_default=deep"
-        rm -f "$FAIL_COUNT_FILE"
+        rm -f "$FAIL_MARKER" "$FAIL_COUNT_FILE"
         touch "$BLACKLIST_FILE"
         exit 0
     fi
+    rm -f "$FAIL_MARKER"
 fi
 
 if [[ -f "$BLACKLIST_FILE" ]]; then
-    log "deep sleep previously failed to resume on this machine; leaving s2idle in place."
+    log "deep sleep previously failed to resume on this machine; leaving s2idle in place (ujust hypr-deep-sleep-reset to try again)."
     exit 0
 fi
 

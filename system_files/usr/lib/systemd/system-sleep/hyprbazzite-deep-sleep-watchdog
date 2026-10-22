@@ -25,6 +25,11 @@ MARKER=/var/lib/hyprbazzite/sleep-pending
 
 case "$1" in
     pre)
+        # Only arm for a suspend that really enters S3 - the state this
+        # guards. Arming for every sleep also counted s2idle, plain hibernate
+        # and the first sleeps before the karg took effect.
+        [[ "${2:-}" == suspend || "${2:-}" == suspend-then-hibernate ]] || exit 0
+        grep -q '\[deep\]' /sys/power/mem_sleep 2>/dev/null || exit 0
         mkdir -p /var/lib/hyprbazzite
         touch "$MARKER"
         ;;
