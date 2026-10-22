@@ -180,12 +180,14 @@ gamemode_toggle() {
 
 # `hyprctl reload` re-evaluates the Lua config from scratch, which also drops
 # what was applied at runtime through `hyprctl eval`: the workspace-to-monitor
-# rules (workspace_rebind) and the night-light shader. Put those back.
+# rules (workspace_rebind), the on-screen keyboard's window rule and the
+# night-light shader. Put those back.
 _reload_config() {
     local nightlight=0
     [[ "$(qs nightlight state 2>/dev/null)" == true ]] && nightlight=1
     hyprctl reload >/dev/null
     workspace_rebind
+    _osk_window_rule
     if (( nightlight )); then SWAYNC_TOGGLE_STATE=true qs nightlight set; fi
     return 0
 }
@@ -606,6 +608,20 @@ osk_toggle() {
     fi
 }
 
+# The OSK's float/position window rule only exists in the running compositor
+# (set with `hyprctl eval`), so a config reload drops it - _reload_config
+# re-applies it through here. $1 = top|bottom; default: the anchor last
+# chosen this session, else WVKBD_ANCHOR from wvkbd.conf.
+_osk_window_rule() {
+    local anchor="${1:-}" move='{"0","50%"}'
+    if [[ -z "$anchor" ]]; then
+        anchor=$(cat "${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor" 2>/dev/null) \
+            || anchor=$( . /etc/hypr/wvkbd.conf 2>/dev/null; echo "${WVKBD_ANCHOR:-bottom}" )
+    fi
+    [[ "$anchor" == "top" ]] && move='{"0","0"}'
+    hyprctl eval "$(printf 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = %s })' "$move")" >/dev/null 2>&1 || true
+}
+
 osk_swap_anchor() {
     local state_file="${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor"
     local current="bottom"
@@ -616,13 +632,7 @@ osk_swap_anchor() {
 
     printf '%s\n' "$next" > "$state_file"
 
-    if command -v hyprctl >/dev/null 2>&1; then
-        if [[ "$next" = "top" ]]; then
-            hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, move = {"0","0"} })' >/dev/null 2>&1 || true
-        else
-            hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, move = {"0","50%"} })' >/dev/null 2>&1 || true
-        fi
-    fi
+    _osk_window_rule "$next"
 
     if pgrep -x wvkbd-mobintl >/dev/null 2>&1 || pgrep -x wvkbd >/dev/null 2>&1; then
         pkill -x wvkbd-mobintl >/dev/null 2>&1 || true
@@ -794,11 +804,7 @@ automation_osk() {
     }
 
     _sync_state
-    if [[ "$anchor" = "top" ]]; then
-        hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","0"} })' >/dev/null 2>&1 || true
-    else
-        hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","50%"} })' >/dev/null 2>&1 || true
-    fi
+    _osk_window_rule "$anchor"
     udevadm monitor --udev --subsystem-match=input --property 9>&- | while read -r line; do
         # udevadm never exits on its own: stop once this Hyprland instance
         # is gone instead of lingering into the next one.
