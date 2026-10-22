@@ -309,6 +309,10 @@ jobs:
       # set, sign with that key: that is what installed systems verify once
       # cosign.pub is committed. Without it, sign keyless (GitHub OIDC), which
       # can be checked by hand but not enforced by containers-policy.json.
+      # The key signature must use the legacy format: cosign v3 (what
+      # cosign-installer installs) defaults to Sigstore bundles stored as OCI
+      # referrers, which containers/image doesn't read - it looks for the
+      # `sha256-<digest>.sig` attachment - so every enforced pull would fail.
       - name: Sign Image
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
@@ -319,7 +323,8 @@ jobs:
           IMAGE_DIGEST_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}
         run: |
           if [ -n "${COSIGN_PRIVATE_KEY}" ]; then
-            cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${IMAGE_DIGEST_REF}"
+            cosign sign --yes --key env://COSIGN_PRIVATE_KEY \
+              --new-bundle-format=false --use-signing-config=false "${IMAGE_DIGEST_REF}"
           else
             cosign sign --yes "${IMAGE_DIGEST_REF}"
           fi
@@ -333,7 +338,7 @@ jobs:
         run: |
           if [ -n "${COSIGN_PRIVATE_KEY}" ]; then
             cosign public-key --key env://COSIGN_PRIVATE_KEY > "${RUNNER_TEMP}/signing.pub"
-            cosign verify --key "${RUNNER_TEMP}/signing.pub" "${IMAGE_DIGEST_REF}"
+            cosign verify --key "${RUNNER_TEMP}/signing.pub" --new-bundle-format=false "${IMAGE_DIGEST_REF}"
           else
             # Anchored to this repository's build workflow, not just the owner.
             cosign verify \
