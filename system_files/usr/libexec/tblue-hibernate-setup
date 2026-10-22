@@ -68,6 +68,26 @@ ensure_swapfile() {
 # -- Main ---------------------------------------------------------------------
 
 main() {
+    # btrfs only: the swapfile relies on `btrfs filesystem mkswapfile` (or
+    # NOCOW) and `btrfs inspect-internal map-swapfile` for its resume offset.
+    # On any other root this failed on every boot, since the done-marker is
+    # only written on success. Exiting 0 lets the unit mark itself done.
+    if [[ "$(stat -f -c %T /var)" != "btrfs" ]]; then
+        log "/var is not on btrfs; skipping swapfile and hibernation setup."
+        exit 0
+    fi
+
+    # Kernel lockdown (Secure Boot) disables hibernation outright - see the
+    # karg notes below - so don't spend RAM+2GiB of disk on a swapfile that
+    # can never hold a hibernation image. Checked via lockdown, not
+    # /sys/power/state: Bazzite's own nohibernate karg (removed below) also
+    # hides "disk" there until the next boot.
+    if grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
+        log "Kernel lockdown is active (Secure Boot): hibernation is unavailable, skipping."
+        log "After disabling Secure Boot, re-run with: sudo rm /var/lib/tblue/hibernate-setup.done && sudo systemctl start tblue-hibernate-setup"
+        exit 0
+    fi
+
     # 1. Ensure the swapfile exists (create it if missing), then fstab + activate.
     ensure_swapfile
 
@@ -120,6 +140,10 @@ main() {
     # just isn't available for this reason.
     # Guarded so steady-state boots skip the (slow) rpm-ostree transaction.
     # NOTE: applied kargs require a reboot to take effect.
+    # resume_delay=5 used to be appended here, but the kernel parameter is
+    # resumedelay= (no underscore), so it was a no-op. The real resume runs
+    # from the initramfs, which ignores that delay anyway, while the correctly
+    # spelled one would add 5s to every boot. A re-run removes the old one.
     if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'nohibernate' \
        || ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^resume='; then
         log "Provisioning hibernation kargs (remove nohibernate, add resume; reboot required)."
@@ -127,8 +151,7 @@ main() {
             --delete-if-present="nohibernate" \
             --append-if-missing="resume=UUID=$dec_uuid" \
             --append-if-missing="resume_offset=$offset" \
-            --append-if-missing="rootwait" \
-            --append-if-missing="resume_delay=5"
+            --delete-if-present="resume_delay=5"
     else
         log "Hibernation kargs already provisioned; leaving kargs unchanged."
     fi
