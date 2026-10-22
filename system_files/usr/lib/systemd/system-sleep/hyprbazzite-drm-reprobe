@@ -35,7 +35,10 @@ reprobe() {
 case "${1:-}" in
     post)
         reprobe
-        systemd-run --no-block --collect --quiet --unit=hyprbazzite-drm-reprobe-retry \
+        # No fixed --unit name: a suspend within ~10s of resuming would find
+        # the previous retry unit still active and silently skip these.
+        systemd-run --no-block --collect --quiet \
+            --description="Re-probe DRM connectors after resume" \
             /usr/lib/systemd/system-sleep/hyprbazzite-drm-reprobe retry || true
         ;;
     retry)
