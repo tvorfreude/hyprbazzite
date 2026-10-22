@@ -160,6 +160,19 @@ if [ ! -f "/usr/share/sddm/themes/hyprlockish/Main.qml" ]; then
 fi
 echo "SDDM theme is present."
 
+# 7b. Update signature policy: once cosign.pub is committed, the key is
+# installed and every pull of this image must be signed by it.
+if [ -f /etc/pki/containers/hyprbazzite.pub ]; then
+    for policy in /etc/containers/policy.json /usr/etc/containers/policy.json; do
+        [ -f "$policy" ] || continue
+        if ! jq -e '[.transports.docker[][] | select(.keyPath? == "/etc/pki/containers/hyprbazzite.pub")] | length > 0' "$policy" >/dev/null; then
+            echo "ERROR: hyprbazzite.pub is installed but $policy does not require it."
+            exit 1
+        fi
+    done
+    echo "Update signature policy requires the hyprbazzite key."
+fi
+
 # 8. Secure boot certificate
 if [ ! -f "/etc/pki/secureboot/secureboot.crt" ] && [ ! -f "/usr/share/secureboot/secureboot.crt" ]; then
     echo "WARNING: Secure boot certificate not found in expected locations (non-fatal)."

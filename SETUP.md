@@ -81,6 +81,29 @@ This is a feature (your customizations survive reboots and updates), but it
 means a config file you've never touched still won't pick up a new shipped
 default without one of the steps above.
 
+## Update signature verification (maintainer, one-time)
+
+Installed systems only verify this image's signature on update once a
+public key is committed; until then CI signs keyless, which can be checked
+by hand but not enforced. To turn enforcement on:
+
+1. Generate a key pair (an empty password is fine; otherwise also add the
+   password as a `COSIGN_PASSWORD` secret):
+   ```bash
+   cosign generate-key-pair
+   ```
+2. Add the contents of `cosign.key` as the repository secret
+   `SIGNING_SECRET` (Settings → Secrets and variables → Actions), then store
+   `cosign.key` somewhere safe offline. It is gitignored; never commit it.
+3. Commit `cosign.pub` at the repository root and push.
+
+CI refuses to build if `SIGNING_SECRET` is missing or doesn't match
+`cosign.pub`, so a mismatched key can't brick updates. From the first image
+built with `cosign.pub`, every install requires that signature on its next
+update. Losing the private key means installs can no longer be updated
+without a manual `bootc switch`, so keep a backup. Key rotation isn't
+automated: it needs a transition image whose policy trusts both keys.
+
 ## Troubleshooting
 
 ### Hyprland won't start
