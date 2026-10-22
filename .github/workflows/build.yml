@@ -153,6 +153,32 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
 
+      # A committed cosign.pub makes every installed system require images
+      # signed with that key (see Containerfile, "Image signature policy"), so
+      # publishing anything not signed with the matching private key would
+      # break updates everywhere. Refuse before the long build instead.
+      - name: Check signing setup
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ ! -f cosign.pub ]; then
+            echo "No cosign.pub committed: signing keyless; installed systems do not enforce signatures."
+            exit 0
+          fi
+          if [ -z "${COSIGN_PRIVATE_KEY}" ]; then
+            echo "::error::cosign.pub is committed but the SIGNING_SECRET secret is not set."
+            exit 1
+          fi
+          cosign public-key --key env://COSIGN_PRIVATE_KEY > "${RUNNER_TEMP}/derived.pub"
+          if ! diff -q <(tr -d '[:space:]' < cosign.pub) <(tr -d '[:space:]' < "${RUNNER_TEMP}/derived.pub"); then
+            echo "::error::SIGNING_SECRET does not match the committed cosign.pub."
+            exit 1
+          fi
+          echo "SIGNING_SECRET matches cosign.pub."
+
       - name: Set short SHA
         id: vars
         run: echo "sha_short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
@@ -203,6 +229,7 @@ jobs:
             --layers=false
           build-args: |
             BASE_IMAGE=${{ matrix.base_image }}
+            IMAGE_REF=${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
             SHA_HEAD_SHORT=${{ steps.vars.outputs.sha_short }}
             BUILD_STAMP=${{ steps.metadata.outputs.version }}
 
@@ -278,22 +305,42 @@ jobs:
             "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
 
       # Sign every pushed image (including same-repo PR images) so `bootc switch`
-      # works even when the host enforces a signature policy.
+      # works when the host enforces a signature policy. With SIGNING_SECRET
+      # set, sign with that key: that is what installed systems verify once
+      # cosign.pub is committed. Without it, sign keyless (GitHub OIDC), which
+      # can be checked by hand but not enforced by containers-policy.json.
       - name: Sign Image
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
           COSIGN_REGISTRY_USERNAME: ${{ github.actor }}
           COSIGN_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          IMAGE_DIGEST_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}
         run: |
-          cosign sign --yes "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+          if [ -n "${COSIGN_PRIVATE_KEY}" ]; then
+            cosign sign --yes --key env://COSIGN_PRIVATE_KEY "${IMAGE_DIGEST_REF}"
+          else
+            cosign sign --yes "${IMAGE_DIGEST_REF}"
+          fi
 
       - name: Verify Signature
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          IMAGE_DIGEST_REF: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}
         run: |
-          cosign verify \
-            --certificate-identity-regexp="https://github.com/${{ github.repository_owner }}/" \
-            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-            "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}"
+          if [ -n "${COSIGN_PRIVATE_KEY}" ]; then
+            cosign public-key --key env://COSIGN_PRIVATE_KEY > "${RUNNER_TEMP}/signing.pub"
+            cosign verify --key "${RUNNER_TEMP}/signing.pub" "${IMAGE_DIGEST_REF}"
+          else
+            # Anchored to this repository's build workflow, not just the owner.
+            cosign verify \
+              --certificate-identity-regexp="^https://github\.com/${{ github.repository }}/\.github/workflows/build\.yml@" \
+              --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+              "${IMAGE_DIGEST_REF}"
+          fi
 
   cleanup:
     name: Cleanup old package versions

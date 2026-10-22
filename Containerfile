@@ -118,6 +118,34 @@ COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
 COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
 
 # ---------------------------------------------------------------------------
+# Step 5b: Image signature policy (updates of this image)
+# ---------------------------------------------------------------------------
+# Bazzite's containers-policy.json only requires signatures for
+# ghcr.io/ublue-os; every other image falls through to an accept-anything
+# catch-all, so updates of this image were never verified - anyone able to
+# push to the package could ship root code to every install. Once a cosign
+# public key is committed as cosign.pub (see SETUP.md), require every pull of
+# this image to be signed by it. Without cosign.pub nothing changes. CI
+# refuses to build if the signing secret doesn't match the committed key.
+ARG IMAGE_REF=ghcr.io/tvorfreude/hyprbazzite
+RUN --mount=type=bind,target=/ctx \
+    if [ -f /ctx/cosign.pub ]; then \
+        install -Dm0644 /ctx/cosign.pub /etc/pki/containers/hyprbazzite.pub && \
+        mkdir -p /etc/containers/registries.d && \
+        printf 'docker:\n  %s:\n    use-sigstore-attachments: true\n' "${IMAGE_REF}" \
+            > /etc/containers/registries.d/hyprbazzite.yaml && \
+        found=0 && \
+        for policy in /etc/containers/policy.json /usr/etc/containers/policy.json; do \
+            [ -f "$policy" ] || continue; \
+            jq --arg ref "${IMAGE_REF}" \
+               '.transports.docker[$ref] = [{"type": "sigstoreSigned", "keyPath": "/etc/pki/containers/hyprbazzite.pub", "signedIdentity": {"type": "matchRepository"}}]' \
+               "$policy" > /tmp/policy.json && \
+            mv /tmp/policy.json "$policy" && found=1; \
+        done && \
+        [ "$found" = 1 ] || { echo "ERROR: no containers policy.json to add ${IMAGE_REF} to" >&2; exit 1; }; \
+    fi
+
+# ---------------------------------------------------------------------------
 # Step 6: Import terra-mesa GPG key (instead of disabling gpgcheck)
 # ---------------------------------------------------------------------------
 RUN if [ -f /etc/yum.repos.d/terra-mesa.repo ]; then \
