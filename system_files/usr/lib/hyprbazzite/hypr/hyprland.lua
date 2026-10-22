@@ -7,15 +7,28 @@ require("styles")
 
 -- Essential Variables
 -- Accent comes from hyprbazzite-accent (Dracula purple unless the user chose
--- "auto" or a custom colour). Any failure keeps the default.
+-- "auto" or a custom colour). Any failure keeps the default. Read the value
+-- it last rendered into $XDG_RUNTIME_DIR first: `hyprbazzite-accent hex` runs
+-- ImageMagick on the wallpaper in "auto" mode, and this file is evaluated on
+-- the compositor's main thread, so every reload froze the screen while it ran.
+-- The command remains the fallback for a session's first load, before
+-- anything has rendered the accent.
 local active_border = "rgba(bd93f9ee)"
 do
-    local ok, pipe = pcall(io.popen, "/usr/libexec/hyprbazzite-accent hex 2>/dev/null")
-    if ok and pipe then
-        local hex = (pipe:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
-        pipe:close()
-        if hex then active_border = "rgba(" .. hex .. "ee)" end
+    local hex
+    local f = io.open((os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprbazzite/accent", "r")
+    if f then
+        hex = (f:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
+        f:close()
     end
+    if not hex then
+        local ok, pipe = pcall(io.popen, "/usr/libexec/hyprbazzite-accent hex 2>/dev/null")
+        if ok and pipe then
+            hex = (pipe:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
+            pipe:close()
+        end
+    end
+    if hex then active_border = "rgba(" .. hex .. "ee)" end
 end
 local inactive_border = "rgba(44475aaa)"
 
