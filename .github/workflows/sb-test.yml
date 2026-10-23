@@ -32,7 +32,7 @@ jobs:
       - name: Install QEMU and virt-firmware
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils ovmf imagemagick python3-venv >/dev/null
+          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils ovmf imagemagick python3-venv sbsigntool >/dev/null
           python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install -q virt-firmware
           echo "VM_DIR=$RUNNER_TEMP/vm" >> "$GITHUB_ENV"
           ls /usr/share/OVMF/
@@ -60,11 +60,23 @@ jobs:
           # Firmware: Microsoft keys, Secure Boot on, plus the Universal Blue
           # certificate in db - the one Bazzite signs its kernels with (what
           # enrolling the key as a MOK does on real hardware).
-          sudo podman run --rm --entrypoint cat "$IMAGE" /usr/share/ublue-os/sb_pubkey.der > "$VM_DIR/ublue.der"
-          openssl x509 -inform der -in "$VM_DIR/ublue.der" -out "$VM_DIR/ublue.pem"
-          openssl x509 -in "$VM_DIR/ublue.pem" -noout -subject
+          in_image() { sudo podman run --rm --entrypoint sh "$IMAGE" -c "$1"; }
+          echo "---- certificates in the image"
+          in_image 'ls -l /etc/pki/akmods/certs /usr/share/ublue-os/*.der /usr/share/ublue-os/*.crt 2>&1; find / -xdev \( -name "*.der" -o -name "*.cer" \) \( -path "*ublue*" -o -path "*akmods*" -o -path "*secureboot*" \) 2>/dev/null'
+          echo "---- kernel signature"
+          in_image 'cat /usr/lib/modules/*/vmlinuz' > "$VM_DIR/vmlinuz"
+          sbverify --list "$VM_DIR/vmlinuz" || true
+          args=()
+          for c in $(in_image 'ls /etc/pki/akmods/certs/*.der 2>/dev/null'); do
+            n=$(basename "$c" .der)
+            in_image "cat $c" > "$VM_DIR/$n.der"
+            openssl x509 -inform der -in "$VM_DIR/$n.der" -out "$VM_DIR/$n.pem"
+            echo "db += $c: $(openssl x509 -in "$VM_DIR/$n.pem" -noout -subject)"
+            args+=(--add-db 2a3d9e5c-1f4b-4c6d-9e8f-0a1b2c3d4e5f "$VM_DIR/$n.pem")
+          done
+          [[ ${#args[@]} -gt 0 ]] || { echo "no Universal Blue certificate found in the image" >&2; exit 1; }
           "$RUNNER_TEMP/venv/bin/virt-fw-vars" -i /usr/share/OVMF/OVMF_VARS_4M.ms.fd -o "$VM_DIR/vars.fd" \
-            --secure-boot --add-db 2a3d9e5c-1f4b-4c6d-9e8f-0a1b2c3d4e5f "$VM_DIR/ublue.pem"
+            --secure-boot "${args[@]}"
           sudo podman build -q --build-arg BASE="$IMAGE" -t localhost/hb-vmtest:latest \
             -f .github/sb-test/Containerfile .github/sb-test
           ssh-keygen -q -t ed25519 -N '' -f "$VM_DIR/key"
