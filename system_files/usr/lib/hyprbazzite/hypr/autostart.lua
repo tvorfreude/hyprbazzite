@@ -4,16 +4,26 @@
 -- All processes are guarded against duplicates so that a `hyprctl reload`
 -- doesn't spawn second instances.
 
+-- process_name is matched with `pgrep -x`, i.e. against the kernel's process
+-- name, which is cut to 15 characters: pass the first 15 of a longer name.
 local function exec_once(cmd, process_name)
     process_name = process_name or cmd:match("^(%S+)")
     hl.exec_cmd(string.format("pgrep -x %s >/dev/null 2>&1 || %s", process_name, cmd))
+end
+
+-- exec_once, only where the shell condition `test` holds. The condition runs
+-- in the spawned shell, not through os.execute(): inside Hyprland that can't
+-- report an exit status (it returns nil even for `true`, seen on 0.56).
+local function exec_once_if(test, cmd, process_name)
+    process_name = process_name or cmd:match("^(%S+)")
+    hl.exec_cmd(string.format("%s && { pgrep -x %s >/dev/null 2>&1 || %s; }", test, process_name, cmd))
 end
 
 hl.on("hyprland.start", function()
     -- CORE SERVICES (session bus, polkit, keyring)
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
     hl.exec_cmd("systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit")
+    exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit-")
     exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
 
     -- UI ELEMENTS
@@ -56,16 +66,12 @@ hl.on("hyprland.start", function()
     -- startup above it - this also provides its SSH agent for the terminal.
     exec_once("sh -c 'sleep 3 && flatpak run com.bitwarden.desktop'", "bitwarden-app")
 
-    -- OPTIONAL (only start if binary exists)
-    if os.execute("command -v cursor-clip >/dev/null 2>&1") == 0 then
-        exec_once("cursor-clip --daemon", "cursor-clip")
-    end
+    -- OPTIONAL (only start if installed)
+    exec_once_if("command -v cursor-clip >/dev/null 2>&1", "cursor-clip --daemon", "cursor-clip")
 
-    -- HARDWARE-SPECIFIC
-    if os.execute("test -d /sys/bus/iio/devices") == 0 then
-        exec_once("iio-hyprland", "iio-hyprland")
-    end
-    if os.execute("test -d /sys/module/asus_nb_wmi") == 0 then
-        exec_once("rog-control-center", "rog-control-ce")
-    end
+    -- HARDWARE-SPECIFIC (and only where the tool is installed; the image
+    -- ships neither)
+    exec_once_if("command -v iio-hyprland >/dev/null 2>&1 && test -d /sys/bus/iio/devices", "iio-hyprland")
+    exec_once_if("command -v rog-control-center >/dev/null 2>&1 && test -d /sys/module/asus_nb_wmi",
+        "rog-control-center", "rog-control-cen")
 end)
