@@ -66,12 +66,17 @@ main() {
     # (Not /sys/power/state: Bazzite's nohibernate karg also hides "disk".)
     if grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
         log "Kernel lockdown is active (Secure Boot): hibernation is unavailable, skipping."
-        log "After disabling Secure Boot, re-run with: sudo rm /var/lib/tblue/hibernate-setup.done && sudo systemctl start tblue-hibernate-setup"
+        log "After disabling Secure Boot, re-run with: sudo rm /var/lib/tblue/hibernate-setup-v2.done && sudo systemctl start tblue-hibernate-setup"
         exit 0
     fi
 
     # 1. Ensure the swapfile exists (create it if missing), then fstab + activate.
     ensure_swapfile
+    # logind and systemd-sleep may only read swap files labelled swapfile_t
+    # (customizable, so restorecon keeps it); otherwise hibernation is refused.
+    if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then
+        chcon -t swapfile_t "$SWAPFILE_PATH"
+    fi
 
     if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
         echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
