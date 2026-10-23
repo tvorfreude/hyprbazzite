@@ -1,11 +1,15 @@
 // Wheel users in an active local session may suspend-then-hibernate (part of
 // the "sleep" chain used by the lid and the power menu) without a prompt,
-// also while other sessions exist. Deliberately not the -ignore-inhibit
-// variant: an inhibitor should still be able to hold off sleep.
+// also while other sessions exist. logind has no suspend-then-hibernate
+// actions of its own: it checks the hibernate ones for it (and for hybrid
+// sleep and plain hibernate). Plain hibernate is already allowed for active
+// sessions by default; the -multiple-sessions variant is what prompted.
+// Deliberately not the -ignore-inhibit variant: an inhibitor should still be
+// able to hold off sleep.
 polkit.addRule(function(action, subject) {
     var allowed = [
-        "org.freedesktop.login1.suspend-then-hibernate",
-        "org.freedesktop.login1.suspend-then-hibernate-multiple-sessions"
+        "org.freedesktop.login1.hibernate",
+        "org.freedesktop.login1.hibernate-multiple-sessions"
     ];
 
     if (allowed.indexOf(action.id) >= 0 && subject.local && subject.active && subject.isInGroup("wheel")) {
