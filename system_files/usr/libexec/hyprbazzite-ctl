@@ -90,9 +90,8 @@ _save_wallpaper() {
     [[ -n "$out" ]] && printf '%s\n' "$out" > "$(_gamemode_wall_state)"
 }
 
-# wallpaper-cycle runs under bash, so its process name is "bash" and
-# `pgrep -x wallpaper-cycle` never found it; it records its PID instead.
-# The cmdline check guards against a stale file pointing at a reused PID.
+# wallpaper-cycle's process name is "bash": find it by its PID file, checking
+# the cmdline in case the PID was reused.
 _wallpaper_cycle_pid() {
     local pid
     pid=$(cat "${XDG_RUNTIME_DIR:-/tmp}/wallpaper-cycle.pid" 2>/dev/null) || return 1
@@ -157,12 +156,7 @@ gamemode_toggle() {
         fi
         notify-send -e -u low -i "$notif_icon" " Gamemode:" " enabled"
     else
-        # A reload, not a mirror-image eval: re-running the config restores
-        # gaps/blur/animations exactly as hyprland.lua has them, and drops the
-        # gamemode window rule above. Countering it with another
-        # `opacity = "1 override"` rule (as this used to) overrode rules.lua's
-        # inactive opacity for every window until the next reload, and each
-        # toggle stacked two more rules.
+        # A reload restores hyprland.lua's settings and drops the rule above.
         _reload_config
         _restore_wallpaper
         sleep 0.5
@@ -170,14 +164,9 @@ gamemode_toggle() {
     fi
 }
 
-# Some state only exists in the running compositor, set with `hyprctl eval`:
-# the workspace-to-monitor rules (workspace_rebind), the on-screen keyboard's
-# window rule and the night-light shader. Evaluating the config again - a
-# `hyprctl reload` from anywhere, Hyprland's own auto-reload - drops it, so
-# hyprland.lua starts this in the background on every load (on the very first
-# load, before the compositor answers, each step just fails quietly). Every
-# step is guarded: under set -e one failing hyprctl call would otherwise end
-# the caller (gamemode-off was left on a black screen that way).
+# Re-applies state set with `hyprctl eval` (workspace rules, OSK window rule,
+# night light), which every config load drops; hyprland.lua runs this after
+# each load. Every step may fail without ending the caller.
 restore_runtime() {
     local shader
     workspace_rebind >/dev/null 2>&1 || true
@@ -528,11 +517,8 @@ theme_update() {
 _is_amd_cpu() { grep -q AuthenticAMD /proc/cpuinfo 2>/dev/null; }
 
 tdp_get_backend() {
-    # AMD only: ryzenadj/amdctl drive AMD's SMU, and the Bazzite base ships
-    # ryzenadj on every image, so Intel machines used to pick it too. There
-    # is deliberately no hwmon power1_cap fallback: no CPU driver exposes
-    # one, so that file belongs to a GPU (a dGPU, unless it's an APU), and
-    # "TDP" would have throttled the graphics card instead.
+    # AMD only (both drive AMD's SMU). No hwmon power1_cap fallback: that
+    # file belongs to a GPU, not the CPU.
     _is_amd_cpu || return 1
     if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
     if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
@@ -552,10 +538,8 @@ tdp_get_current() {
     esac
 }
 
-# pkexec, not sudo: this runs from waybar/wofi, where there is no terminal
-# for sudo to prompt on, so it used to fail silently. 10-tdp-control.rules
-# lets wheel users in an active local session run ryzenadj/amdctl without a
-# password; anything else gets a normal polkit prompt.
+# pkexec, not sudo: there's no terminal here. 10-tdp-control.rules allows
+# these exact commands without a password (wheel, local session).
 tdp_set() {
     local watts="${1:-}" backend
     [[ "$watts" =~ ^[0-9]+$ ]] || { echo "Usage: hyprbazzite-ctl tdp set <watts>" >&2; return 1; }
@@ -599,10 +583,8 @@ osk_toggle() {
     fi
 }
 
-# The OSK's float/position window rule only exists in the running compositor
-# (set with `hyprctl eval`), so a config reload drops it - _reload_config
-# re-applies it through here. $1 = top|bottom; default: the anchor last
-# chosen this session, else WVKBD_ANCHOR from wvkbd.conf.
+# The OSK's window rule (runtime-only). $1 = top|bottom; default: this
+# session's last anchor, else WVKBD_ANCHOR from wvkbd.conf.
 _osk_window_rule() {
     local anchor="${1:-}" move='{"0","50%"}'
     if [[ -z "$anchor" ]]; then
@@ -656,11 +638,8 @@ power_menu() {
     esac
 }
 
-# Lock through logind so hypridle's lock_cmd runs: one hyprlock instance, with
-# the image's config. A bare `hyprlock` finds no config at all (it searches
-# ~/.config/hypr and /etc/xdg/hypr, never /etc/hypr) and exits without
-# locking. lock-session does nothing if hypridle isn't running, so start
-# hyprlock directly in that case.
+# Lock via logind so hypridle's lock_cmd runs (one hyprlock, our config);
+# without hypridle, start hyprlock directly.
 _lock_now() {
     if pgrep -x hypridle >/dev/null 2>&1; then
         loginctl lock-session
@@ -782,9 +761,7 @@ automation_osk() {
 }
 
 automation_temp() {
-    # Polled by waybar every 10s, so no forks per sensor: builtin reads, the
-    # score set in a variable rather than echoed through a subshell, and
-    # hwmon scored once per device (the score only depends on its name).
+    # Polled by waybar every 10s: no forks per sensor.
     local best_temp_mc="" best_source="" best_score=-1 score
     _score() {
         local src_lc=${1,,}
@@ -808,7 +785,7 @@ automation_temp() {
         { read -r name < "$hw/name"; } 2>/dev/null || name="unknown"
         _score "$name"
         (( score > best_score )) || continue
-        # First readable input of the best-scoring device, as before.
+        # First readable input of the best-scoring device.
         for input in "$hw"/temp*_input; do
             [[ -r "$input" ]] || continue
             { read -r temp_mc < "$input"; } 2>/dev/null || continue
@@ -1296,12 +1273,8 @@ open_target() {
     return 1
 }
 
-# "Awake" = an idle inhibitor held by a transient user unit. One source of
-# truth shared by the swaync Awake toggle and the waybar idle indicator
-# (custom/idle, signal 9). hypridle honours systemd idle inhibitors, so its
-# idle lock/screen-off listeners pause while before_sleep_cmd still locks the
-# screen before every suspend. Stopping hypridle instead (as this used to)
-# also dropped that lock: closing the lid resumed to an unlocked desktop.
+# "Awake" = an idle inhibitor held by a transient user unit (swaync toggle,
+# waybar custom/idle). hypridle keeps running, so it still locks before sleep.
 _AWAKE_UNIT="hyprbazzite-awake.service"
 
 _awake_active() { systemctl --user is-active --quiet "$_AWAKE_UNIT"; }

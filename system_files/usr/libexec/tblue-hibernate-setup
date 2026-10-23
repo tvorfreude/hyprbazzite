@@ -56,20 +56,14 @@ ensure_swapfile() {
 # -- Main ---------------------------------------------------------------------
 
 main() {
-    # btrfs only: the swapfile relies on `btrfs filesystem mkswapfile` (or
-    # NOCOW) and `btrfs inspect-internal map-swapfile` for its resume offset.
-    # On any other root this failed on every boot, since the done-marker is
-    # only written on success. Exiting 0 lets the unit mark itself done.
+    # btrfs only (mkswapfile, map-swapfile). Exit 0 so the unit marks itself done.
     if [[ "$(stat -f -c %T /var)" != "btrfs" ]]; then
         log "/var is not on btrfs; skipping swapfile and hibernation setup."
         exit 0
     fi
 
-    # Kernel lockdown (Secure Boot) disables hibernation outright - see the
-    # karg notes below - so don't spend RAM+2GiB of disk on a swapfile that
-    # can never hold a hibernation image. Checked via lockdown, not
-    # /sys/power/state: Bazzite's own nohibernate karg (removed below) also
-    # hides "disk" there until the next boot.
+    # Lockdown (Secure Boot) disables hibernation: no point in a swapfile.
+    # (Not /sys/power/state: Bazzite's nohibernate karg also hides "disk".)
     if grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
         log "Kernel lockdown is active (Secure Boot): hibernation is unavailable, skipping."
         log "After disabling Secure Boot, re-run with: sudo rm /var/lib/tblue/hibernate-setup.done && sudo systemctl start tblue-hibernate-setup"
@@ -107,34 +101,11 @@ main() {
 
     log "Setting resume=UUID=$dec_uuid and resume_offset=$offset for hybrid sleep."
 
-    # 3. Set kernel arguments for resume.
-    # Use --append-if-missing (not --replace): on a fresh install the resume
-    # kargs don't exist yet, and --replace fails on a missing key.
-    # Also strip 'nohibernate', which Bazzite/uBlue ships by default -- while
-    # it is present the kernel reports /sys/power/disk as [disabled] and
-    # neither hibernate nor suspend-then-hibernate can run at all. This karg
-    # is necessary but not always sufficient: Secure Boot puts the kernel in
-    # lockdown=integrity mode independently, which disables hibernation on
-    # its own regardless of kargs - confirmed live on real hardware: even
-    # with nohibernate successfully removed and resume kargs correctly set,
-    # /sys/power/state still had no "disk" entry and CanHibernate/
-    # CanSuspendThenHibernate both reported "na". There's no karg or sleep.conf
-    # setting that overrides that (it's intentional - an unsigned hibernation
-    # image could otherwise be used to tamper with a verified-boot kernel on
-    # resume), so hyprbazzite-ctl's _sleep_best_effort() and
-    # HandleLidSwitch=sleep (logind.conf.d) use logind's own SleepOperation=
-    # fallback chain instead of ever hardcoding suspend-then-hibernate
-    # directly, so actual sleep still works on hardware where hibernation
-    # just isn't available for this reason.
-    # Guarded so steady-state boots skip the (slow) rpm-ostree transaction.
-    # NOTE: applied kargs require a reboot to take effect.
-    # resume_delay=5 used to be appended here, but the kernel parameter is
-    # resumedelay= (no underscore), so it was a no-op. The real resume runs
-    # from the initramfs, which ignores that delay anyway, while the correctly
-    # spelled one would add 5s to every boot. Installs provisioned before this
-    # keep the harmless leftover until the setup is re-run (remove
-    # /var/lib/tblue/hibernate-setup.done), which then deletes it - not worth
-    # a forced rpm-ostree transaction on every machine.
+    # 3. Resume kargs (--append-if-missing: --replace fails on a missing key),
+    #    without Bazzite's nohibernate, and without the old resume_delay=5 (a
+    #    misspelled no-op). Only when needed - rpm-ostree is slow - and they
+    #    apply after a reboot. Lockdown still disables hibernation regardless,
+    #    which is why sleep goes through logind's SleepOperation= chain.
     local kargs
     kargs=$(rpm-ostree kargs | tr ' ' '\n')
     if grep -qx 'nohibernate' <<<"$kargs" \

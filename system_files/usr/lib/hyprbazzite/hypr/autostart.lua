@@ -11,9 +11,8 @@ local function exec_once(cmd, process_name)
     hl.exec_cmd(string.format("pgrep -x %s >/dev/null 2>&1 || %s", process_name, cmd))
 end
 
--- exec_once, only where the shell condition `test` holds. The condition runs
--- in the spawned shell, not through os.execute(): inside Hyprland that can't
--- report an exit status (it returns nil even for `true`, seen on 0.56).
+-- exec_once where the shell condition `test` holds. Tested in the shell:
+-- inside Hyprland, os.execute() returns nil even for `true`.
 local function exec_once_if(test, cmd, process_name)
     process_name = process_name or cmd:match("^(%S+)")
     hl.exec_cmd(string.format("%s && { pgrep -x %s >/dev/null 2>&1 || %s; }", test, process_name, cmd))
@@ -21,10 +20,8 @@ end
 
 hl.on("hyprland.start", function()
     -- CORE SERVICES (session bus, polkit, keyring)
-    -- The session's environment goes to D-Bus activation and systemd --user,
-    -- then hyprbazzite-session.target brings up graphical-session.target,
-    -- which xdg-desktop-portal requires and hyprbazzite-lid/-battery are
-    -- wanted by. One shell, so the target starts after the import.
+    -- Import the environment, then start hyprbazzite-session.target (it
+    -- brings up graphical-session.target, which the portal needs). In order.
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
         .. "systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
         .. "systemctl --user start hyprbazzite-session.target")

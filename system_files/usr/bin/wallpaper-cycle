@@ -3,9 +3,8 @@
 #
 # This script sets a random GIF wallpaper from the configured directory,
 # cycles it at regular intervals, re-applies it when monitors are hotplugged,
-# and on SIGUSR1 puts a wallpaper back on screen (hyprbazzite-ctl sends that
-# to the PID in $XDG_RUNTIME_DIR/wallpaper-cycle.pid - the process name is
-# "bash", so pgrep/pkill by name never find it).
+# and on SIGUSR1 puts it back on screen. Its PID is in
+# $XDG_RUNTIME_DIR/wallpaper-cycle.pid (the process name is just "bash").
 
 set -euo pipefail
 
@@ -79,10 +78,8 @@ cycle_now() {
     fi
 }
 
-# Put what is already showing on every output again - a newly connected or
-# re-detected monitor comes up without it. Not a new random pick (which used
-# to happen on every hotplug and every post-resume re-probe), and no frame
-# extraction or accent work: nothing about the wallpaper changed.
+# Show the current wallpaper again on every output (a hotplugged or
+# re-probed monitor comes up without it).
 reapply_current() {
     local current=""
     if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
@@ -94,10 +91,8 @@ reapply_current() {
     awww img --transition-type none --resize crop --filter "$FILTER" "$current"
 }
 
-# SIGUSR1: hyprbazzite-ctl sends it right after restarting awww-daemon
-# (Refresh Session, gamemode off), when nothing is showing. A new random GIF,
-# or the pinned picture again while one is pinned - cycle_now alone skips a
-# pinned wallpaper, which left the desktop blank.
+# SIGUSR1, sent after awww-daemon restarts: a new wallpaper, or the pinned
+# one again while one is pinned.
 on_usr1() {
     if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
         reapply_current
@@ -157,9 +152,7 @@ main() {
     sleep 2
     cycle_now || true
 
-    # Background children get `9>&-` so they never hold the instance lock:
-    # anything left behind with it (the interval sleep used to be) would make
-    # a restart in the same Hyprland instance exit silently.
+    # Background children get `9>&-`: they must not hold the instance lock.
     monitor_hotplug 9>&- &
     hotplug_pid=$!
 

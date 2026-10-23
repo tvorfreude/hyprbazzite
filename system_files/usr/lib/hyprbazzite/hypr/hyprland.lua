@@ -6,15 +6,9 @@ require("rules")
 require("styles")
 
 -- Essential Variables
--- Accent comes from hyprbazzite-accent (Dracula purple unless the user chose
--- "auto" or a custom colour). Any failure keeps the default. Read the value
--- it last rendered into $XDG_RUNTIME_DIR first: `hyprbazzite-accent hex` runs
--- ImageMagick on the wallpaper in "auto" mode, and this file is evaluated on
--- the compositor's main thread, so every reload froze the screen while it ran.
--- The cached value is only used while the mode file still reads exactly as it
--- did when the value was rendered (it can change outside the tool, e.g. a
--- chezmoi pull). The command remains the fallback for that and for a
--- session's first load.
+-- Accent from hyprbazzite-accent (Dracula purple by default). Prefer the value
+-- it last rendered while the mode file is unchanged: the command can run
+-- ImageMagick, and this file runs on the compositor's main thread.
 local active_border = "rgba(bd93f9ee)"
 do
     local function first_line(path)
@@ -100,9 +94,6 @@ hl.config({
     debug = { full_cm_proto = true },
 })
 
--- Workspace-to-monitor rules, the on-screen keyboard's window rule and night
--- light are applied at runtime with `hyprctl eval`, so every evaluation of this
--- file (`hyprctl reload` from anywhere, Hyprland's own auto-reload) drops them.
--- Put them back - in the background, because that talks to the compositor,
--- which is busy evaluating this file right now.
+-- Each config load drops the runtime-only state (workspace rules, OSK rule,
+-- night light): restore it, in the background since the compositor is busy.
 os.execute("/usr/libexec/hyprbazzite-ctl restore-runtime >/dev/null 2>&1 &")

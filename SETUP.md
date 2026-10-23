@@ -98,11 +98,10 @@ by hand but not enforced. To turn enforcement on:
 3. Commit `cosign.pub` at the repository root and push.
 
 CI refuses to build if `SIGNING_SECRET` is missing or doesn't match
-`cosign.pub`, so a mismatched key can't brick updates. From the first image
-built with `cosign.pub`, every install requires that signature on its next
-update. Losing the private key means installs can no longer be updated
-without a manual `bootc switch`, so keep a backup. Key rotation isn't
-automated: it needs a transition image whose policy trusts both keys.
+`cosign.pub`. From the first image built with `cosign.pub`, installs require
+that signature on update, so back up the private key: without it, installs
+need a manual `bootc switch`. Rotating keys needs a transition image whose
+policy trusts both.
 
 ## Troubleshooting
 

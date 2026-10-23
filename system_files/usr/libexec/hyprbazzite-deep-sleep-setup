@@ -36,9 +36,7 @@ log() { echo "[hyprbazzite-deep-sleep-setup] $*"; }
 
 mkdir -p /var/lib/hyprbazzite
 
-# The marker is only cleared once it has been dealt with: if the revert below
-# fails (set -e, e.g. another rpm-ostree transaction is running), the next
-# boot sees it again and retries instead of losing the revert.
+# The marker is only cleared once handled, so a failed revert retries next boot.
 if [[ -f "$FAIL_MARKER" ]]; then
     count=$(( $(cat "$FAIL_COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
     echo "$count" > "$FAIL_COUNT_FILE"

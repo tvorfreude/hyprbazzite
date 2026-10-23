@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 # hyprbazzite-user-firstboot - per-user first-login setup.
 #
-# 1. Once per user: makes the image's system Hyprland config (/etc/hypr)
-#    authoritative by moving stale/default Hyprland dotfiles out of the way
-#    (e.g. left by a previous image, a rebase, or Hyprland's own first-run
-#    generation) - UNLESS the user provides their own
-#    ~/.config/hypr/hyprland.lua (dotfiles / chezmoi), which is left untouched
-#    so the session launcher uses it. Moved aside, never deleted: a classic
-#    hyprland.conf setup, scripts or wallpapers in there are the user's.
-# 2. Replaces ~/.config links into the read-only /usr/share/hyprbazzite/config
-#    (how older images seeded new accounts) with real, writable copies, and
-#    adds the skel files those images never installed, where missing.
+# 1. Once: moves a ~/.config/hypr without hyprland.lua aside (never deleted)
+#    so /etc/hypr applies. A user's own hyprland.lua is left alone.
+# 2. Replaces links into /usr/share/hyprbazzite/config (older images) with
+#    writable copies, and installs missing skel files.
 #
 # Flatpak theming/integration is handled system-wide by hyprbazzite-flatpak-overrides;
 # no Flatpak apps are installed by the image (users install their own).

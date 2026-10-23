@@ -1,9 +1,5 @@
-// Polkit rule to allow users in the 'wheel' group to use TDP control without password.
-// Only in an active local session (not SSH), and only for the exact command
-// lines hyprbazzite-ctl runs through pkexec: pkexec hands rules the full
-// command line, program first as an absolute path. Anything else these tools
-// can do as root (temperature and current limits, curve offsets...) still
-// needs authentication - matching the program alone allowed all of it.
+// Wheel users in an active local session may run exactly the ryzenadj/amdctl
+// command lines hyprbazzite-ctl uses (via pkexec) without a password.
 polkit.addRule(function(action, subject) {
     if (action.id != "org.freedesktop.policykit.exec" ||
         !subject.local || !subject.active || !subject.isInGroup("wheel")) {
