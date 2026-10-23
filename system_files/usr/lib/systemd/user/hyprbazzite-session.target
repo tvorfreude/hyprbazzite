@@ -1,0 +1,15 @@
+[Unit]
+Description=HyprBazzite Hyprland session
+Documentation=man:systemd.special(7)
+# graphical-session.target refuses a direct start; a session target bound
+# to it is how a compositor brings it up. xdg-desktop-portal requires it,
+# and hyprbazzite-lid/-battery are wanted by it. autostart.lua starts this
+# once the session's environment is imported; hyprbazzite-session stops it
+# when the compositor exits.
+BindsTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+# graphical-session.target only stops by itself once no active unit needs
+# it, and the units hanging off it (the portal among them) keep it needed:
+# stop it along with this one.
+PropagatesStopTo=graphical-session.target
