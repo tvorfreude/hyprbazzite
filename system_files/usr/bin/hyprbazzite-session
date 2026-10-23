@@ -9,9 +9,7 @@
 # The Lua config uses require() for its sibling modules (autostart, bindings,
 # etc.), which resolve relative to the chosen hyprland.lua's directory — so a
 # user providing their own hyprland.lua is expected to ship the full set,
-# including starting hyprbazzite-session.target the way autostart.lua does
-# (without it graphical-session.target never comes up, and
-# xdg-desktop-portal with it).
+# including starting hyprbazzite-session.target as autostart.lua does.
 set -euo pipefail
 
 user_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.lua"
@@ -24,11 +22,8 @@ else
     echo "hyprbazzite-session: using system config $cfg" >&2
 fi
 
-# autostart.lua brings up graphical-session.target through
-# hyprbazzite-session.target: take it down with the compositor, so the
-# portal and the session services don't outlive it and the next login
-# starts them with its own environment. Also when logind ends the session
-# with SIGTERM or SIGHUP, which would otherwise end this script first.
+# Stop the session target (and graphical-session.target with it) when the
+# compositor exits, also when logind ends the session with SIGTERM/SIGHUP.
 end_session() {
     systemctl --user stop hyprbazzite-session.target 2>/dev/null || true
     systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE 2>/dev/null || true

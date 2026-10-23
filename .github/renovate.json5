@@ -67,11 +67,8 @@
       pinDigests: true,
     },
     {
-      // Files the image build neither builds nor tests (build.yml's path
-      // filters skip them), so their PRs never get a status check, and
-      // Renovate won't automerge a PR without one - they sat open forever.
-      // None of them affects the image. Kept in their own group so a grouped
-      // PR can never mix these with changes to build.yml, which stay tested.
+      // No CI runs for these (build.yml's path filters skip them), so don't
+      // wait for checks. Own group, so they never ride along with build.yml.
       matchFileNames: [
         '.github/workflows/build-iso.yml',
         '.github/workflows/pr-cleanup.yml',

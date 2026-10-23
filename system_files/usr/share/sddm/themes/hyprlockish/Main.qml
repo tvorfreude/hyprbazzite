@@ -61,9 +61,7 @@ Rectangle {
         }
     }
 
-    // Account to log in as. Starts at the last user SDDM remembers; with more
-    // than one account, Up/Down in the password field (or clicking the name)
-    // picks another. There used to be no way to log in as anyone else.
+    // Account to log in as: SDDM's last user; Up/Down or a click picks another.
     property int userIndex: Math.max(0, userModel.lastIndex)
     readonly property string userName: userModel.data(userModel.index(userIndex, 0), 257)  // NameRole
 

@@ -1,25 +1,11 @@
 #!/usr/bin/env bash
 # hyprbazzite-drm-reprobe - re-detect monitors that vanish across suspend
 #
-# After a real S3 suspend (see hyprbazzite-deep-sleep-setup) amdgpu comes back
-# with DisplayPort hotplug state lost: a monitor that went into standby while
-# the GPU was down is reported "disconnected" and never comes back until
-# something re-probes the connector, so Hyprland resumes with fewer outputs
-# than it went to sleep with (or none, leaving the screens black). Writing
-# "detect" to a connector's sysfs status file forces that re-probe, which
-# raises a normal DRM hotplug uevent that Hyprland already handles.
-#
-# A monitor can take a few seconds to wake and answer link training, so
-# retry on a short delay instead of only once right at resume. Only
-# connectors that are currently "disconnected" are touched, and only DP/HDMI
-# ones (internal eDP panels are not hotplugged).
-#
-# The delayed retries run as their own transient unit. This hook runs inside
-# systemd-suspend.service, which kills whatever is left in its cgroup the
-# moment systemd-sleep exits, so a backgrounded `sleep; reprobe` was killed
-# before its first retry. Running them in the foreground is no better: user
-# processes stay frozen until the hooks return, so the desktop would hang for
-# ~10s after every resume.
+# After S3, amdgpu can report a DP/HDMI monitor that was in standby as
+# "disconnected" until its connector is re-probed. Writing "detect" to the
+# connector's status re-probes it (Hyprland handles the hotplug), retried for
+# a few seconds since monitors wake slowly. The retries run as a transient
+# unit: systemd-suspend.service kills hook processes left behind.
 
 set -u
 
@@ -35,8 +21,8 @@ reprobe() {
 case "${1:-}" in
     post)
         reprobe
-        # No fixed --unit name: a suspend within ~10s of resuming would find
-        # the previous retry unit still active and silently skip these.
+        # No fixed unit name: one still running from the last resume would
+        # block it.
         systemd-run --no-block --collect --quiet \
             --description="Re-probe DRM connectors after resume" \
             /usr/lib/systemd/system-sleep/hyprbazzite-drm-reprobe retry || true

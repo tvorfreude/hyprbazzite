@@ -80,11 +80,8 @@ for unit in "${REQUIRED_UNITS[@]}"; do
 done
 echo "All systemd units are present."
 
-# 4b. Enablement. Our own units must be enabled by the build, and the base
-# image's update/rollback machinery must survive it: a `systemctl preset-all`
-# once silently disabled all of the latter (no automatic updates, no greenboot
-# rollback) and nothing noticed, because only unit files were checked above.
-# SYSTEMD_OFFLINE=1: there is no running systemd in the verification container.
+# 4b. Enablement: our units, and the base image's update/rollback units the
+# build must leave enabled. SYSTEMD_OFFLINE=1: no systemd running here.
 mapfile -t OUR_UNITS < <(awk '$1 == "enable" {print $2}' /usr/lib/systemd/system-preset/50-hyprbazzite.preset)
 for unit in "${OUR_UNITS[@]}"; do
     if ! SYSTEMD_OFFLINE=1 systemctl is-enabled --quiet "$unit"; then

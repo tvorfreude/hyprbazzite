@@ -1,7 +1,5 @@
-# No [[customizations.filesystem]] here: bootc-image-builder ignores it for
-# anaconda-iso once a kickstart is supplied (below), and partitioning is left
-# to the installer, whose Fedora default is btrfs (what tblue-hibernate-setup
-# needs for its swapfile).
+# No filesystem customizations: with a kickstart, partitioning is left to the
+# installer (Fedora's default is btrfs, which tblue-hibernate-setup needs).
 
 [customizations.installer.kickstart]
 contents = '''
@@ -46,8 +44,6 @@ mkdir -p /tmp/tblue-secureboot
 key_paths=()
 
 # Only the Universal Blue key: it signs the kernel modules Bazzite ships.
-# (There used to be a project-specific key here too, but it was never put
-# in the image and signs nothing - enrolling it would only widen boot trust.)
 ublue_key=""
 if [ -f "$sysroot/usr/share/ublue-os/sb_pubkey.der" ]; then
   ublue_key="$sysroot/usr/share/ublue-os/sb_pubkey.der"

@@ -132,24 +132,13 @@ startup_sync() {
 
 startup_sync
 
-# Event-driven: login1 signals (lid switch, sessions coming and going) plus
-# DRM hotplug uevents (a dock plugged in or out at the greeter). gdbus
-# subscribes to signals only. This used to be `busctl monitor`, which also
-# prints every method call to login1 and its reply, many lines each, and ran
-# one sync per line - and sync's own loginctl/busctl queries are such calls,
-# so the loop fed itself and woke about once a second for as long as anyone
-# was logged in.
-#
-# Debounced: wait a beat so logind's session bookkeeping (what
-# _user_session_active reads) settles at login/logout, drain the rest of the
-# burst (bounded, so an event storm can't starve the sync), then look at the
-# current state once.
+# Event-driven: login1 signals (lid, sessions) and DRM hotplugs. gdbus, not
+# `busctl monitor`, which also shows method calls (sync's own included).
+# Debounced: let logind settle, drain the burst, then sync once.
 {
     gdbus monitor --system --dest org.freedesktop.login1 & login1_pid=$!
     udevadm monitor --udev --subsystem-match=drm & drm_pid=$!
-    # Either monitor ending ends the watch (Restart=always brings it back).
-    # Take the other one down too: its open end of the pipe would otherwise
-    # keep this loop alive on only half of its events.
+    # Either monitor ending ends the watch (Restart=always); stop the other.
     wait -n || true
     kill "$login1_pid" "$drm_pid" 2>/dev/null || true
     exit 1

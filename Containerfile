@@ -82,11 +82,8 @@ RUN --mount=type=cache,dst=/var/cache \
 # ---------------------------------------------------------------------------
 # Step 4: Install HyprBazzite packages
 # ---------------------------------------------------------------------------
-# No --skip-unavailable: a package that has vanished (renamed, or a COPR
-# without a build for the new Fedora) must fail the build, not ship an image
-# quietly missing its lock screen or notification daemon. It used to hide
-# that `lact`, `gdk-pixbuf2-modules` and `jetbrains-mono` never installed.
-# (LACT: upstream recommends its Flatpak on Fedora Atomic.)
+# No --skip-unavailable: a missing package must fail the build.
+# (LACT: use its Flatpak, as upstream recommends on Fedora Atomic.)
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install \
@@ -118,15 +115,10 @@ COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
 COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
 
 # ---------------------------------------------------------------------------
-# Step 5b: Image signature policy (updates of this image)
+# Step 5b: Image signature policy
 # ---------------------------------------------------------------------------
-# Bazzite's containers-policy.json only requires signatures for
-# ghcr.io/ublue-os; every other image falls through to an accept-anything
-# catch-all, so updates of this image were never verified - anyone able to
-# push to the package could ship root code to every install. Once a cosign
-# public key is committed as cosign.pub (see SETUP.md), require every pull of
-# this image to be signed by it. Without cosign.pub nothing changes. CI
-# refuses to build if the signing secret doesn't match the committed key.
+# Bazzite's policy only verifies ghcr.io/ublue-os. With cosign.pub committed
+# (see SETUP.md), pulls of this image must be signed by that key.
 ARG IMAGE_REF=ghcr.io/tvorfreude/hyprbazzite
 RUN --mount=type=bind,target=/ctx \
     if [ -f /ctx/cosign.pub ]; then \
@@ -148,13 +140,9 @@ RUN --mount=type=bind,target=/ctx \
 # ---------------------------------------------------------------------------
 # Step 7: Seed new home directories (/etc/skel)
 # ---------------------------------------------------------------------------
-# Real copies, not symlinks: useradd copies symlinks as-is, so links into the
-# read-only /usr tree left new users unable to save their own GTK bookmarks,
-# kitty or qt5ct settings (EROFS), and only directories were ever linked, so
-# .zshrc and starship.toml never reached anyone. /usr/share/hyprbazzite/config
-# stays as a read-only reference copy: accounts created from older images
-# still link into it until hyprbazzite-user-firstboot swaps the links for
-# copies.
+# Real copies: useradd copies symlinks as-is, and links into /usr are
+# read-only. /usr/share/hyprbazzite/config stays for accounts from older
+# images that still link into it (hyprbazzite-user-firstboot replaces those).
 RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
     mkdir -p /usr/share/hyprbazzite/config && \
     cp -af /usr/lib/hyprbazzite/skel/.config/. /usr/share/hyprbazzite/config/
@@ -186,16 +174,8 @@ RUN usermod -s /bin/zsh root && \
     units="hhd.service sddm.service tblue-hibernate-setup.service tblue-disable-nonpower-wakeup.service hyprbazzite-flatpak-overrides.service tblue-secureboot-firstboot.service tblue-hhd-enable-user.service hyprbazzite-power-tuning.service hyprbazzite-deep-sleep-setup.service hyprbazzite-console-lid.service" && \
     mkdir -p /usr/lib/systemd/system-preset && \
     printf 'enable %s\n' $units > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    # A preset FILE alone is just a policy declaration - it does nothing
-    # until something applies it (confirmed in a fresh VM: every unit above
-    # showed disabled despite "preset: enabled"). Apply it to OUR units only.
-    # Never `systemctl preset-all` here: that applies the whole preset policy
-    # to every unit in the image, and Fedora's catch-all `disable *` then
-    # removes everything Bazzite turned on with a plain `systemctl enable` -
-    # it silently disabled uupd.timer (automatic updates), greenboot's
-    # healthcheck/rollback trigger, bazzite-hardware-setup and
-    # bazzite-flatpak-manager on every install. verify-image.sh now checks
-    # those stay enabled.
+    # Apply the preset to our units only. Never `preset-all`: Fedora's
+    # `disable *` would turn off what Bazzite enabled (uupd, greenboot...).
     systemctl preset $units && \
     # Enable the per-user first-login service for all users (global user preset
     # + an explicit default.target.wants symlink so it activates without relying

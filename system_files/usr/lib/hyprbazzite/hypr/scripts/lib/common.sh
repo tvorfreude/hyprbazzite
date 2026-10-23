@@ -37,8 +37,6 @@ ensure_hyprland_env() {
 }
 
 # --- Hyprland Instance Helpers ---
-# Shared by hyprbazzite-ctl and wallpaper-cycle, so both agree on where the
-# socket lives and how the lock is named.
 
 # Event socket of this process's Hyprland instance. Newer releases keep it
 # under $XDG_RUNTIME_DIR/hypr, older ones under /tmp/hypr.
@@ -51,18 +49,13 @@ hypr_socket2() {
     return 1
 }
 
-# False once the Hyprland instance this process was started for has gone
-# away, so a daemon left behind by a compositor restart or a logout exits
-# instead of lingering into the next one. Always true outside Hyprland.
+# False once this process's Hyprland instance is gone (true outside Hyprland).
 hypr_instance_alive() {
     [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || hypr_socket2 >/dev/null
 }
 
-# Keeps a long-running daemon to one instance per Hyprland instance: takes
-# a lock on fd 9, non-zero if another process already holds it. Name-based
-# de-duplication (pgrep) can't do this - the generic names are shared, and
-# bash scripts all run as "bash". Children that outlive a single event
-# should get `9>&-` so they don't keep holding the lock.
+# One daemon per Hyprland instance: locks fd 9, non-zero if already held.
+# Long-lived children should get `9>&-`.
 hypr_instance_lock() {
     exec 9>"${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-$1-${HYPRLAND_INSTANCE_SIGNATURE:-default}.lock"
     flock -n 9
