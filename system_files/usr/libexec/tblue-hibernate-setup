@@ -15,18 +15,6 @@ log() {
     echo "[tblue-hibernate-setup] $*" >&2
 }
 
-configure_sleep_setting() {
-    local key="$1"
-    local value="$2"
-    local config="/etc/systemd/sleep.conf"
-
-    if grep -q "^${key}" "$config" 2>/dev/null; then
-        sed -i "s/^${key}.*/${key}=${value}/" "$config"
-    else
-        echo "${key}=${value}" >> "$config"
-    fi
-}
-
 # Size the swapfile a little larger than RAM so systemd can always fit the
 # hibernation image (it refuses if usable swap < in-use memory).
 swapfile_size_mib() {
@@ -162,18 +150,8 @@ main() {
         log "Hibernation kargs already provisioned; leaving kargs unchanged."
     fi
 
-    # 4. Configure systemd sleep settings. Values here match
-    # /usr/lib/hyprbazzite/systemd/sleep.conf.d/90-tblue-hibernate.conf and
-    # /usr/lib/systemd/sleep.conf.d/hibernate.conf on purpose - this writes
-    # straight to the base /etc/systemd/sleep.conf, and all three used to
-    # disagree on AllowHibernation (no/no/yes) with the drop-ins silently
-    # winning either way (they're layered on top of the base file). Keeping
-    # all three in agreement now instead of relying on load-order to settle
-    # a three-way argument no one could see without reading all three files.
-    configure_sleep_setting "AllowSuspend" "yes"
-    configure_sleep_setting "AllowHibernation" "yes"
-    configure_sleep_setting "AllowSuspendThenHibernate" "yes"
-
+    # The sleep settings themselves (Allow{Suspend,Hibernation,
+    # SuspendThenHibernate}=yes) ship as sleep.conf.d drop-ins.
     log "Hybrid sleep setup complete."
 }
 
