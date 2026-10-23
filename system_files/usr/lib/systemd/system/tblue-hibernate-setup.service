@@ -1,6 +1,10 @@
 [Unit]
 Description=TBlue Hibernate first-boot provisioning
 After=local-fs.target
+# rpm-ostree runs one transaction at a time and fails the next ("Transaction
+# in progress") instead of waiting: first-boot karg changes go one after the
+# other - Bazzite's own, then this, then power-tuning, then deep-sleep-setup.
+After=bazzite-hardware-setup.service
 DefaultDependencies=no
 # Only run once — skip if the done-marker already exists
 ConditionPathExists=!/var/lib/tblue/hibernate-setup.done
