@@ -21,8 +21,13 @@ end
 
 hl.on("hyprland.start", function()
     -- CORE SERVICES (session bus, polkit, keyring)
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    hl.exec_cmd("systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
+    -- The session's environment goes to D-Bus activation and systemd --user,
+    -- then hyprbazzite-session.target brings up graphical-session.target,
+    -- which xdg-desktop-portal requires and hyprbazzite-lid/-battery are
+    -- wanted by. One shell, so the target starts after the import.
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
+        .. "systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
+        .. "systemctl --user start hyprbazzite-session.target")
     exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit-")
     exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
 
