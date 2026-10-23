@@ -1,0 +1,9 @@
+# Test-only layer for the VM boot test: reachable over SSH, passwordless sudo
+# for the test user, and SDDM logs that user straight into the Hyprland
+# session. Never published.
+ARG BASE
+FROM ${BASE}
+RUN systemctl enable sshd.service && \
+    mkdir -p /etc/sddm.conf.d /etc/sudoers.d && \
+    printf '[Autologin]\nUser=tester\nSession=hyprland.desktop\n' > /etc/sddm.conf.d/zz-vmtest-autologin.conf && \
+    printf 'tester ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/zz-vmtest && chmod 0440 /etc/sudoers.d/zz-vmtest

@@ -1,0 +1,138 @@
+name: Secure Boot hibernate test (temporary)
+# Throwaway: boots the branch image with Secure Boot enforcing, opts in to
+# hibernation, hibernates and resumes, then undoes the opt-in. Not meant to
+# be merged.
+on:
+  push:
+    branches:
+      - claude/eloquent-lovelace-ca6nca
+    paths:
+      - '.github/sb-test/**'
+      - '.github/workflows/sb-test.yml'
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/hyprbazzite:claude-eloquent-lovelace-ca6nca
+  V: .github/sb-test/vm.sh
+
+jobs:
+  secureboot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 170
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Free disk space
+        uses: ublue-os/remove-unwanted-software@cc0becac701cf642c8f0a6613bbdaf5dc36b259e # v9
+
+      - name: Install QEMU and virt-firmware
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils ovmf imagemagick python3-venv >/dev/null
+          python3 -m venv "$RUNNER_TEMP/venv" && "$RUNNER_TEMP/venv/bin/pip" install -q virt-firmware
+          echo "VM_DIR=$RUNNER_TEMP/vm" >> "$GITHUB_ENV"
+          ls /usr/share/OVMF/
+
+      - name: Wait for the image built from the last non-TEMP commit
+        run: |
+          git fetch -q --depth=30 origin "$GITHUB_REF"
+          want=$(git log -1 --format=%H --invert-grep --grep='^TEMP' FETCH_HEAD)
+          echo "waiting for an image built from $want or a descendant"
+          for _ in $(seq 60); do
+            got=$(skopeo inspect --no-tags "docker://$IMAGE" 2>/dev/null | jq -r '.Labels["org.opencontainers.image.revision"] // empty')
+            echo "image revision: ${got:-?}"
+            [[ -n "$got" ]] && git merge-base --is-ancestor "$want" "$got" 2>/dev/null && exit 0
+            sleep 30
+          done
+          exit 1
+
+      - name: Build the qcow2 and Secure Boot firmware vars
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p "$VM_DIR"
+          echo "$TOKEN" | sudo podman login ghcr.io -u "${{ github.actor }}" --password-stdin
+          sudo podman pull -q "$IMAGE"
+          # Firmware: Microsoft keys, Secure Boot on, plus the Universal Blue
+          # certificate in db - the one Bazzite signs its kernels with (what
+          # enrolling the key as a MOK does on real hardware).
+          sudo podman run --rm --entrypoint cat "$IMAGE" /usr/share/ublue-os/sb_pubkey.der > "$VM_DIR/ublue.der"
+          openssl x509 -inform der -in "$VM_DIR/ublue.der" -out "$VM_DIR/ublue.pem"
+          openssl x509 -in "$VM_DIR/ublue.pem" -noout -subject
+          "$RUNNER_TEMP/venv/bin/virt-fw-vars" -i /usr/share/OVMF/OVMF_VARS_4M.ms.fd -o "$VM_DIR/vars.fd" \
+            --secure-boot --add-db 2a3d9e5c-1f4b-4c6d-9e8f-0a1b2c3d4e5f "$VM_DIR/ublue.pem"
+          sudo podman build -q --build-arg BASE="$IMAGE" -t localhost/hb-vmtest:latest \
+            -f .github/sb-test/Containerfile .github/sb-test
+          ssh-keygen -q -t ed25519 -N '' -f "$VM_DIR/key"
+          cat > "$VM_DIR/bib.toml" <<TOML
+          [[customizations.user]]
+          name = "tester"
+          password = "tester"
+          key = "$(cat "$VM_DIR/key.pub")"
+          groups = ["wheel"]
+
+          [customizations.kernel]
+          append = "console=tty0 console=ttyS0,115200"
+          TOML
+          sudo podman run --rm --privileged --pull=newer --security-opt label=type:unconfined_t \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            -v "$VM_DIR/bib.toml:/config.toml:ro" -v "$VM_DIR:/output" \
+            quay.io/centos-bootc/bootc-image-builder:latest \
+            --type qcow2 --rootfs btrfs --config /config.toml --output /output \
+            localhost/hb-vmtest:latest
+          sudo podman rmi -a -f >/dev/null 2>&1 || true
+
+      - name: First boot with Secure Boot enforcing
+        run: |
+          $V boot 1
+          $V wait-ssh 1200
+          $V push .github/sb-test/checks.sh
+          $V run first-boot
+          $V run sb-locked
+
+      - name: Opt in (ujust hypr-hibernate-on-secureboot)
+        run: |
+          if $V user ujust --list 2>/dev/null | grep -q hypr-hibernate-on-secureboot; then J=ujust
+          else J="just --justfile /usr/share/ublue-os/just/85-hyprbazzite.just"; fi
+          echo "J=$J" >> "$GITHUB_ENV"
+          $V user "printf 'y\naaaaaaaa\naaaaaaaa\n' | $J hypr-hibernate-on-secureboot"
+          $V run sb-optin-check
+
+      - name: Reboot and confirm in MokManager
+        run: |
+          $V user sudo systemctl reboot || true
+          $V mok-confirm
+          $V wait-ssh 900
+          $V run sb-unlocked
+          sleep 5; $V shot unlocked-desktop
+
+      - name: Hibernate and resume with Secure Boot on
+        id: hibernate
+        run: |
+          $V run prepare
+          sleep 3; $V shot before-hibernate
+          $V run hibernate
+          $V wait-off 300
+          $V boot 2
+          $V wait-ssh 600
+          grep -a -E 'Image signature found|resume from hibernation' "$VM_DIR/serial-2.log" | head -5
+          $V run verify
+
+      - name: Undo (ujust hypr-secureboot-verify-linux)
+        if: ${{ !cancelled() && steps.hibernate.outcome == 'success' }}
+        run: |
+          $V user "printf 'aaaaaaaa\naaaaaaaa\n' | $J hypr-secureboot-verify-linux"
+          $V user sudo systemctl reboot || true
+          $V mok-confirm
+          $V wait-ssh 900
+          $V run sb-relocked
+
+      - name: Diagnostics
+        if: ${{ always() }}
+        run: |
+          $V user sudo journalctl -b -p warning --no-pager -o short-monotonic 2>/dev/null | tail -n 40 || true
+          $V stop || true
