@@ -94,11 +94,16 @@ main() {
         bootupctl validate || true
     fi
 
-    # Collect MOK key paths to check (the Universal Blue module-signing key)
+    # The Universal Blue key the kernel is signed with (needed to boot it with
+    # Secure Boot on).
     local key_paths=()
-    if [[ -f /usr/share/ublue-os/sb_pubkey.der ]]; then
-        key_paths+=("/usr/share/ublue-os/sb_pubkey.der")
-    fi
+    local candidate
+    for candidate in /etc/pki/akmods/certs/akmods-ublue.der /usr/share/ublue-os/etc/pki/akmods/certs/akmods-ublue.der; do
+        if [[ -f "$candidate" ]]; then
+            key_paths+=("$candidate")
+            break
+        fi
+    done
 
     # Check/enroll keys with mokutil
     if command -v mokutil >/dev/null 2>&1 && [[ ${#key_paths[@]} -gt 0 ]]; then
@@ -112,7 +117,7 @@ main() {
             fi
         done
     elif command -v mokutil >/dev/null 2>&1; then
-        log "No Universal Blue Secure Boot key at /usr/share/ublue-os; skipping MOK key check."
+        log "No Universal Blue Secure Boot key in the image; skipping MOK key check."
     fi
 
     mark_done

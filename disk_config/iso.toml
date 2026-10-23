@@ -43,11 +43,15 @@ esac
 mkdir -p /tmp/tblue-secureboot
 key_paths=()
 
-# Only the Universal Blue key: it signs the kernel modules Bazzite ships.
+# Only the Universal Blue key: it signs the kernel Bazzite ships.
 ublue_key=""
-if [ -f "$sysroot/usr/share/ublue-os/sb_pubkey.der" ]; then
-  ublue_key="$sysroot/usr/share/ublue-os/sb_pubkey.der"
-elif command -v curl >/dev/null 2>&1; then
+for candidate in "$sysroot/etc/pki/akmods/certs/akmods-ublue.der" "$sysroot/usr/share/ublue-os/etc/pki/akmods/certs/akmods-ublue.der"; do
+  if [ -f "$candidate" ]; then
+    ublue_key="$candidate"
+    break
+  fi
+done
+if [ -z "$ublue_key" ] && command -v curl >/dev/null 2>&1; then
   fetched_ublue_key="/tmp/tblue-secureboot/ublue-sb_pubkey.der"
   if curl -fsSL -o "$fetched_ublue_key" https://github.com/ublue-os/akmods/raw/main/certs/public_key.der; then
     ublue_key="$fetched_ublue_key"
