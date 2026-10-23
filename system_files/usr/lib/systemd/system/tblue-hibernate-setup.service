@@ -5,14 +5,13 @@ After=local-fs.target
 # bazzite-hardware-setup, this, power-tuning, deep-sleep-setup.
 After=bazzite-hardware-setup.service
 DefaultDependencies=no
-# Once per version of the setup (v2 labels the swapfile for SELinux; re-running
-# skips whatever is already done).
+# Until the setup marks itself done (v2 labels the swapfile for SELinux;
+# re-running skips whatever is already done).
 ConditionPathExists=!/var/lib/tblue/hibernate-setup-v2.done
 
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/tblue-hibernate-setup
-ExecStartPost=/bin/bash -c 'mkdir -p /var/lib/tblue && touch /var/lib/tblue/hibernate-setup-v2.done'
 RemainAfterExit=yes
 Nice=19
 IOSchedulingClass=idle

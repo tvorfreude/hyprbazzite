@@ -81,6 +81,20 @@ This is a feature (your customizations survive reboots and updates), but it
 means a config file you've never touched still won't pick up a new shipped
 default without one of the steps above.
 
+## Hibernation and Secure Boot
+
+Hibernation (and suspend-then-hibernate, which closing the lid uses) is set
+up automatically on the first boot of a btrfs install. With Secure Boot on,
+the kernel locks itself down and Linux refuses to hibernate; sleep then
+falls back to plain suspend.
+
+To hibernate anyway, run `ujust hypr-hibernate-on-secureboot` and reboot. It
+turns off shim's verification of Linux while Secure Boot stays enabled in the
+firmware, so Windows and its anti-cheat still see it on. The trade-off: the
+Linux kernel and modules are no longer verified at boot. The next boot shows
+a blue confirmation screen; the command explains what to press. Undo with
+`ujust hypr-secureboot-verify-linux`.
+
 ## Update signature verification (maintainer, one-time)
 
 Installed systems only verify this image's signature on update once a
