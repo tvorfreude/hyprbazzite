@@ -8,11 +8,17 @@ set -euo pipefail
 
 # -- Configuration -----------------------------------------------------------
 readonly SWAPFILE_PATH="/var/swap/swapfile"
+readonly DONE_MARKER="/var/lib/tblue/hibernate-setup-v2.done"
 
 # -- Helpers ------------------------------------------------------------------
 
 log() {
     echo "[tblue-hibernate-setup] $*" >&2
+}
+
+mark_done() {
+    mkdir -p "${DONE_MARKER%/*}"
+    : > "$DONE_MARKER"
 }
 
 # Size the swapfile a little larger than RAM so systemd can always fit the
@@ -56,17 +62,18 @@ ensure_swapfile() {
 # -- Main ---------------------------------------------------------------------
 
 main() {
-    # btrfs only (mkswapfile, map-swapfile). Exit 0 so the unit marks itself done.
+    # btrfs only (mkswapfile, map-swapfile).
     if [[ "$(stat -f -c %T /var)" != "btrfs" ]]; then
         log "/var is not on btrfs; skipping swapfile and hibernation setup."
+        mark_done
         exit 0
     fi
 
-    # Lockdown (Secure Boot) disables hibernation: no point in a swapfile.
-    # (Not /sys/power/state: Bazzite's nohibernate karg also hides "disk".)
+    # A locked-down kernel refuses to hibernate: no point in a swapfile yet.
+    # Not marked done, so this checks again every boot. (Not /sys/power/state:
+    # the nohibernate karg also hides "disk".)
     if grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
-        log "Kernel lockdown is active (Secure Boot): hibernation is unavailable, skipping."
-        log "After disabling Secure Boot, re-run with: sudo rm /var/lib/tblue/hibernate-setup-v2.done && sudo systemctl start tblue-hibernate-setup"
+        log "Kernel lockdown is active: hibernation is unavailable; checking again next boot."
         exit 0
     fi
 
@@ -128,6 +135,7 @@ main() {
 
     # The sleep settings themselves (Allow{Suspend,Hibernation,
     # SuspendThenHibernate}=yes) ship as sleep.conf.d drop-ins.
+    mark_done
     log "Hybrid sleep setup complete."
 }
 
