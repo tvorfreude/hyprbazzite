@@ -2,9 +2,14 @@
 # wallpaper-cycle - Cycle through GIF wallpapers using awww
 #
 # This script sets a random GIF wallpaper from the configured directory,
-# cycles it at regular intervals, and responds to monitor hotplug events.
+# cycles it at regular intervals, re-applies it when monitors are hotplugged,
+# and on SIGUSR1 puts it back on screen. Its PID is in
+# $XDG_RUNTIME_DIR/wallpaper-cycle.pid (the process name is just "bash").
 
 set -euo pipefail
+
+# hypr_instance_alive, hypr_instance_lock
+source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh
 
 # -- Configuration -----------------------------------------------------------
 readonly DIR="/usr/share/backgrounds/gif_wallpapers"
@@ -16,13 +21,15 @@ readonly TRANSITION_DURATION=2
 readonly CYCLE_INTERVAL=900  # seconds (15 minutes)
 readonly FILTER="${WALLPAPER_FILTER:-Nearest}"  # Nearest keeps GIFs crisp; set WALLPAPER_FILTER=Lanczos3 to smooth-scale photos
 readonly WALLUST_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/wallust"
+readonly RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+readonly CURRENT_FILE="$RUNTIME_DIR/wallpaper-current"
+readonly PID_FILE="$RUNTIME_DIR/wallpaper-cycle.pid"
 
 # -- Helpers ------------------------------------------------------------------
 
 cycle_now() {
     # Skip if user has pinned a wallpaper via the wallpaper picker
-    local runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
-    if [[ -f "${runtime_dir}/wallpaper-pinned" ]]; then
+    if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
         return 0
     fi
 
@@ -48,6 +55,7 @@ cycle_now() {
             --resize crop \
             --filter "$FILTER" \
             "$wallpaper"
+        printf '%s\n' "$wallpaper" > "$CURRENT_FILE"
 
         # hyprlock.conf's background.path reads a static frame from here - it
         # has no idea awww or GIF cycling exist, so without this it's stuck
@@ -70,39 +78,97 @@ cycle_now() {
     fi
 }
 
+# Show the current wallpaper again on every output (a hotplugged or
+# re-probed monitor comes up without it).
+reapply_current() {
+    local current=""
+    if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
+        current="$WALLUST_DIR/current_wallpaper.jpg"   # the picker's copy
+    elif [[ -r "$CURRENT_FILE" ]]; then
+        current=$(<"$CURRENT_FILE")
+    fi
+    [[ -f "$current" ]] || return 0
+    awww img --transition-type none --resize crop --filter "$FILTER" "$current"
+}
+
+# SIGUSR1, sent after awww-daemon restarts: a new wallpaper, or the pinned
+# one again while one is pinned.
+on_usr1() {
+    if [[ -f "${RUNTIME_DIR}/wallpaper-pinned" ]]; then
+        reapply_current
+    else
+        cycle_now
+    fi
+}
+
 # -- Monitor hotplug listener ------------------------------------------------
 
 monitor_hotplug() {
     udevadm monitor --udev --subsystem-match=drm | \
     while read -r line; do
-        if echo "$line" | grep -q 'change'; then
-            cycle_now || true
-        fi
+        [[ "$line" == *change* ]] || continue
+        # A hotplug or a resume re-probe arrives as a burst of events, one per
+        # connector: let it settle (bounded), then re-apply once.
+        for _ in {1..30}; do read -r -t 2 _ || break; done
+        hypr_instance_alive || exit 0
+        reapply_current || true
     done
+}
+
+cleanup() {
+    if [[ -n "${sleep_pid:-}" ]]; then
+        kill "$sleep_pid" 2>/dev/null || true
+    fi
+    if [[ -n "${hotplug_pid:-}" ]]; then
+        pkill -P "$hotplug_pid" 2>/dev/null || true
+        kill "$hotplug_pid" 2>/dev/null || true
+    fi
+    if [[ "$(cat "$PID_FILE" 2>/dev/null)" == "$$" ]]; then
+        rm -f "$PID_FILE"
+    fi
 }
 
 # -- Main ---------------------------------------------------------------------
 
 main() {
-    # Trap USR1 signal for manual cycle
-    trap cycle_now USR1
+    # One instance per Hyprland instance (autostart can't de-duplicate by
+    # process name: this runs as "bash").
+    hypr_instance_lock wallpaper-cycle || exit 0
+
+    # Turn termination into a normal exit so the EXIT trap always runs and
+    # takes the hotplug listener (and its udevadm) down too.
+    trap 'exit 143' TERM
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap cleanup EXIT
+    # `|| true`: under set -e, a failing command inside a trap handler
+    # (awww-daemon briefly unavailable, say) would end the daemon.
+    trap 'on_usr1 || true' USR1
+    # Only now advertise the PID: hyprbazzite-ctl sends USR1 to it, and before
+    # the handler above exists that signal's default action ends the process.
+    echo "$$" > "$PID_FILE"
 
     # Initial delay to ensure awww daemon is ready
     sleep 2
     cycle_now || true
 
-    # Start monitor hotplug listener in background
-    monitor_hotplug &
-    readonly hotplug_pid=$!
+    # Background children get `9>&-`: they must not hold the instance lock.
+    monitor_hotplug 9>&- &
+    hotplug_pid=$!
 
-    # Cleanup hotplug listener on exit
-    trap "kill $hotplug_pid 2>/dev/null" EXIT
-
-    # Infinite loop with interruptible sleep
-    while true; do
-        sleep "$CYCLE_INTERVAL" &
-        wait $!
-        cycle_now || true
+    # Interruptible sleep: a USR1 cuts it short (the trap has already
+    # cycled), and the interval starts over.
+    while hypr_instance_alive; do
+        sleep "$CYCLE_INTERVAL" 9>&- &
+        sleep_pid=$!
+        if wait "$sleep_pid"; then
+            # Re-check first: after a logout/login within one interval the
+            # same WAYLAND_DISPLAY belongs to the new session.
+            hypr_instance_alive || break
+            cycle_now || true
+        else
+            kill "$sleep_pid" 2>/dev/null || true
+        fi
     done
 }
 

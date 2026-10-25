@@ -10,17 +10,9 @@ set -euo pipefail
 # ===============================================================================
 
 # --- Shared Library ---
-source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh 2>/dev/null || true
-
-# Fallbacks if common.sh failed to load
-command -v notify >/dev/null 2>&1 || notify() {
-    local title="$1" msg="$2" urgency="${3:-normal}"
-    command -v notify-send >/dev/null 2>&1 && notify-send -u "$urgency" "$title" "$msg"
-}
-command -v json_escape >/dev/null 2>&1 || json_escape() {
-    local s="$1"; s=${s//\\/\\\\}; s=${s//\"/\\\"}; s=${s//$'\n'/\\n}; printf '%s' "$s"
-}
-: "${CONFIG_DIR:="${XDG_CONFIG_HOME:-$HOME/.config}"}"
+# Required: notify, json_escape, CONFIG_DIR and the Hyprland instance helpers
+# live there (shipped with this script; verify-image.sh checks it).
+source /usr/lib/hyprbazzite/hypr/scripts/lib/common.sh
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # MENU MODULE — interactive launcher (replaces TritonCtl)
@@ -98,6 +90,15 @@ _save_wallpaper() {
     [[ -n "$out" ]] && printf '%s\n' "$out" > "$(_gamemode_wall_state)"
 }
 
+# wallpaper-cycle's process name is "bash": find it by its PID file, checking
+# the cmdline in case the PID was reused.
+_wallpaper_cycle_pid() {
+    local pid
+    pid=$(cat "${XDG_RUNTIME_DIR:-/tmp}/wallpaper-cycle.pid" 2>/dev/null) || return 1
+    [[ "$pid" =~ ^[0-9]+$ ]] && grep -qa wallpaper-cycle "/proc/$pid/cmdline" 2>/dev/null || return 1
+    echo "$pid"
+}
+
 _restore_wallpaper() {
     local state out name img restored=0
     state=$(_gamemode_wall_state)
@@ -114,8 +115,9 @@ _restore_wallpaper() {
 
     # Nothing saved (e.g. gamemode was enabled before this fix): let the cycle
     # daemon pick a fresh GIF if it is running, else the static fallback.
-    if pgrep -x wallpaper-cycle >/dev/null 2>&1; then
-        pkill -USR1 wallpaper-cycle || true
+    local pid
+    if pid=$(_wallpaper_cycle_pid); then
+        kill -USR1 "$pid" || true
         return 0
     fi
     local f
@@ -154,21 +156,32 @@ gamemode_toggle() {
         fi
         notify-send -e -u low -i "$notif_icon" " Gamemode:" " enabled"
     else
-        hyprctl eval 'hl.config({
-            animations = { enabled = true },
-            decoration = { shadow = { enabled = true }, blur = { enabled = true }, rounding = 8, active_opacity = 1.0, inactive_opacity = 1.0 },
-            general = { gaps_in = 5, gaps_out = 10, border_size = 2 },
-        })
-        hl.window_rule({ match = { class = ".*" }, opacity = "1 override" })' >/dev/null
+        # A reload restores hyprland.lua's settings and drops the rule above.
+        _reload_config
         _restore_wallpaper
         sleep 0.5
         notify-send -e -u normal -i "$notif_icon" " Gamemode:" " disabled"
-        # No hyprctl reload here: the eval call above restores the gamemode-off
-        # values. They must stay in sync with general/decoration in
-        # hypr/hyprland.lua (gaps_in=5, gaps_out=10, border_size=2, rounding=8);
-        # they had drifted (20/3/10), leaving oversized gaps after turning
-        # gamemode off.
     fi
+}
+
+# Re-applies state set with `hyprctl eval` (workspace rules, OSK window rule,
+# night light), which every config load drops; hyprland.lua runs this after
+# each load. Every step may fail without ending the caller.
+restore_runtime() {
+    local shader
+    workspace_rebind >/dev/null 2>&1 || true
+    _osk_window_rule
+    if shader=$(cat "${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite/nightlight" 2>/dev/null) && [[ -n "$shader" ]]; then
+        hyprctl eval "hl.config({ decoration = { screen_shader = \"$shader\" } })" >/dev/null 2>&1 || true
+    fi
+    return 0
+}
+
+# Reload and restore right away, without waiting on hyprland.lua's background
+# restore (and for a user's own hyprland.lua, which doesn't start one).
+_reload_config() {
+    hyprctl reload >/dev/null 2>&1 || true
+    restore_runtime
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -292,7 +305,7 @@ wallpaper_pick() {
 
         if command -v wallust &>/dev/null; then
             wallust run "$wallust_current" -s
-            hyprctl reload
+            _reload_config
         fi
 
         if command -v awww &>/dev/null; then
@@ -361,21 +374,25 @@ chezmoi_action() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 session_refresh() {
-    local apps=(hypridle mako waybar fcitx5 awww-daemon)
+    local apps=(hypridle waybar fcitx5 awww-daemon)
     for app in "${apps[@]}"; do
-        pkill "$app" || true
+        pkill -x "$app" || true
     done
 
     sleep 0.3
+    # Same command lines as autostart.lua: a bare `waybar` finds no config on
+    # this image (it lives in /etc/waybar) and exits, leaving no bar at all.
     hypridle -c /etc/hypr/hypridle.conf &
-    mako &
-    waybar &
+    waybar --config /etc/waybar/config.jsonc --style "$(/usr/libexec/hyprbazzite-accent style waybar)" &
     fcitx5 &
     awww-daemon &
+    # swaync (this image's notification daemon) reloads in place.
+    swaync-client -R -rs >/dev/null 2>&1 || true
     sleep 0.5
 
-    if command -v wallpaper-cycle &>/dev/null && pgrep -x wallpaper-cycle >/dev/null 2>&1; then
-        pkill -USR1 wallpaper-cycle || true
+    local pid
+    if pid=$(_wallpaper_cycle_pid); then
+        kill -USR1 "$pid" || true
     elif [[ -f "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" ]]; then
         awww img "$CONFIG_DIR/hypr/wallust/current_wallpaper.jpg" --transition-type wipe --transition-duration 2
     fi
@@ -439,7 +456,7 @@ quicksettings_show() {
                 sed -i "s/^theme = .*/theme = $gtk_dark/" "$CONFIG_DIR/qt6ct/qt6ct.conf" 2>/dev/null || true
                 notify "Settings" "Switched to dark mode"
             fi
-            hyprctl reload
+            _reload_config
             ;;
     esac
 }
@@ -487,8 +504,8 @@ theme_update() {
 
     # Reload running services
     pgrep -x waybar >/dev/null && killall -SIGUSR2 waybar || true
-    pgrep -x mako >/dev/null && makoctl reload || true
-    hyprctl reload 2>/dev/null || true
+    swaync-client -rs >/dev/null 2>&1 || true
+    _reload_config 2>/dev/null || true
 
     notify "Theme" "Updated from $(basename "$wallpaper")"
 }
@@ -497,52 +514,47 @@ theme_update() {
 # TDP MODULE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+_is_amd_cpu() { grep -q AuthenticAMD /proc/cpuinfo 2>/dev/null; }
+
 tdp_get_backend() {
+    # AMD only (both drive AMD's SMU). No hwmon power1_cap fallback: that
+    # file belongs to a GPU, not the CPU.
+    _is_amd_cpu || return 1
     if command -v ryzenadj >/dev/null 2>&1; then echo "ryzenadj"; return 0; fi
     if command -v amdctl >/dev/null 2>&1; then echo "amdctl"; return 0; fi
-    if [[ -d /sys/class/hwmon ]]; then echo "sysfs"; return 0; fi
     return 1
 }
 
+# $1 = "privileged": read through pkexec (wheel only, so it never prompts).
+# Only for interactive callers - the waybar module polls every 30s.
 tdp_get_current() {
-    local backend
+    local backend run=()
+    [[ "${1:-}" == privileged ]] && id -nG | grep -qw wheel && run=(pkexec)
     backend=$(tdp_get_backend || echo "unknown")
     case "$backend" in
-        ryzenadj) ryzenadj --info | grep -E 'TDP|CPU Name' ;;
-        amdctl) amdctl info | grep -i 'power limit\|cpu model' ;;
-        sysfs)
-            local cap_file
-            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" 2>/dev/null | head -n1)
-            if [[ -n "$cap_file" ]]; then
-                echo "Current TDP: $(( $(cat "$cap_file") / 1000000 ))W"
-            else
-                echo "TDP not found in sysfs"
-            fi
-            ;;
+        ryzenadj) "${run[@]}" ryzenadj --info | grep -E 'TDP|CPU Name' ;;
+        amdctl) "${run[@]}" amdctl info | grep -i 'power limit\|cpu model' ;;
         *) echo "TDP control unsupported" ;;
     esac
 }
 
+# pkexec, not sudo: there's no terminal here. 10-tdp-control.rules allows
+# these exact commands without a password (wheel, local session).
 tdp_set() {
-    local watts="$1"
-    local backend
-    backend=$(tdp_get_backend || { notify "Error" "TDP backend not found"; return 1; })
+    local watts="${1:-}" backend
+    [[ "$watts" =~ ^[0-9]+$ ]] || { echo "Usage: hyprbazzite-ctl tdp set <watts>" >&2; return 1; }
+    backend=$(tdp_get_backend) || { notify "Error" "TDP backend not found"; return 1; }
 
     case "$backend" in
-        ryzenadj) sudo ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
-        amdctl) sudo amdctl set power-limit "$watts" ;;
-        sysfs)
-            local cap_file
-            cap_file=$(find /sys/class/hwmon/hwmon* -name "power1_cap" 2>/dev/null | head -n1)
-            echo $((watts * 1000000)) | sudo tee "$cap_file" >/dev/null
-            ;;
-    esac
+        ryzenadj) pkexec ryzenadj --stapm-limit=$((watts*1000)) --fast-limit=$((watts*1000)) --slow-limit=$((watts*1000)) ;;
+        amdctl) pkexec amdctl set power-limit "$watts" ;;
+    esac || { notify "TDP" "Could not set ${watts}W via $backend" "critical"; return 1; }
     notify "TDP" "Set to ${watts}W via $backend"
 }
 
 tdp_menu() {
     local current
-    current=$(tdp_get_current | grep -o '[0-9]\+' | head -n1 || echo "unknown")
+    current=$(tdp_get_current privileged | grep -o '[0-9]\+' | head -n1 || echo "unknown")
     local options="10W\n15W\n25W\n35W\n45W"
     local choice
     choice=$(echo -e "$options" | wofi --dmenu --width 300 --height 400 --prompt "Set TDP (Current: ${current}W)") || return 0
@@ -571,6 +583,18 @@ osk_toggle() {
     fi
 }
 
+# The OSK's window rule (runtime-only). $1 = top|bottom; default: this
+# session's last anchor, else WVKBD_ANCHOR from wvkbd.conf.
+_osk_window_rule() {
+    local anchor="${1:-}" move='{"0","50%"}'
+    if [[ -z "$anchor" ]]; then
+        anchor=$(cat "${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor" 2>/dev/null) \
+            || anchor=$( . /etc/hypr/wvkbd.conf 2>/dev/null; echo "${WVKBD_ANCHOR:-bottom}" )
+    fi
+    [[ "$anchor" == "top" ]] && move='{"0","0"}'
+    hyprctl eval "$(printf 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = %s })' "$move")" >/dev/null 2>&1 || true
+}
+
 osk_swap_anchor() {
     local state_file="${XDG_RUNTIME_DIR:-/tmp}/wvkbd-anchor"
     local current="bottom"
@@ -581,13 +605,7 @@ osk_swap_anchor() {
 
     printf '%s\n' "$next" > "$state_file"
 
-    if command -v hyprctl >/dev/null 2>&1; then
-        if [[ "$next" = "top" ]]; then
-            hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, move = {"0","0"} })' >/dev/null 2>&1 || true
-        else
-            hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, move = {"0","50%"} })' >/dev/null 2>&1 || true
-        fi
-    fi
+    _osk_window_rule "$next"
 
     if pgrep -x wvkbd-mobintl >/dev/null 2>&1 || pgrep -x wvkbd >/dev/null 2>&1; then
         pkill -x wvkbd-mobintl >/dev/null 2>&1 || true
@@ -620,6 +638,16 @@ power_menu() {
     esac
 }
 
+# Lock via logind so hypridle's lock_cmd runs (one hyprlock, our config);
+# without hypridle, start hyprlock directly.
+_lock_now() {
+    if pgrep -x hypridle >/dev/null 2>&1; then
+        loginctl lock-session
+    else
+        pidof hyprlock >/dev/null 2>&1 || hyprlock -c /etc/hypr/hyprlock.conf
+    fi
+}
+
 power_action() {
     local action="$1"
     case "$action" in
@@ -627,7 +655,7 @@ power_action() {
         reboot) systemctl reboot ;;
         suspend) systemctl suspend ;;
         sleep) _sleep_best_effort ;;
-        lock) hyprlock ;;
+        lock) _lock_now ;;
         logout) hyprctl eval 'hl.dispatch(hl.dsp.exit())' ;;
         *) echo "Unknown power action: $action"; return 1 ;;
     esac
@@ -658,26 +686,15 @@ power_profile_cycle() {
 # AUTOMATION MODULE (waybar exec helpers & background services)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Hyprland's event socket: newer releases keep it under $XDG_RUNTIME_DIR/hypr,
-# older ones under /tmp/hypr. The DND/monitor automation only knew the latter,
-# so on this Hyprland it could never connect.
-_hypr_socket2() {
-    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}" d
-    [[ -n "$sig" ]] || return 1
-    for d in "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" /tmp/hypr; do
-        [[ -S "$d/$sig/.socket2.sock" ]] && { echo "$d/$sig/.socket2.sock"; return 0; }
-    done
-    return 1
-}
-
 automation_dnd() {
     if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
         echo "Hyprland instance signature not found." >&2
         return 1
     fi
+    hypr_instance_lock automation-dnd || return 0
     local sock
-    sock=$(_hypr_socket2) || { echo "Hyprland event socket not found." >&2; return 1; }
-    socat -U - "UNIX-CONNECT:$sock" | while read -r line; do
+    sock=$(hypr_socket2) || { echo "Hyprland event socket not found." >&2; return 1; }
+    socat -U - "UNIX-CONNECT:$sock" 9>&- | while read -r line; do
         case "$line" in
             fullscreen\>\>1) swaync-client --dnd-on ;;
             fullscreen\>\>0) swaync-client --dnd-off ;;
@@ -700,6 +717,7 @@ automation_dnd() {
 }
 
 automation_osk() {
+    hypr_instance_lock automation-osk || return 0
     local conf="/etc/hypr/wvkbd.conf"
     [[ -f "$conf" ]] && . "$conf"
     local layout="${WVKBD_LAYOUT:-mobintl}"
@@ -727,50 +745,53 @@ automation_osk() {
                 "$bin" --hidden -H "$height" -L "$height_land" -l "$layers" \
                     --landscape-layers "$land_layers" --fn "$font" --alpha "$alpha" \
                     --bg "$bg" --fg "$fg" --fg-sp "$fg_sp" --press "$press" \
-                    --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 &
+                    --press-sp "$press_sp" --text "$text" --text-sp "$text_sp" >/dev/null 2>&1 9>&- &
             fi
         fi
     }
 
     _sync_state
-    if [[ "$anchor" = "top" ]]; then
-        hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","0"} })' >/dev/null 2>&1 || true
-    else
-        hyprctl eval 'hl.window_rule({ match = { class = "^(wvkbd|wvkbd-.*)$" }, float = true, move = {"0","50%"} })' >/dev/null 2>&1 || true
-    fi
-    udevadm monitor --udev --subsystem-match=input --property | while read -r line; do
+    _osk_window_rule "$anchor"
+    udevadm monitor --udev --subsystem-match=input --property 9>&- | while read -r line; do
+        # udevadm never exits on its own: stop once this Hyprland instance
+        # is gone instead of lingering into the next one.
+        hypr_instance_alive || break
         [[ "$line" =~ ACTION=(add|remove|change) ]] && _sync_state
     done
 }
 
 automation_temp() {
-    local best_temp_mc="" best_source="" best_score=-1
+    # Polled by waybar every 10s: no forks per sensor.
+    local best_temp_mc="" best_source="" best_score=-1 score
     _score() {
-        local src_lc=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
-        if [[ "$src_lc" =~ (tctl|cpu|package|x86_pkg_temp|coretemp|k10temp|zenpower|soc_thermal) ]]; then echo 300
-        elif [[ "$src_lc" =~ acpitz ]]; then echo 180
-        elif [[ "$src_lc" =~ (junction|edge|amdgpu|gpu) ]]; then echo 120
-        elif [[ "$src_lc" =~ (nvme|ssd) ]]; then echo 90
-        else echo 60; fi
+        local src_lc=${1,,}
+        if [[ "$src_lc" =~ (tctl|cpu|package|x86_pkg_temp|coretemp|k10temp|zenpower|soc_thermal) ]]; then score=300
+        elif [[ "$src_lc" =~ acpitz ]]; then score=180
+        elif [[ "$src_lc" =~ (junction|edge|amdgpu|gpu) ]]; then score=120
+        elif [[ "$src_lc" =~ (nvme|ssd) ]]; then score=90
+        else score=60; fi
     }
+    local zone temp_mc type
     for zone in /sys/class/thermal/thermal_zone*; do
         [[ -r "$zone/temp" ]] || continue
-        local temp_mc type score
-        temp_mc=$(cat "$zone/temp" 2>/dev/null || true)
-        type=$(cat "$zone/type" 2>/dev/null || echo "unknown")
-        score=$(_score "$type")
+        { read -r temp_mc < "$zone/temp"; } 2>/dev/null || continue
+        { read -r type < "$zone/type"; } 2>/dev/null || type="unknown"
+        _score "$type"
         (( score > best_score )) && { best_score=$score; best_temp_mc=$temp_mc; best_source="thermal:${type}"; }
     done
+    local hw name input label
     for hw in /sys/class/hwmon/hwmon*; do
         [[ -d "$hw" ]] || continue
-        local name=$(cat "$hw/name" 2>/dev/null || echo "unknown")
+        { read -r name < "$hw/name"; } 2>/dev/null || name="unknown"
+        _score "$name"
+        (( score > best_score )) || continue
+        # First readable input of the best-scoring device.
         for input in "$hw"/temp*_input; do
             [[ -r "$input" ]] || continue
-            local temp_mc label score
-            temp_mc=$(cat "$input" 2>/dev/null || true)
-            label=$(cat "${input%_input}_label" 2>/dev/null || echo "temp")
-            score=$(_score "$name")
-            (( score > best_score )) && { best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"; }
+            { read -r temp_mc < "$input"; } 2>/dev/null || continue
+            { read -r label < "${input%_input}_label"; } 2>/dev/null || label="temp"
+            best_score=$score; best_temp_mc=$temp_mc; best_source="${name}:${label}"
+            break
         done
     done
 
@@ -794,9 +815,10 @@ automation_temp() {
 waybar_power_status() {
     local backend="unknown" profile="unknown"
 
-    if busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile >/dev/null 2>&1; then
+    local out
+    if out=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null); then
         backend="tuned-ppd"
-        profile=$(busctl --system get-property net.hadess.PowerProfiles /net/hadess/PowerProfiles net.hadess.PowerProfiles ActiveProfile 2>/dev/null | awk -F'"' '{print $2}')
+        profile=${out#s \"}; profile=${profile%\"}   # s "balanced" -> balanced
     elif command -v tuned-adm >/dev/null 2>&1; then
         backend="tuned"
         profile=$(tuned-adm active 2>/dev/null | sed -n 's/^Current active profile: *//p')
@@ -1141,7 +1163,7 @@ keybinds_switch() {
             linux) rm -f "$marker" ;;
         esac
         notify "Keybinds" "Switched to ${1} profile. Reloading..."
-        hyprctl reload
+        _reload_config
     }
 
     case "$action" in
@@ -1251,12 +1273,18 @@ open_target() {
     return 1
 }
 
-# "Awake" = hypridle stopped. One source of truth shared by the swaync Awake
-# toggle and the waybar idle indicator (custom/idle, signal 9).
+# "Awake" = an idle inhibitor held by a transient user unit (swaync toggle,
+# waybar custom/idle). hypridle keeps running, so it still locks before sleep.
+_AWAKE_UNIT="hyprbazzite-awake.service"
+
+_awake_active() { systemctl --user is-active --quiet "$_AWAKE_UNIT"; }
+
 _awake_apply() {
     if [[ "$1" == "on" ]]; then
-        pkill -x hypridle || true
+        _awake_active || systemd-run --user --quiet --collect --unit="$_AWAKE_UNIT" \
+            systemd-inhibit --what=idle --who=HyprBazzite --why="Awake mode" sleep infinity
     else
+        systemctl --user stop "$_AWAKE_UNIT" 2>/dev/null || true
         pgrep -x hypridle >/dev/null 2>&1 || setsid hypridle -c /etc/hypr/hypridle.conf >/dev/null 2>&1 &
     fi
     sleep 0.2
@@ -1265,9 +1293,9 @@ _awake_apply() {
 
 waybar_idle_status() {
     local awake=0 text class tip
-    pgrep -x hypridle >/dev/null 2>&1 || awake=1
+    _awake_active && awake=1
     if (( awake )); then
-        text=$'\U000F0208'; class="activated"; tip=$'Staying awake: screen will not lock or sleep\n\nClick: allow idle again'
+        text=$'\U000F0208'; class="activated"; tip=$'Staying awake: idle lock and screen-off are paused\n(the screen still locks before sleep)\n\nClick: allow idle again'
     else
         text=$'\U000F0209'; class="deactivated"; tip=$'Idle lock/sleep enabled\n\nClick: stay awake'
     fi
@@ -1323,7 +1351,7 @@ _emit_app_name() {
 waybar_app_name() {
     _emit_app_name
     local sock
-    sock=$(_hypr_socket2) || return 0
+    sock=$(hypr_socket2) || return 0
     socat -U - "UNIX-CONNECT:$sock" | while read -r line; do
         case "$line" in
             activewindow\>\>*|closewindow\>\>*|workspace\>\>*|focusedmon\>\>*) _emit_app_name ;;
@@ -1354,23 +1382,28 @@ qs() {
         speakers:set)    wpctl set-mute "$sink" "$(_qs_onoff 1 0)" ;;
         mic:state)       wpctl get-volume "$src" 2>/dev/null | grep -q MUTED && echo true || echo false ;;
         mic:set)         wpctl set-mute "$src" "$(_qs_onoff 1 0)" ;;
-        awake:state)     pgrep -x hypridle >/dev/null 2>&1 && echo false || echo true ;;
+        awake:state)     _awake_active && echo true || echo false ;;
         awake:set)       _awake_apply "$(_qs_onoff on off)" ;;
-        awake:toggle)    pgrep -x hypridle >/dev/null 2>&1 && _awake_apply on || _awake_apply off ;;
+        awake:toggle)    if _awake_active; then _awake_apply off; else _awake_apply on; fi ;;
         gamemode:state)  [[ "$(_animations_enabled)" == "0" ]] && echo true || echo false ;;
         gamemode:set)    gamemode_toggle ;;
         nightlight:state)
             hyprctl -j getoption decoration:screen_shader 2>/dev/null | jq -r '.str // ""' | grep -q "nightlight.frag" && echo true || echo false ;;
         nightlight:set)
+            # The state file lets restore_runtime put the shader back after
+            # a config reload.
             local shader="${HYPRBAZZITE_NIGHTLIGHT_SHADER:-/usr/lib/hyprbazzite/hypr/nightlight.frag}"
+            local state="${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite/nightlight"
             if [[ "${SWAYNC_TOGGLE_STATE:-}" == "true" ]]; then
                 hyprctl eval "hl.config({ decoration = { screen_shader = \"$shader\" } })" >/dev/null
+                mkdir -p "${state%/*}" && printf '%s\n' "$shader" > "$state"
             else
                 hyprctl eval 'hl.config({ decoration = { screen_shader = "" } })' >/dev/null
+                rm -f "$state"
             fi ;;
         screenshot:run)  swaync-client -cp -sw; sleep 0.35; screenshot_take region ;;
         picker:run)      swaync-client -cp -sw; sleep 0.35; hyprpicker -a ;;
-        lock:run)        swaync-client -cp -sw; sleep 0.35; hyprlock ;;
+        lock:run)        swaync-client -cp -sw; sleep 0.35; _lock_now ;;
         *) echo "Usage: hyprbazzite-ctl qs <wifi|bluetooth|speakers|mic|awake|gamemode|nightlight> <state|set> | <screenshot|picker|lock> run"; return 1 ;;
     esac
 }
@@ -1392,6 +1425,8 @@ Modules:
   wallpaper [pick]              Interactive wallpaper picker
   chezmoi [push|pull]           Dotfiles management
   refresh                       Restart session apps (waybar, idle, etc.)
+  reload                        Reload the Hyprland config, keeping runtime state
+  restore-runtime               Re-apply runtime-only state (run by hyprland.lua on load)
   settings                      Quick settings menu
   theme [update] [wallpaper]    Update color theme from wallpaper
   tdp [get|set <watts>|profile] TDP power management
@@ -1424,6 +1459,8 @@ USAGE
         accent) /usr/libexec/hyprbazzite-accent "$@" ;;
         chezmoi) chezmoi_action "${1:-}" ;;
         refresh) session_refresh ;;
+        reload) _reload_config ;;
+        restore-runtime) restore_runtime ;;
         settings) quicksettings_show ;;
         theme)
             case "${1:-update}" in
@@ -1433,7 +1470,7 @@ USAGE
             ;;
         tdp)
             case "${1:-}" in
-                get) tdp_get_current ;;
+                get) tdp_get_current privileged ;;
                 set) tdp_set "${2:-}" ;;
                 profile) tdp_menu ;;
                 *) echo "Usage: hyprbazzite-ctl tdp [get|set <watts>|profile]"; return 1 ;;

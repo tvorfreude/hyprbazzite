@@ -60,7 +60,6 @@ end
 
 -- ─── System ──────────────────────────────────────────────────────────────────
 hl.bind(mod .. " + N",            hl.dsp.exec_cmd("swaync-client -t -sw"))
-hl.bind(mod .. " + O",            hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl transparency toggle"))
 hl.bind(appmod .. " + SHIFT + V", hl.dsp.exec_cmd("cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
 
 -- ─── Mouse ───────────────────────────────────────────────────────────────────
@@ -135,7 +134,7 @@ if macos then
     hl.bind(appmod .. " + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot area"))
     hl.bind(appmod .. " + SHIFT + 5", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot window"))
     hl.bind(appmod .. " + CTRL + SHIFT + 4", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot clipboard"))
-    hl.bind(appmod .. " + CTRL + Q",  hl.dsp.exec_cmd("hyprlock"))
+    hl.bind(appmod .. " + CTRL + Q",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl power lock"))
 
     -- ═══════════════════════════════════════════════════════════════════════════
     -- RESIZE SUBMAP — mirrors AeroSpace [mode.resize.binding]
@@ -188,9 +187,10 @@ if macos then
     -- Enter with alt-shift-/; esc reloads config and exits.
     -- ═══════════════════════════════════════════════════════════════════════════
     hl.define_submap("service", function()
-        -- esc = reload config + exit
+        -- esc = reload config + exit (via ctl, which restores the workspace
+        -- rules and night light a plain reload drops)
         hl.bind("escape", function()
-            hl.exec_cmd("hyprctl reload")
+            hl.exec_cmd("/usr/libexec/hyprbazzite-ctl reload")
             hl.dispatch(hl.dsp.submap("reset"))
         end)
         -- r = flatten workspace tree + exit. Dwindle has no flatten; just exit.
@@ -252,7 +252,7 @@ else
     hl.bind(mod .. " + CTRL + S",  hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl screenshot full"))
 
     -- ─── System ──────────────────────────────────────────────────────────────
-    hl.bind(mod .. " + ALT + L",   hl.dsp.exec_cmd("hyprlock"))
+    hl.bind(mod .. " + ALT + L",   hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl power lock"))
     hl.bind(mod .. " + K",         hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk toggle"))
     hl.bind(mod .. " + SHIFT + K", hl.dsp.exec_cmd("/usr/libexec/hyprbazzite-ctl osk swap-anchor"))
 
