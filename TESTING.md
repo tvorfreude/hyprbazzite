@@ -189,12 +189,20 @@ PR is closed (see `.github/workflows/pr-cleanup.yml`), so they don't accumulate.
 
 ### Verifying image signatures
 
-Published images are signed with cosign (keyless, GitHub OIDC). Verify before
-trusting an image:
+Published images are signed with cosign. With a signing key set up (see
+SETUP.md, "Update signature verification"), images are signed with that key
+and installed systems enforce it on every update; verify by hand with:
+
+```bash
+cosign verify --key cosign.pub ghcr.io/tvorfreude/hyprbazzite:latest
+```
+
+Without a key, CI signs keyless (GitHub OIDC). Verify those against this
+repository's build workflow, not just the owner:
 
 ```bash
 cosign verify \
-  --certificate-identity-regexp="https://github.com/tvorfreude/" \
+  --certificate-identity-regexp='^https://github\.com/tvorfreude/hyprbazzite/\.github/workflows/build\.yml@' \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
   ghcr.io/tvorfreude/hyprbazzite:latest
 ```
