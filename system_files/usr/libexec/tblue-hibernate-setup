@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # tblue-hibernate-setup - Configure hybrid sleep/hibernation for btrfs swapfiles
 #
-# Sets up resume kernel parameters, configures systemd sleep settings,
-# and disables unnecessary wakeup sources.
+# Sets up resume kernel parameters and configures systemd sleep settings.
+# (Wakeup sources are filtered by tblue-disable-nonpower-wakeup.service.)
 
 set -euo pipefail
 
 # -- Configuration -----------------------------------------------------------
 readonly SWAPFILE_PATH="/var/swap/swapfile"
+readonly DONE_MARKER="/var/lib/tblue/hibernate-setup-v2.done"
 
 # -- Helpers ------------------------------------------------------------------
 
@@ -15,16 +16,9 @@ log() {
     echo "[tblue-hibernate-setup] $*" >&2
 }
 
-configure_sleep_setting() {
-    local key="$1"
-    local value="$2"
-    local config="/etc/systemd/sleep.conf"
-
-    if grep -q "^${key}" "$config" 2>/dev/null; then
-        sed -i "s/^${key}.*/${key}=${value}/" "$config"
-    else
-        echo "${key}=${value}" >> "$config"
-    fi
+mark_done() {
+    mkdir -p "${DONE_MARKER%/*}"
+    : > "$DONE_MARKER"
 }
 
 # Size the swapfile a little larger than RAM so systemd can always fit the
@@ -68,8 +62,31 @@ ensure_swapfile() {
 # -- Main ---------------------------------------------------------------------
 
 main() {
+    # btrfs only (mkswapfile, map-swapfile).
+    if [[ "$(stat -f -c %T /var)" != "btrfs" ]]; then
+        log "/var is not on btrfs; skipping swapfile and hibernation setup."
+        mark_done
+        exit 0
+    fi
+
+    # Lockdown (Secure Boot) disables hibernation: no point in a swapfile yet.
+    # Not marked done, so this checks again every boot. --ignore-lockdown
+    # (ujust hypr-hibernate-on-secureboot) sets up ahead of the reboot that
+    # lifts it. (Not /sys/power/state: the nohibernate karg also hides "disk".)
+    if [[ "${1:-}" != --ignore-lockdown ]] &&
+        grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
+        log "Kernel lockdown is active (Secure Boot): hibernation is unavailable."
+        log "To allow it, run: ujust hypr-hibernate-on-secureboot"
+        exit 0
+    fi
+
     # 1. Ensure the swapfile exists (create it if missing), then fstab + activate.
     ensure_swapfile
+    # logind and systemd-sleep may only read swap files labelled swapfile_t
+    # (customizable, so restorecon keeps it); otherwise hibernation is refused.
+    if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then
+        chcon -t swapfile_t "$SWAPFILE_PATH"
+    fi
 
     if ! grep -q "$SWAPFILE_PATH" /etc/fstab; then
         echo "$SWAPFILE_PATH none swap defaults,nofail 0 0" >> /etc/fstab
@@ -99,60 +116,30 @@ main() {
 
     log "Setting resume=UUID=$dec_uuid and resume_offset=$offset for hybrid sleep."
 
-    # 3. Set kernel arguments for resume.
-    # Use --append-if-missing (not --replace): on a fresh install the resume
-    # kargs don't exist yet, and --replace fails on a missing key.
-    # Also strip 'nohibernate', which Bazzite/uBlue ships by default -- while
-    # it is present the kernel reports /sys/power/disk as [disabled] and
-    # neither hibernate nor suspend-then-hibernate can run at all. This karg
-    # is necessary but not always sufficient: Secure Boot puts the kernel in
-    # lockdown=integrity mode independently, which disables hibernation on
-    # its own regardless of kargs - confirmed live on real hardware: even
-    # with nohibernate successfully removed and resume kargs correctly set,
-    # /sys/power/state still had no "disk" entry and CanHibernate/
-    # CanSuspendThenHibernate both reported "na". There's no karg or sleep.conf
-    # setting that overrides that (it's intentional - an unsigned hibernation
-    # image could otherwise be used to tamper with a verified-boot kernel on
-    # resume), so hyprbazzite-ctl's _sleep_best_effort() and
-    # HandleLidSwitch=sleep (logind.conf.d) use logind's own SleepOperation=
-    # fallback chain instead of ever hardcoding suspend-then-hibernate
-    # directly, so actual sleep still works on hardware where hibernation
-    # just isn't available for this reason.
-    # Guarded so steady-state boots skip the (slow) rpm-ostree transaction.
-    # NOTE: applied kargs require a reboot to take effect.
-    if rpm-ostree kargs | tr ' ' '\n' | grep -qx 'nohibernate' \
-       || ! rpm-ostree kargs | tr ' ' '\n' | grep -q '^resume='; then
-        log "Provisioning hibernation kargs (remove nohibernate, add resume; reboot required)."
+    # 3. Resume kargs (--append-if-missing: --replace fails on a missing key),
+    #    without Bazzite's nohibernate, and without the old resume_delay=5 (a
+    #    misspelled no-op). Only when needed - rpm-ostree is slow - and they
+    #    apply after a reboot. Lockdown still disables hibernation regardless,
+    #    which is why sleep goes through logind's SleepOperation= chain.
+    local kargs
+    kargs=$(rpm-ostree kargs | tr ' ' '\n')
+    if grep -qx 'nohibernate' <<<"$kargs" \
+       || ! grep -q '^resume=' <<<"$kargs" \
+       || grep -qx 'resume_delay=5' <<<"$kargs"; then
+        log "Provisioning hibernation kargs (remove nohibernate/resume_delay, add resume; reboot required)."
         rpm-ostree kargs \
             --delete-if-present="nohibernate" \
             --append-if-missing="resume=UUID=$dec_uuid" \
             --append-if-missing="resume_offset=$offset" \
-            --append-if-missing="rootwait" \
-            --append-if-missing="resume_delay=5"
+            --delete-if-present="resume_delay=5"
     else
         log "Hibernation kargs already provisioned; leaving kargs unchanged."
     fi
 
-    # 4. Configure systemd sleep settings. Values here match
-    # /usr/lib/hyprbazzite/systemd/sleep.conf.d/90-tblue-hibernate.conf and
-    # /usr/lib/systemd/sleep.conf.d/hibernate.conf on purpose - this writes
-    # straight to the base /etc/systemd/sleep.conf, and all three used to
-    # disagree on AllowHibernation (no/no/yes) with the drop-ins silently
-    # winning either way (they're layered on top of the base file). Keeping
-    # all three in agreement now instead of relying on load-order to settle
-    # a three-way argument no one could see without reading all three files.
-    configure_sleep_setting "AllowSuspend" "yes"
-    configure_sleep_setting "AllowHibernation" "yes"
-    configure_sleep_setting "AllowSuspendThenHibernate" "yes"
-
+    # The sleep settings themselves (Allow{Suspend,Hibernation,
+    # SuspendThenHibernate}=yes) ship as sleep.conf.d drop-ins.
+    mark_done
     log "Hybrid sleep setup complete."
-
-    # 5. Disable non-power/lid wakeup sources. This duplicated the logic that
-    # tblue-disable-nonpower-wakeup.service (and its underlying script) also
-    # runs on every boot; now just delegate to it instead of keeping two
-    # copies of the same allow-list in sync.
-    log "Disabling non-power/lid wakeup sources."
-    /usr/lib/hyprbazzite/hypr/scripts/disable-nonpower-wakeup.sh
 }
 
 main "$@"

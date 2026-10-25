@@ -1,22 +1,24 @@
-# Polkit rule to allow users in the 'wheel' group to use TDP control without password.
-# Scoped to only the specific binaries needed for TDP management.
+// Wheel users in an active local session may run exactly the ryzenadj/amdctl
+// command lines hyprbazzite-ctl uses (via pkexec) without a password.
 polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.policykit.exec" &&
-        subject.isInGroup("wheel")) {
-        // Only allow passwordless execution for TDP-related binaries
-        var allowedPrograms = [
-            "/usr/bin/ryzenadj",
-            "/usr/sbin/ryzenadj",
-            "/usr/bin/amdctl",
-            "/usr/sbin/amdctl"
-        ];
-        var program = action.lookup("program");
-        if (program) {
-            for (var i = 0; i < allowedPrograms.length; i++) {
-                if (program == allowedPrograms[i]) {
-                    return polkit.Result.YES;
-                }
-            }
-        }
+    if (action.id != "org.freedesktop.policykit.exec" ||
+        !subject.local || !subject.active || !subject.isInGroup("wheel")) {
+        return polkit.Result.NOT_HANDLED;
     }
+    var cmd = action.lookup("command_line") || "";
+    var m;
+
+    if (/^\/usr\/s?bin\/(ryzenadj --info|amdctl info)$/.test(cmd)) {
+        return polkit.Result.YES;
+    }
+    // One limit for STAPM/fast/slow, in mW, 3-120 W.
+    m = /^\/usr\/s?bin\/ryzenadj --stapm-limit=(\d+) --fast-limit=\1 --slow-limit=\1$/.exec(cmd);
+    if (m && +m[1] >= 3000 && +m[1] <= 120000) {
+        return polkit.Result.YES;
+    }
+    m = /^\/usr\/s?bin\/amdctl set power-limit (\d+)$/.exec(cmd);
+    if (m && +m[1] >= 3 && +m[1] <= 120) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
 });
