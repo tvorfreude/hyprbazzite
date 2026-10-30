@@ -9,7 +9,9 @@ ConditionPathExists=/proc/acpi/button/lid
 [Service]
 Type=simple
 ExecStart=/usr/libexec/hyprbazzite-console-lid-watch
-Restart=on-failure
+# always, not on-failure: the script only ever exits when one of its event
+# monitors does, and systemd then cleans up the other one with the cgroup.
+Restart=always
 RestartSec=2
 
 [Install]

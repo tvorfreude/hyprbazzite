@@ -7,7 +7,13 @@ set -e
 echo "Starting HyprBazzite Image Verification..."
 
 # 1. Critical Package Checks
-declare -a REQUIRED_PKGS=("hyprland" "waybar" "wofi" "zsh" "starship" "sddm" "kitty" "awww" "hypridle" "nemo")
+declare -a REQUIRED_PKGS=(
+    "hyprland" "waybar" "wofi" "zsh" "starship" "sddm" "kitty" "awww" "hypridle" "nemo"
+    # session-critical: lock screen, notifications/quick settings, portal, and
+    # what hyprbazzite-ctl's daemons and waybar modules shell out to
+    "hyprlock" "SwayNotificationCenter" "xdg-desktop-portal-hyprland"
+    "socat" "jq" "ImageMagick" "libnotify" "cliphist" "wvkbd" "hhd"
+)
 for pkg in "${REQUIRED_PKGS[@]}"; do
     if ! rpm -q "$pkg" > /dev/null 2>&1; then
         echo "ERROR: Required package '$pkg' is missing from the image."
@@ -74,6 +80,32 @@ for unit in "${REQUIRED_UNITS[@]}"; do
 done
 echo "All systemd units are present."
 
+# 4b. Enablement: our units, and the base image's update/rollback units the
+# build must leave enabled. SYSTEMD_OFFLINE=1: no systemd running here.
+mapfile -t OUR_UNITS < <(awk '$1 == "enable" {print $2}' /usr/lib/systemd/system-preset/50-hyprbazzite.preset)
+for unit in "${OUR_UNITS[@]}"; do
+    if ! SYSTEMD_OFFLINE=1 systemctl is-enabled --quiet "$unit"; then
+        echo "ERROR: Unit '$unit' is listed in 50-hyprbazzite.preset but not enabled."
+        exit 1
+    fi
+done
+declare -a BASE_UNITS=(
+    "uupd.timer"
+    "greenboot-healthcheck.service"
+    "greenboot-set-rollback-trigger.service"
+    "bazzite-hardware-setup.service"
+    "bazzite-flatpak-manager.service"
+)
+for unit in "${BASE_UNITS[@]}"; do
+    if [ ! -e "/usr/lib/systemd/system/$unit" ]; then
+        echo "WARNING: Base unit '$unit' no longer exists (renamed upstream?); not checked."
+    elif ! SYSTEMD_OFFLINE=1 systemctl is-enabled --quiet "$unit"; then
+        echo "ERROR: Base image unit '$unit' was disabled by this build."
+        exit 1
+    fi
+done
+echo "Our units are enabled and the base image's update/rollback units are intact."
+
 # 5. Polkit rules
 declare -a REQUIRED_POLKIT=(
     "/usr/lib/hyprbazzite/polkit-1/rules.d/10-tdp-control.rules"
@@ -125,9 +157,17 @@ if [ ! -f "/usr/share/sddm/themes/hyprlockish/Main.qml" ]; then
 fi
 echo "SDDM theme is present."
 
-# 8. Secure boot certificate
-if [ ! -f "/etc/pki/secureboot/secureboot.crt" ] && [ ! -f "/usr/share/secureboot/secureboot.crt" ]; then
-    echo "WARNING: Secure boot certificate not found in expected locations (non-fatal)."
+# 7b. Update signature policy: once cosign.pub is committed, the key is
+# installed and every pull of this image must be signed by it.
+if [ -f /etc/pki/containers/hyprbazzite.pub ]; then
+    for policy in /etc/containers/policy.json /usr/etc/containers/policy.json; do
+        [ -f "$policy" ] || continue
+        if ! jq -e '[.transports.docker[][] | select(.keyPath? == "/etc/pki/containers/hyprbazzite.pub")] | length > 0' "$policy" >/dev/null; then
+            echo "ERROR: hyprbazzite.pub is installed but $policy does not require it."
+            exit 1
+        fi
+    done
+    echo "Update signature policy requires the hyprbazzite key."
 fi
 
 echo "Verification PASSED: Image is healthy and ready for deployment."

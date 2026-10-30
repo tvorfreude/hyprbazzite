@@ -7,6 +7,9 @@ Description=Disable non-power/lid wakeup sources (bag-safe: USB/PCIe/etc. can't 
 # suspend/resume) and reset on reboot, so running once at boot is sufficient.
 After=multi-user.target
 ConditionPathExists=/proc/acpi/wakeup
+# Laptops and handhelds only: desktops must still wake from keyboard, mouse
+# and Wake-on-LAN.
+ConditionPathExistsGlob=/sys/class/power_supply/BAT*
 
 [Service]
 Type=oneshot
