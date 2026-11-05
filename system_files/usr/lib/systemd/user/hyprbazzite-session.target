@@ -1,0 +1,11 @@
+[Unit]
+Description=HyprBazzite Hyprland session
+Documentation=man:systemd.special(7)
+# Brings up graphical-session.target (which refuses a direct start) for the
+# portal and our session services. Started by autostart.lua, stopped by
+# hyprbazzite-session.
+BindsTo=graphical-session.target
+Wants=graphical-session-pre.target
+After=graphical-session-pre.target
+# Otherwise it stays up while anything that depends on it is running.
+PropagatesStopTo=graphical-session.target

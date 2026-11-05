@@ -6,16 +6,32 @@ require("rules")
 require("styles")
 
 -- Essential Variables
--- Accent comes from hyprbazzite-accent (Dracula purple unless the user chose
--- "auto" or a custom colour). Any failure keeps the default.
+-- Accent from hyprbazzite-accent (Dracula purple by default). Prefer the value
+-- it last rendered while the mode file is unchanged: the command can run
+-- ImageMagick, and this file runs on the compositor's main thread.
 local active_border = "rgba(bd93f9ee)"
 do
-    local ok, pipe = pcall(io.popen, "/usr/libexec/hyprbazzite-accent hex 2>/dev/null")
-    if ok and pipe then
-        local hex = (pipe:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
-        pipe:close()
-        if hex then active_border = "rgba(" .. hex .. "ee)" end
+    local function first_line(path)
+        local f = io.open(path, "r")
+        if not f then return nil end
+        local line = f:read("*l")
+        f:close()
+        return line
     end
+    local hex
+    local cfg = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
+    local run = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/hyprbazzite"
+    if (first_line(run .. "/accent-mode") or "") == (first_line(cfg .. "/hyprbazzite/accent-mode") or "") then
+        hex = (first_line(run .. "/accent") or ""):match("^#(%x%x%x%x%x%x)$")
+    end
+    if not hex then
+        local ok, pipe = pcall(io.popen, "/usr/libexec/hyprbazzite-accent hex 2>/dev/null")
+        if ok and pipe then
+            hex = (pipe:read("*l") or ""):match("^#(%x%x%x%x%x%x)$")
+            pipe:close()
+        end
+    end
+    if hex then active_border = "rgba(" .. hex .. "ee)" end
 end
 local inactive_border = "rgba(44475aaa)"
 
@@ -77,3 +93,7 @@ hl.config({
     ecosystem = { no_update_news = true },
     debug = { full_cm_proto = true },
 })
+
+-- Each config load drops the runtime-only state (workspace rules, OSK rule,
+-- night light): restore it, in the background since the compositor is busy.
+os.execute("/usr/libexec/hyprbazzite-ctl restore-runtime >/dev/null 2>&1 &")

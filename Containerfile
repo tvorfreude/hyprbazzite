@@ -82,23 +82,25 @@ RUN --mount=type=cache,dst=/var/cache \
 # ---------------------------------------------------------------------------
 # Step 4: Install HyprBazzite packages
 # ---------------------------------------------------------------------------
+# No --skip-unavailable: a missing package must fail the build.
+# (LACT: use its Flatpak, as upstream recommends on Fedora Atomic.)
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
-    dnf5 -y install --skip-unavailable \
+    dnf5 -y install \
     hyprland hyprland-guiutils hyprlock hypridle hyprpicker hyprpaper uwsm hyprland-uwsm \
     awww waybar SwayNotificationCenter wofi wvkbd \
     xdg-desktop-portal-hyprland lxqt-policykit sddm \
     openrgb openrgb-udev-rules \
-    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep \
-    hhd adjustor hhd-ui lact \
+    zsh starship lsd git chezmoi kitty tmux fastfetch jq ripgrep socat libnotify \
+    hhd adjustor hhd-ui \
     rom-properties lutris steam-devices \
     brightnessctl gparted systemd-devel btop \
     nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
     network-manager-applet pavucontrol \
     gnome-keyring gnome-keyring-pam seahorse libsecret libsecret-devel gcr gcr-devel \
     blueman breeze-icon-theme papirus-icon-theme papirus-icon-theme-dark \
-    gdk-pixbuf2-modules qt5ct qt6ct \
-    jetbrains-mono jetbrains-mono-fonts \
+    qt5ct qt6ct \
+    jetbrains-mono-fonts \
     wl-clipboard grim slurp playerctl imv swappy mpv cliphist \
     ImageMagick fcitx5 ocean-sound-theme && \
     dnf5 -y autoremove && \
@@ -113,26 +115,37 @@ COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
 COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
 
 # ---------------------------------------------------------------------------
-# Step 6: Import terra-mesa GPG key (instead of disabling gpgcheck)
+# Step 5b: Image signature policy
 # ---------------------------------------------------------------------------
-RUN if [ -f /etc/yum.repos.d/terra-mesa.repo ]; then \
-        rpm --import https://repos.fyralabs.com/terra42/key.asc 2>/dev/null || \
-        rpm --import https://repos.fyralabs.com/terra41/key.asc 2>/dev/null || \
-        (echo "Warning: Could not import terra GPG key, disabling gpgcheck as fallback" && \
-         sed -i 's/^gpgcheck=1/gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo && \
-         sed -i 's/^repo_gpgcheck=1/repo_gpgcheck=0/' /etc/yum.repos.d/terra-mesa.repo); \
+# Bazzite's policy only verifies ghcr.io/ublue-os. With cosign.pub committed
+# (see SETUP.md), pulls of this image must be signed by that key.
+ARG IMAGE_REF=ghcr.io/tvorfreude/hyprbazzite
+RUN --mount=type=bind,target=/ctx \
+    if [ -f /ctx/cosign.pub ]; then \
+        install -Dm0644 /ctx/cosign.pub /etc/pki/containers/hyprbazzite.pub && \
+        mkdir -p /etc/containers/registries.d && \
+        printf 'docker:\n  %s:\n    use-sigstore-attachments: true\n' "${IMAGE_REF}" \
+            > /etc/containers/registries.d/hyprbazzite.yaml && \
+        found=0 && \
+        for policy in /etc/containers/policy.json /usr/etc/containers/policy.json; do \
+            [ -f "$policy" ] || continue; \
+            jq --arg ref "${IMAGE_REF}" \
+               '.transports.docker[$ref] = [{"type": "sigstoreSigned", "keyPath": "/etc/pki/containers/hyprbazzite.pub", "signedIdentity": {"type": "matchRepository"}}]' \
+               "$policy" > /tmp/policy.json && \
+            mv /tmp/policy.json "$policy" && found=1; \
+        done && \
+        [ "$found" = 1 ] || { echo "ERROR: no containers policy.json to add ${IMAGE_REF} to" >&2; exit 1; }; \
     fi
 
 # ---------------------------------------------------------------------------
-# Step 7: Set up user config symlinks (bootc-compliant)
+# Step 7: Seed new home directories (/etc/skel)
 # ---------------------------------------------------------------------------
-RUN mkdir -p /usr/share/hyprbazzite/config && \
-    cp -af /usr/lib/hyprbazzite/skel/.config/. /usr/share/hyprbazzite/config/ && \
-    mkdir -p /etc/skel/.config && \
-    for dir in /usr/share/hyprbazzite/config/*/; do \
-        dirname=$(basename "$dir"); \
-        ln -sf "/usr/share/hyprbazzite/config/$dirname" "/etc/skel/.config/$dirname"; \
-    done
+# Real copies: useradd copies symlinks as-is, and links into /usr are
+# read-only. /usr/share/hyprbazzite/config stays for accounts from older
+# images that still link into it (hyprbazzite-user-firstboot replaces those).
+RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
+    mkdir -p /usr/share/hyprbazzite/config && \
+    cp -af /usr/lib/hyprbazzite/skel/.config/. /usr/share/hyprbazzite/config/
 
 # ---------------------------------------------------------------------------
 # Step 8: Set permissions on scripts and executables
@@ -158,33 +171,12 @@ RUN usermod -s /bin/zsh root && \
     chmod -R 0755 /usr/share/sddm/themes && \
     chmod 0644 /usr/share/sddm/themes/hyprlockish/* && \
     # Enable system services via preset
+    units="hhd.service sddm.service tblue-hibernate-setup.service tblue-disable-nonpower-wakeup.service hyprbazzite-flatpak-overrides.service tblue-secureboot-firstboot.service tblue-hhd-enable-user.service hyprbazzite-power-tuning.service hyprbazzite-deep-sleep-setup.service hyprbazzite-console-lid.service" && \
     mkdir -p /usr/lib/systemd/system-preset && \
-    echo "enable hhd.service" > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable sddm.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-hibernate-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-disable-nonpower-wakeup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-flatpak-overrides.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-secureboot-firstboot.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable tblue-hhd-enable-user.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-power-tuning.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-deep-sleep-setup.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    echo "enable hyprbazzite-console-lid.service" >> /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
-    # A preset FILE alone is just a policy declaration - it does nothing
-    # until something actually applies it, and nothing ever did. Confirmed
-    # live by booting this image in a fresh QEMU VM: every single service
-    # in the preset list above showed disabled despite "preset: enabled",
-    # except sddm.service - which works for a completely different reason
-    # (the sddm RPM's own install scriptlet calls systemctl preset on
-    # itself immediately during package install, not deferred to this
-    # file at all). Every one of our own custom services enabled only
-    # through this preset file - hhd, tblue-hibernate-setup,
-    # hyprbazzite-power-tuning, hyprbazzite-console-lid, etc. - has never
-    # actually been enabled, on any machine, for this project's entire
-    # history. systemctl preset-all materializes the real .wants/ symlinks
-    # at build time instead of leaving them as an inert declaration;
-    # verified live in the same VM that this one command alone fixes every
-    # affected unit.
-    systemctl preset-all && \
+    printf 'enable %s\n' $units > /usr/lib/systemd/system-preset/50-hyprbazzite.preset && \
+    # Apply the preset to our units only. Never `preset-all`: Fedora's
+    # `disable *` would turn off what Bazzite enabled (uupd, greenboot...).
+    systemctl preset $units && \
     # Enable the per-user first-login service for all users (global user preset
     # + an explicit default.target.wants symlink so it activates without relying
     # on preset timing for freshly-created users)

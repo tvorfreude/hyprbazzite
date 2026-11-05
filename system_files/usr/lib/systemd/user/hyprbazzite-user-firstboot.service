@@ -1,7 +1,9 @@
 [Unit]
 Description=HyprBazzite per-user first-login setup
 # %S is the user's state dir (~/.local/state). Skip once the marker exists.
-ConditionPathExists=!%S/hyprbazzite/user-firstboot.done
+# v2: also migrates ~/.config links into /usr to writable copies, so accounts
+# that only have the original user-firstboot.done marker run once more.
+ConditionPathExists=!%S/hyprbazzite/user-firstboot-v2.done
 
 [Service]
 Type=oneshot

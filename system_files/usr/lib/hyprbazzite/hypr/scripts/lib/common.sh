@@ -36,6 +36,31 @@ ensure_hyprland_env() {
     fi
 }
 
+# --- Hyprland Instance Helpers ---
+
+# Event socket of this process's Hyprland instance. Newer releases keep it
+# under $XDG_RUNTIME_DIR/hypr, older ones under /tmp/hypr.
+hypr_socket2() {
+    local sig="${HYPRLAND_INSTANCE_SIGNATURE:-}" d
+    [[ -n "$sig" ]] || return 1
+    for d in "${XDG_RUNTIME_DIR:-/run/user/$UID}/hypr" /tmp/hypr; do
+        [[ -S "$d/$sig/.socket2.sock" ]] && { echo "$d/$sig/.socket2.sock"; return 0; }
+    done
+    return 1
+}
+
+# False once this process's Hyprland instance is gone (true outside Hyprland).
+hypr_instance_alive() {
+    [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || hypr_socket2 >/dev/null
+}
+
+# One daemon per Hyprland instance: locks fd 9, non-zero if already held.
+# Long-lived children should get `9>&-`.
+hypr_instance_lock() {
+    exec 9>"${XDG_RUNTIME_DIR:-/tmp}/hyprbazzite-$1-${HYPRLAND_INSTANCE_SIGNATURE:-default}.lock"
+    flock -n 9
+}
+
 # --- Notification Helper ---
 # Usage: notify "Title" "Message" [urgency]
 # urgency: low, normal (default), critical
