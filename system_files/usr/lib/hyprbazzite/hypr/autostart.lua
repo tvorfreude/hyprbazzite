@@ -20,7 +20,8 @@ end
 
 hl.on("hyprland.start", function()
     -- CORE SERVICES (session bus, polkit; the oo7 Secret Service daemon is
-    -- D-Bus activated and unlocked at login by pam_oo7, so nothing to start)
+    -- D-Bus activated (our org.freedesktop.secrets.service) and unlocked at
+    -- login by pam_oo7, so nothing to start)
     -- Import the environment, then start hyprbazzite-session.target (it
     -- brings up graphical-session.target, which the portal needs). In order.
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "

@@ -187,5 +187,13 @@ if ! grep -qE '^performance=hyprbazzite-performance' /etc/tuned/ppd.conf \
 fi
 echo "Performance profile is wired up."
 
+# 7e. oo7 ships no D-Bus activation file of its own, so ours must make the
+# Secret Service name activatable (otherwise "The name is not activatable").
+if ! grep -q "oo7-daemon" /usr/share/dbus-1/services/org.freedesktop.secrets.service 2>/dev/null; then
+    echo "ERROR: org.freedesktop.secrets is not activated by oo7-daemon."
+    exit 1
+fi
+echo "Secret Service activation points at oo7-daemon."
+
 echo "Verification PASSED: Image is healthy and ready for deployment."
 exit 0

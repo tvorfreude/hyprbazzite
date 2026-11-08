@@ -119,7 +119,8 @@ RUN --mount=type=cache,dst=/var/cache \
 # (LACT: use its Flatpak, as upstream recommends on Fedora Atomic.)
 # Secrets: Fedora 45 replaces gnome-keyring with oo7 (Secret Service daemon,
 # its portal, and the PAM module that unlocks the keyring at login; sddm's own
-# PAM file already references pam_oo7).
+# PAM file already references pam_oo7). oo7 ships no D-Bus activation file, so
+# system_files adds usr/share/dbus-1/services/org.freedesktop.secrets.service.
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install \
