@@ -5,10 +5,10 @@ HyprBazzite is a custom [bootc](https://github.com/bootc-dev/bootc) image based 
 ## 🚀 Features
 
 - **Base**: Built on Fedora-based Bazzite (Stable), inheriting its gaming optimizations and hardware support.
-- **Window Manager**: Hyprland (via `sdegler/hyprland` COPR) for a smooth, dynamic Wayland experience.
+- **Window Manager**: Hyprland (via `lionheartp/Hyprland` COPR) for a smooth, dynamic Wayland experience.
 - **Shell**: Zsh with Starship prompt and JetBrains Mono Nerd Fonts.
 - **Theme**: Dracula GTK and Qt themes pre-installed and configured.
-- **Gaming**: Includes Steam devices support, Lutris, and LACT for AMD GPU control.
+- **Gaming**: Includes Steam devices support and Lutris. For AMD GPU control, install LACT's Flatpak (`flatpak install flathub io.github.ilya_zlobintsev.LACT`), which is what upstream recommends on atomic systems.
 - **Handheld Support**: Integrated `hhd` (Handheld Daemon) for devices like the Legion Go and ROG Ally.
 - **Atomic**: Fully compatible with `bootc` for transactional, reliable system updates.
 

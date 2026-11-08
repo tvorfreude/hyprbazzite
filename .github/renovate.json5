@@ -67,6 +67,17 @@
       pinDigests: true,
     },
     {
+      // No CI runs for these (build.yml's path filters skip them), so don't
+      // wait for checks. Own group, so they never ride along with build.yml.
+      matchFileNames: [
+        '.github/workflows/build-iso.yml',
+        '.github/workflows/pr-cleanup.yml',
+        'Justfile',
+      ],
+      groupName: 'untested tooling (ISO workflow, PR cleanup, Justfile)',
+      ignoreTests: true,
+    },
+    {
       // Assets stage is a tiny, build-only base (curl + unzip only). Let
       // Renovate keep its tag current so we don't drift onto an EOL Alpine, but
       // DON'T pin a digest: tag-only updates avoid the tag/digest-mismatch class

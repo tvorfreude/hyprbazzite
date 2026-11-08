@@ -140,6 +140,8 @@ render_all() {
     render_css "$WAYBAR_BASE" "$OUT_DIR/waybar.css" "$hex"
     render_css "$SWAYNC_BASE" "$OUT_DIR/swaync.css" "$hex"
     echo "$hex" >"$OUT_DIR/accent"
+    # Cache key for hyprland.lua: the mode file's raw first line.
+    { head -n1 "$MODE_FILE" 2>/dev/null || true; } >"$OUT_DIR/accent-mode"
 
     # wofi has no --style at the call sites (bindings + ctl menus), so it reads
     # ~/.config/wofi/style.css first. Only keep a user-level copy while a custom

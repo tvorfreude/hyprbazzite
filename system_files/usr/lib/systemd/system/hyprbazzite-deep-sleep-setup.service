@@ -1,6 +1,8 @@
 [Unit]
 Description=HyprBazzite deep (S3) sleep provisioning for desktops, with resume-failure watchdog
 After=local-fs.target
+# One rpm-ostree transaction at a time (see tblue-hibernate-setup.service).
+After=bazzite-hardware-setup.service tblue-hibernate-setup.service hyprbazzite-power-tuning.service
 DefaultDependencies=no
 # Desktops only - a battery means this is a laptop, which this project
 # already treats as suspending correctly on its own (see

@@ -94,32 +94,8 @@ main() {
         bootupctl validate || true
     fi
 
-    # Collect MOK key paths to check/enroll
+    # Collect MOK key paths to check (the Universal Blue module-signing key)
     local key_paths=()
-
-    # Try to find or generate the TBlue key in DER format
-    local tblue_key_path=""
-    if [[ -f /usr/share/tblue-secureboot/secureboot.der ]]; then
-        tblue_key_path="/usr/share/tblue-secureboot/secureboot.der"
-    elif command -v openssl >/dev/null 2>&1; then
-        local pem_source
-        for pem_source in /usr/share/tblue-secureboot/secureboot.pem /usr/share/tblue-secureboot/secureboot.crt; do
-            if [[ -f "$pem_source" ]]; then
-                mkdir -p /var/lib/tblue
-                local generated_key="/var/lib/tblue/secureboot.der"
-                if openssl x509 -in "$pem_source" -outform DER -out "$generated_key" >/dev/null 2>&1; then
-                    tblue_key_path="$generated_key"
-                    break
-                fi
-            fi
-        done
-    fi
-
-    if [[ -n "$tblue_key_path" && -f "$tblue_key_path" ]]; then
-        key_paths+=("$tblue_key_path")
-    fi
-
-    # Also check for ublue-os key
     if [[ -f /usr/share/ublue-os/sb_pubkey.der ]]; then
         key_paths+=("/usr/share/ublue-os/sb_pubkey.der")
     fi
@@ -136,7 +112,7 @@ main() {
             fi
         done
     elif command -v mokutil >/dev/null 2>&1; then
-        log "No usable Secure Boot certificates found at /usr/share/tblue-secureboot or /usr/share/ublue-os; skipping MOK key check."
+        log "No Universal Blue Secure Boot key at /usr/share/ublue-os; skipping MOK key check."
     fi
 
     mark_done

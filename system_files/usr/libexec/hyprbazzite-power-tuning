@@ -29,6 +29,13 @@ if tr ' ' '\n' < /proc/cmdline | grep -q '^pcie_aspm\.policy='; then
                      --delete-if-present="pcie_aspm.policy=powersave" || true
 fi
 
+# The Performance profile turns ASPM off itself (hyprbazzite-performance);
+# don't undo that when this runs after it at boot.
+if tuned-adm active 2>/dev/null | grep -q hyprbazzite-performance; then
+    echo "[hyprbazzite-power-tuning] Performance profile active; leaving ASPM alone."
+    exit 0
+fi
+
 if [[ ! -w "$POLICY_FILE" ]]; then
     echo "[hyprbazzite-power-tuning] $POLICY_FILE not available; nothing to do."
     exit 0

@@ -4,16 +4,28 @@
 -- All processes are guarded against duplicates so that a `hyprctl reload`
 -- doesn't spawn second instances.
 
+-- process_name is matched with `pgrep -x`, i.e. against the kernel's process
+-- name, which is cut to 15 characters: pass the first 15 of a longer name.
 local function exec_once(cmd, process_name)
     process_name = process_name or cmd:match("^(%S+)")
     hl.exec_cmd(string.format("pgrep -x %s >/dev/null 2>&1 || %s", process_name, cmd))
 end
 
+-- exec_once where the shell condition `test` holds. Tested in the shell:
+-- inside Hyprland, os.execute() returns nil even for `true`.
+local function exec_once_if(test, cmd, process_name)
+    process_name = process_name or cmd:match("^(%S+)")
+    hl.exec_cmd(string.format("%s && { pgrep -x %s >/dev/null 2>&1 || %s; }", test, process_name, cmd))
+end
+
 hl.on("hyprland.start", function()
     -- CORE SERVICES (session bus, polkit, keyring)
-    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    hl.exec_cmd("systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
-    exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit")
+    -- Import the environment, then start hyprbazzite-session.target (it
+    -- brings up graphical-session.target, which the portal needs). In order.
+    hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
+        .. "systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
+        .. "systemctl --user start hyprbazzite-session.target")
+    exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit-")
     exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
 
     -- UI ELEMENTS
@@ -26,7 +38,9 @@ hl.on("hyprland.start", function()
 
     -- WALLPAPER
     exec_once("awww-daemon", "awww-daemon")
-    exec_once("wallpaper-cycle", "wallpaper-cycle")
+    -- No name guard: it runs as "bash", so `pgrep -x wallpaper-cycle` never
+    -- matched; the script keeps itself to one instance per Hyprland instance.
+    hl.exec_cmd("wallpaper-cycle")
 
     -- AUTOMATION (hyprbazzite-ctl long-running services)
     -- workspace rebind is a one-shot (not a daemon, so no exec_once guard);
@@ -36,8 +50,10 @@ hl.on("hyprland.start", function()
     -- session with the lid already closed is covered by that service's own
     -- startup sync instead of a second one racing it from this hook.
     hl.exec_cmd("/usr/libexec/hyprbazzite-ctl workspace rebind init")
-    exec_once("/usr/libexec/hyprbazzite-ctl automation dnd", "socat")
-    exec_once("/usr/libexec/hyprbazzite-ctl automation osk", "udevadm")
+    -- No name guards: they used generic names ("socat", "udevadm") that other
+    -- things here also run. The daemons hold a per-instance lock themselves.
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl automation dnd")
+    hl.exec_cmd("/usr/libexec/hyprbazzite-ctl automation osk")
 
     -- UTILITIES
     exec_once("wl-paste --watch cliphist store", "wl-paste")
@@ -52,16 +68,12 @@ hl.on("hyprland.start", function()
     -- startup above it - this also provides its SSH agent for the terminal.
     exec_once("sh -c 'sleep 3 && flatpak run com.bitwarden.desktop'", "bitwarden-app")
 
-    -- OPTIONAL (only start if binary exists)
-    if os.execute("command -v cursor-clip >/dev/null 2>&1") == 0 then
-        exec_once("cursor-clip --daemon", "cursor-clip")
-    end
+    -- OPTIONAL (only start if installed)
+    exec_once_if("command -v cursor-clip >/dev/null 2>&1", "cursor-clip --daemon", "cursor-clip")
 
-    -- HARDWARE-SPECIFIC
-    if os.execute("test -d /sys/bus/iio/devices") == 0 then
-        exec_once("iio-hyprland", "iio-hyprland")
-    end
-    if os.execute("test -d /sys/module/asus_nb_wmi") == 0 then
-        exec_once("rog-control-center", "rog-control-ce")
-    end
+    -- HARDWARE-SPECIFIC (and only where the tool is installed; the image
+    -- ships neither)
+    exec_once_if("command -v iio-hyprland >/dev/null 2>&1 && test -d /sys/bus/iio/devices", "iio-hyprland")
+    exec_once_if("command -v rog-control-center >/dev/null 2>&1 && test -d /sys/module/asus_nb_wmi",
+        "rog-control-center", "rog-control-cen")
 end)
