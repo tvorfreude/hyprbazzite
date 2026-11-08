@@ -180,8 +180,8 @@ fi
 echo "ujust imports the hyprbazzite recipes."
 
 # 7d. Performance must map to the profile that turns PCIe power saving off
-if ! grep -qE '^performance=hyprbazzite-performance' /usr/etc/tuned/ppd.conf \
-   || [ ! -x /usr/etc/tuned/profiles/hyprbazzite-performance/pcie-power.sh ]; then
+if ! grep -qE '^performance=hyprbazzite-performance' /etc/tuned/ppd.conf \
+   || [ ! -x /usr/lib/tuned/profiles/hyprbazzite-performance/pcie-power.sh ]; then
     echo "ERROR: the performance power profile is not wired to hyprbazzite-performance."
     exit 1
 fi

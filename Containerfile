@@ -151,6 +151,23 @@ COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
 COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
 
 # ---------------------------------------------------------------------------
+# Step 5a: Map the PPD "performance" profile to hyprbazzite-performance
+# ---------------------------------------------------------------------------
+# tuned-ppd only reads /etc/tuned/ppd.conf, and /usr/etc is not allowed in a
+# bootc image, so patch the base's file in place (the profile itself ships in
+# /usr/lib/tuned/profiles). Fails the build if the mapping didn't take.
+RUN if [ -f /etc/tuned/ppd.conf ]; then \
+        sed -i 's/^performance=.*/performance=hyprbazzite-performance/' /etc/tuned/ppd.conf; \
+    else \
+        install -d /etc/tuned && \
+        printf '%s\n' '[main]' 'default=balanced' 'battery_detection=true' 'sysfs_acpi_monitor=true' '' \
+            '[profiles]' 'power-saver=powersave-bazzite' 'balanced=balanced-bazzite' \
+            'performance=hyprbazzite-performance' '' '[battery]' \
+            'balanced=balanced-battery-bazzite' 'power-saver=powersave-battery-bazzite' > /etc/tuned/ppd.conf; \
+    fi && \
+    grep -q '^performance=hyprbazzite-performance' /etc/tuned/ppd.conf
+
+# ---------------------------------------------------------------------------
 # Step 5b: Image signature policy
 # ---------------------------------------------------------------------------
 # Bazzite's policy only verifies ghcr.io/ublue-os. With cosign.pub committed
@@ -188,7 +205,7 @@ RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
 # ---------------------------------------------------------------------------
 RUN chmod +x /usr/bin/wallpaper-cycle /usr/bin/hyprbazzite-session && \
     find /usr/libexec/ -type f -exec chmod +x {} + && \
-    chmod +x /usr/etc/tuned/profiles/hyprbazzite-performance/pcie-power.sh
+    chmod +x /usr/lib/tuned/profiles/hyprbazzite-performance/pcie-power.sh
 
 # Bazzite's ujust entry point imports a fixed list of recipe files, so ours
 # (the hypr-* recipes) is never loaded unless it is imported explicitly.
