@@ -19,14 +19,15 @@ local function exec_once_if(test, cmd, process_name)
 end
 
 hl.on("hyprland.start", function()
-    -- CORE SERVICES (session bus, polkit, keyring)
+    -- CORE SERVICES (session bus, polkit; the oo7 Secret Service daemon is
+    -- D-Bus activated (our org.freedesktop.secrets.service) and unlocked at
+    -- login by pam_oo7, so nothing to start)
     -- Import the environment, then start hyprbazzite-session.target (it
     -- brings up graphical-session.target, which the portal needs). In order.
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
         .. "systemctl --user import-environment DISPLAY WAYLAND_DISPLAY XDG_CURRENT_DESKTOP HYPRLAND_INSTANCE_SIGNATURE; "
         .. "systemctl --user start hyprbazzite-session.target")
     exec_once("/usr/libexec/lxqt-policykit-agent", "lxqt-policykit-")
-    exec_once("gnome-keyring-daemon --start --components=pkcs11,secrets,ssh,gpg", "gnome-keyring-d")
 
     -- UI ELEMENTS
     -- Stylesheets come from hyprbazzite-accent: the shipped CSS plus the accent
@@ -64,8 +65,8 @@ hl.on("hyprland.start", function()
     -- which neither installed portal backend (gtk, hyprland) implements
     -- here (confirmed: org.freedesktop.portal.Background isn't registered
     -- at all on the session bus). Autostarting it directly instead, with a
-    -- short delay so the flatpak sandbox doesn't race gnome-keyring-daemon's
-    -- startup above it - this also provides its SSH agent for the terminal.
+    -- short delay so the flatpak sandbox doesn't race the session coming up
+    -- - this also provides its SSH agent for the terminal.
     exec_once("sh -c 'sleep 3 && flatpak run com.bitwarden.desktop'", "bitwarden-app")
 
     -- OPTIONAL (only start if installed)

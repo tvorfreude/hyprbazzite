@@ -6,7 +6,7 @@
 - **SDDM** - Login manager, themed with the bundled `hyprlockish` theme
 - **Zen Browser** - Privacy-focused browser from `sneexy/zen-browser` COPR
 - **Bitwarden** - Password manager (Flatpak from Flathub)
-- **Full keyring support** - System keyring with GNOME Keyring daemon
+- **Full keyring support** - System keyring through the oo7 Secret Service (replaces GNOME Keyring)
 - **Chezmoi integration** - optional, manual dotfiles push/pull from your own repo
 
 ## Dotfiles (Chezmoi)

@@ -9,7 +9,7 @@
 # The tag is PINNED (not floating :stable) so Renovate can open PRs bumping the
 # date-stamped tag — that's what makes upstream base updates visible/reviewable.
 # Declared before the first FROM so it can be referenced in the final FROM.
-ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable-44.20261006
+ARG BASE_IMAGE=ghcr.io/ublue-os/bazzite:stable-45.20261105
 
 # ---------------------------------------------------------------------------
 # Stage 1: Download external assets (fonts, themes)
@@ -80,10 +80,47 @@ RUN --mount=type=cache,dst=/var/cache \
     dnf5 -y clean all
 
 # ---------------------------------------------------------------------------
+# Step 3b: Satisfy hyprland's Xwayland dependency on Terra-based bases
+# ---------------------------------------------------------------------------
+# Newer Bazzite bases ship terra-xorg-x11-server-Xwayland, which conflicts with
+# Fedora's xorg-x11-server-Xwayland and does not advertise the arch-qualified
+# "xorg-x11-server-Xwayland(x86-64)" capability that the Hyprland COPR's
+# hyprland package requires, so dnf can't resolve it. Xwayland is already
+# installed, so declare the capability with an empty shim package instead of
+# swapping out Terra's build (--nosignature: the local shim is unsigned).
+# No-op when the capability already exists.
+RUN --mount=type=cache,dst=/var/cache \
+    if ! rpm -q --whatprovides 'xorg-x11-server-Xwayland(x86-64)' >/dev/null 2>&1 && \
+       rpm -q terra-xorg-x11-server-Xwayland >/dev/null 2>&1; then \
+      dnf5 -y install rpm-build && \
+      mkdir -p /tmp/shim && \
+      printf '%s\n' \
+        'Name: hyprbazzite-xwayland-shim' \
+        'Version: 1' \
+        'Release: 1' \
+        'Summary: Declares the Xwayland capability provided by the Terra build' \
+        'License: MIT' \
+        'BuildArch: noarch' \
+        'Provides: xorg-x11-server-Xwayland(x86-64)' \
+        '%description' \
+        'Empty shim; see Containerfile.' \
+        '%files' > /tmp/shim/shim.spec && \
+      rpmbuild -bb --define "_topdir /tmp/shim" /tmp/shim/shim.spec && \
+      rpm -i --nosignature /tmp/shim/RPMS/noarch/hyprbazzite-xwayland-shim-1-1.noarch.rpm && \
+      dnf5 -y remove rpm-build && \
+      rm -rf /tmp/shim; \
+    fi && \
+    dnf5 -y clean all
+
+# ---------------------------------------------------------------------------
 # Step 4: Install HyprBazzite packages
 # ---------------------------------------------------------------------------
 # No --skip-unavailable: a missing package must fail the build.
 # (LACT: use its Flatpak, as upstream recommends on Fedora Atomic.)
+# Secrets: Fedora 45 replaces gnome-keyring with oo7 (Secret Service daemon,
+# its portal, and the PAM module that unlocks the keyring at login; sddm's own
+# PAM file already references pam_oo7). oo7 ships no D-Bus activation file, so
+# system_files adds usr/share/dbus-1/services/org.freedesktop.secrets.service.
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     dnf5 -y install \
@@ -97,7 +134,7 @@ RUN --mount=type=cache,dst=/var/cache \
     brightnessctl gparted systemd-devel btop \
     nemo nemo-fileroller tumbler gvfs gvfs-mtp gvfs-gphoto2 gvfs-nfs gvfs-fuse gvfs-smb \
     network-manager-applet pavucontrol \
-    gnome-keyring gnome-keyring-pam seahorse libsecret libsecret-devel gcr gcr-devel \
+    oo7-daemon oo7-portal pam_oo7 oo7-cli seahorse libsecret libsecret-devel gcr gcr-devel \
     blueman breeze-icon-theme papirus-icon-theme papirus-icon-theme-dark \
     qt5ct qt6ct \
     jetbrains-mono-fonts \
@@ -113,6 +150,23 @@ COPY system_files/usr/ /usr/
 COPY --from=assets /fonts /usr/share/fonts/
 COPY --from=assets /themes/Dracula /usr/share/themes/Dracula
 COPY --from=assets /qt5ct/colors /usr/share/qt5ct/colors
+
+# ---------------------------------------------------------------------------
+# Step 5a: Map the PPD "performance" profile to hyprbazzite-performance
+# ---------------------------------------------------------------------------
+# tuned-ppd only reads /etc/tuned/ppd.conf, and /usr/etc is not allowed in a
+# bootc image, so patch the base's file in place (the profile itself ships in
+# /usr/lib/tuned/profiles). Fails the build if the mapping didn't take.
+RUN if [ -f /etc/tuned/ppd.conf ]; then \
+        sed -i 's/^performance=.*/performance=hyprbazzite-performance/' /etc/tuned/ppd.conf; \
+    else \
+        install -d /etc/tuned && \
+        printf '%s\n' '[main]' 'default=balanced' 'battery_detection=true' 'sysfs_acpi_monitor=true' '' \
+            '[profiles]' 'power-saver=powersave-bazzite' 'balanced=balanced-bazzite' \
+            'performance=hyprbazzite-performance' '' '[battery]' \
+            'balanced=balanced-battery-bazzite' 'power-saver=powersave-battery-bazzite' > /etc/tuned/ppd.conf; \
+    fi && \
+    grep -q '^performance=hyprbazzite-performance' /etc/tuned/ppd.conf
 
 # ---------------------------------------------------------------------------
 # Step 5b: Image signature policy
@@ -152,7 +206,7 @@ RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
 # ---------------------------------------------------------------------------
 RUN chmod +x /usr/bin/wallpaper-cycle /usr/bin/hyprbazzite-session && \
     find /usr/libexec/ -type f -exec chmod +x {} + && \
-    chmod +x /usr/etc/tuned/profiles/hyprbazzite-performance/pcie-power.sh
+    chmod +x /usr/lib/tuned/profiles/hyprbazzite-performance/pcie-power.sh
 
 # Bazzite's ujust entry point imports a fixed list of recipe files, so ours
 # (the hypr-* recipes) is never loaded unless it is imported explicitly.
