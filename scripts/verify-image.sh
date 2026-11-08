@@ -13,6 +13,8 @@ declare -a REQUIRED_PKGS=(
     # what hyprbazzite-ctl's daemons and waybar modules shell out to
     "hyprlock" "SwayNotificationCenter" "xdg-desktop-portal-hyprland"
     "socat" "jq" "ImageMagick" "libnotify" "cliphist" "wvkbd" "hhd"
+    # Secret Service: oo7 replaced gnome-keyring in Fedora 45
+    "oo7-daemon" "oo7-portal" "pam_oo7"
 )
 for pkg in "${REQUIRED_PKGS[@]}"; do
     if ! rpm -q "$pkg" > /dev/null 2>&1; then
