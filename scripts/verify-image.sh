@@ -177,5 +177,13 @@ if ! grep -q "85-hyprbazzite.just" /usr/share/ublue-os/justfile; then
 fi
 echo "ujust imports the hyprbazzite recipes."
 
+# 7d. Performance must map to the profile that turns PCIe power saving off
+if ! grep -qE '^performance=hyprbazzite-performance' /usr/etc/tuned/ppd.conf \
+   || [ ! -x /usr/etc/tuned/profiles/hyprbazzite-performance/pcie-power.sh ]; then
+    echo "ERROR: the performance power profile is not wired to hyprbazzite-performance."
+    exit 1
+fi
+echo "Performance profile is wired up."
+
 echo "Verification PASSED: Image is healthy and ready for deployment."
 exit 0

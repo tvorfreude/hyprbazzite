@@ -151,7 +151,8 @@ RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
 # Step 8: Set permissions on scripts and executables
 # ---------------------------------------------------------------------------
 RUN chmod +x /usr/bin/wallpaper-cycle /usr/bin/hyprbazzite-session && \
-    find /usr/libexec/ -type f -exec chmod +x {} +
+    find /usr/libexec/ -type f -exec chmod +x {} + && \
+    chmod +x /usr/etc/tuned/profiles/hyprbazzite-performance/pcie-power.sh
 
 # Bazzite's ujust entry point imports a fixed list of recipe files, so ours
 # (the hypr-* recipes) is never loaded unless it is imported explicitly.
