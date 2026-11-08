@@ -153,6 +153,11 @@ RUN cp -a /usr/lib/hyprbazzite/skel/. /etc/skel/ && \
 RUN chmod +x /usr/bin/wallpaper-cycle /usr/bin/hyprbazzite-session && \
     find /usr/libexec/ -type f -exec chmod +x {} +
 
+# Bazzite's ujust entry point imports a fixed list of recipe files, so ours
+# (the hypr-* recipes) is never loaded unless it is imported explicitly.
+RUN grep -q 85-hyprbazzite.just /usr/share/ublue-os/justfile || \
+    printf '\nimport? "/usr/share/ublue-os/just/85-hyprbazzite.just"\n' >> /usr/share/ublue-os/justfile
+
 # ---------------------------------------------------------------------------
 # Step 9: Configure user defaults, environment, and systemd presets
 # ---------------------------------------------------------------------------

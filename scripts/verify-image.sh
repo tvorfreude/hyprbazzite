@@ -170,5 +170,12 @@ if [ -f /etc/pki/containers/hyprbazzite.pub ]; then
     echo "Update signature policy requires the hyprbazzite key."
 fi
 
+# 7c. ujust must load our recipes (the base justfile imports a fixed list)
+if ! grep -q "85-hyprbazzite.just" /usr/share/ublue-os/justfile; then
+    echo "ERROR: /usr/share/ublue-os/justfile does not import 85-hyprbazzite.just."
+    exit 1
+fi
+echo "ujust imports the hyprbazzite recipes."
+
 echo "Verification PASSED: Image is healthy and ready for deployment."
 exit 0

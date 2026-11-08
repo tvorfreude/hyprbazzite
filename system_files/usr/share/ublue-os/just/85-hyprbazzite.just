@@ -34,33 +34,7 @@ hypr-deep-sleep-reset:
 hypr-tdp-status:
     /usr/libexec/hyprbazzite-ctl tdp get
 
-# Allow hibernation with Secure Boot on (stops shim verifying Linux)
-hypr-hibernate-on-secureboot:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if ! grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
-        echo "The kernel isn't locked down, so hibernation needs no change."
-        exit 0
-    fi
-    echo "Linux can't hibernate while Secure Boot verifies it: the kernel locks"
-    echo "itself down and won't write an unsigned memory image to disk."
-    echo
-    echo "This turns off shim's verification of Linux. Secure Boot stays on in the"
-    echo "firmware (Windows and its anti-cheat still see it), but the kernel and"
-    echo "its modules are no longer verified at boot. Undo with:"
-    echo "  ujust hypr-secureboot-verify-linux"
-    echo
-    echo "You'll pick a password (8-16 characters) now. On the next boot a blue"
-    echo "\"Shim UEFI key management\" screen appears: press a key, choose"
-    echo "\"Change Secure Boot state\", type the characters of that password it"
-    echo "asks for, choose \"Yes\", and let it reboot."
-    read -rp "Continue? [y/N] " answer
-    [[ "$answer" == [yY]* ]] || exit 1
-    sudo mokutil --disable-validation
-    sudo /usr/libexec/tblue-hibernate-setup --ignore-lockdown
-    echo "Done. Reboot and confirm in the blue screen; hibernation works after that."
-
-# Turn shim's verification of Linux back on (no hibernation with Secure Boot)
+# Turn shim's verification of Linux back on (undo for a past "disable validation")
 hypr-secureboot-verify-linux:
     #!/usr/bin/env bash
     set -euo pipefail

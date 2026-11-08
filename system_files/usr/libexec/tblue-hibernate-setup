@@ -69,14 +69,11 @@ main() {
         exit 0
     fi
 
-    # Lockdown (Secure Boot) disables hibernation: no point in a swapfile yet.
-    # Not marked done, so this checks again every boot. --ignore-lockdown
-    # (ujust hypr-hibernate-on-secureboot) sets up ahead of the reboot that
-    # lifts it. (Not /sys/power/state: the nohibernate karg also hides "disk".)
-    if [[ "${1:-}" != --ignore-lockdown ]] &&
-        grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
+    # Lockdown (Secure Boot) disables hibernation: no point in a swapfile.
+    # Not marked done, so this checks again every boot. (Not /sys/power/state:
+    # the nohibernate karg also hides "disk".)
+    if grep -qE '\[(integrity|confidentiality)\]' /sys/kernel/security/lockdown 2>/dev/null; then
         log "Kernel lockdown is active (Secure Boot): hibernation is unavailable."
-        log "To allow it, run: ujust hypr-hibernate-on-secureboot"
         exit 0
     fi
 

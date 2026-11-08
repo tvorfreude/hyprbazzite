@@ -83,16 +83,15 @@ default without one of the steps above.
 
 ## Hibernation and Secure Boot
 
-Hibernation (and suspend-then-hibernate, which closing the lid uses) is set
-up automatically on the first boot of a btrfs install. With Secure Boot on,
-the kernel locks itself down and Linux refuses to hibernate; sleep then
-falls back to plain suspend.
+With Secure Boot on, the kernel locks itself down and Linux refuses to
+hibernate, and this kernel has no signed or encrypted hibernation to replace
+that check. Hibernation is therefore only set up when lockdown is off; with
+Secure Boot on, closing the lid falls back to plain suspend. There is
+deliberately no command to hibernate anyway: it would mean turning off boot
+verification of the kernel.
 
-To hibernate anyway, run `ujust hypr-hibernate-on-secureboot` and reboot. It
-turns off shim's verification of Linux while Secure Boot stays enabled in the
-firmware, so Windows and its anti-cheat still see it on. The trade-off: the
-Linux kernel and modules are no longer verified at boot. The next boot shows
-a blue confirmation screen; the command explains what to press. Undo with
+If you ever ran the old `ujust hypr-hibernate-on-secureboot` (or turned off
+shim validation yourself), turn verification back on with
 `ujust hypr-secureboot-verify-linux`.
 
 ## Update signature verification (maintainer, one-time)
